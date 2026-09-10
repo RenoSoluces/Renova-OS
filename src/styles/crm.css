@@ -1,0 +1,367 @@
+/* ========================= CRM — Pipeline / Kanban ========================= */
+
+.view-toggle {
+  display: inline-flex;
+  background: var(--c-bg-soft);
+  border-radius: var(--r-md);
+  padding: 3px;
+  margin-right: var(--sp-3);
+}
+.view-toggle-btn {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 14px;
+  border-radius: calc(var(--r-md) - 3px);
+  font-size: 13px; font-weight: 600;
+  color: var(--c-text-muted);
+  transition: var(--tr-fast);
+}
+.view-toggle-btn.active {
+  background: var(--c-bg-alt);
+  color: var(--c-primary);
+  box-shadow: var(--sh-sm);
+}
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(230px, 1fr));
+  gap: var(--sp-4);
+  overflow-x: auto;
+  padding-bottom: var(--sp-4);
+  align-items: start;
+}
+
+.kanban-column {
+  background: var(--c-bg-soft);
+  border-radius: var(--r-lg);
+  padding: var(--sp-3);
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  border: 2px solid transparent;
+  transition: var(--tr-fast);
+}
+.kanban-column-over {
+  border-color: var(--c-primary-300);
+  background: var(--c-primary-50);
+}
+
+.kanban-col-header {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 2px;
+}
+.kanban-col-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.kanban-col-title { font-weight: 700; font-size: 13px; color: var(--c-text); flex: 1; }
+.kanban-col-count {
+  font-size: 11px; font-weight: 700;
+  background: var(--c-bg-alt); color: var(--c-text-muted);
+  border-radius: var(--r-pill); padding: 1px 8px;
+}
+.kanban-col-total {
+  font-size: 12px; color: var(--c-text-muted); font-weight: 600;
+  margin: 2px 0 var(--sp-3) 16px;
+}
+
+.kanban-col-body {
+  display: flex; flex-direction: column; gap: var(--sp-2);
+  min-height: 60px;
+}
+.kanban-empty {
+  border: 1.5px dashed var(--c-border-dark);
+  border-radius: var(--r-md);
+  padding: var(--sp-4) var(--sp-2);
+  text-align: center;
+  font-size: 12px;
+  color: var(--c-text-light);
+}
+
+.kanban-card {
+  background: var(--c-bg-alt);
+  border-radius: var(--r-md);
+  padding: var(--sp-3);
+  box-shadow: var(--sh-sm);
+  cursor: grab;
+  transition: var(--tr-fast);
+  border: 1px solid var(--c-border-light);
+}
+.kanban-card:hover { box-shadow: var(--sh-md); transform: translateY(-1px); }
+.kanban-card:active { cursor: grabbing; }
+
+.kanban-card-top { display: flex; align-items: center; gap: 8px; }
+.kanban-card-avatar {
+  width: 24px; height: 24px; border-radius: 50%;
+  background: var(--c-primary-100); color: var(--c-primary-700);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 10px; font-weight: 700; flex-shrink: 0;
+}
+.kanban-card-name { font-size: 13px; font-weight: 700; color: var(--c-text); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.kanban-temp { flex-shrink: 0; }
+.kanban-temp-chaud { color: #D62828; }
+.kanban-temp-froid { color: #3A86C8; }
+.kanban-temp-tiede { color: #E8A317; }
+
+.kanban-card-ville { font-size: 11.5px; color: var(--c-text-muted); margin: 4px 0 0 32px; }
+
+.kanban-card-tags { display: flex; flex-wrap: wrap; gap: 4px; margin: 6px 0 0 32px; }
+.kanban-tag {
+  font-size: 10px; font-weight: 600;
+  background: var(--c-accent-100); color: var(--c-accent-600);
+  border-radius: var(--r-pill); padding: 1px 7px;
+}
+
+.kanban-card-bottom {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-top: var(--sp-2); padding-top: var(--sp-2);
+  border-top: 1px solid var(--c-border-light);
+}
+.kanban-card-montant { font-size: 12.5px; font-weight: 700; color: var(--c-primary-600); }
+.kanban-card-task {
+  display: inline-flex; align-items: center; gap: 3px;
+  font-size: 10.5px; color: var(--c-text-muted); font-weight: 600;
+}
+.kanban-card-task.late { color: var(--c-error); }
+
+/* ========================= CRM — Timeline ========================= */
+
+.timeline-card {
+  background: var(--c-bg-alt);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--c-border-light);
+  box-shadow: var(--sh-sm);
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+.timeline-header { margin-bottom: var(--sp-3); }
+.timeline-title { font-weight: 700; font-size: 14px; color: var(--c-text); }
+
+.timeline-quicklog {
+  display: flex; gap: 8px; margin-bottom: var(--sp-4);
+  flex-wrap: wrap;
+}
+.timeline-type-select {
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  padding: 8px 10px; font-size: 12.5px; background: var(--c-bg-soft);
+  color: var(--c-text); flex-shrink: 0;
+}
+.timeline-input {
+  flex: 1; min-width: 200px;
+  border: 1px solid var(--c-border); border-radius: var(--r-md);
+  padding: 8px 12px; font-size: 13px; background: var(--c-bg-soft);
+}
+.timeline-input:focus, .timeline-type-select:focus { outline: none; border-color: var(--c-border-focus); }
+
+.timeline-list { display: flex; flex-direction: column; gap: 0; max-height: 420px; overflow-y: auto; }
+.timeline-empty { color: var(--c-text-light); font-size: 13px; padding: var(--sp-3) 0; }
+
+.timeline-item { display: flex; gap: 12px; padding: 10px 0; position: relative; }
+.timeline-item:not(:last-child)::before {
+  content: ''; position: absolute; left: 11px; top: 30px; bottom: -10px;
+  width: 1.5px; background: var(--c-border-light);
+}
+.timeline-dot {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; z-index: 1;
+}
+.timeline-body { flex: 1; padding-top: 1px; }
+.timeline-text { font-size: 13px; color: var(--c-text); line-height: 1.4; }
+.timeline-meta { font-size: 11px; color: var(--c-text-light); margin-top: 2px; }
+.timeline-sep { margin: 0 5px; }
+
+/* ========================= CRM — Tasks ========================= */
+
+.tasks-panel {
+  background: var(--c-bg-alt);
+  border-radius: var(--r-lg);
+  border: 1px solid var(--c-border-light);
+  box-shadow: var(--sh-sm);
+  padding: var(--sp-5);
+  margin-bottom: var(--sp-5);
+}
+.tasks-panel-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: var(--sp-3); }
+.tasks-panel-title { font-weight: 700; font-size: 14px; color: var(--c-text); display: flex; align-items: center; gap: 8px; }
+.tasks-count-badge {
+  background: var(--c-primary-100); color: var(--c-primary-700);
+  font-size: 11px; font-weight: 700; border-radius: var(--r-pill); padding: 1px 8px;
+}
+
+.tasks-list { display: flex; flex-direction: column; gap: 6px; }
+.task-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 9px 10px; border-radius: var(--r-md);
+  background: var(--c-bg-soft);
+}
+.task-row.task-late { background: #FDEDED; }
+.task-row.task-done { opacity: .5; }
+.task-row.task-done .task-titre { text-decoration: line-through; }
+
+.task-check {
+  width: 18px; height: 18px; border-radius: 50%;
+  border: 1.5px solid var(--c-border-dark);
+  display: flex; align-items: center; justify-content: center;
+  flex-shrink: 0; margin-top: 1px; color: #fff; background: var(--c-bg-alt);
+}
+.task-row:not(.task-done) .task-check:hover { border-color: var(--c-success); }
+.task-done .task-check { background: var(--c-success); border-color: var(--c-success); }
+.task-check-empty { width: 100%; height: 100%; }
+
+.task-body { flex: 1; }
+.task-titre { font-size: 13px; font-weight: 600; color: var(--c-text); }
+.task-meta { font-size: 11px; color: var(--c-text-muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; }
+.task-prio-dot { width: 6px; height: 6px; border-radius: 50%; display: inline-block; margin-right: 2px; }
+.task-late .task-meta { color: var(--c-error); font-weight: 600; }
+
+.task-delete { color: var(--c-text-light); padding: 2px; flex-shrink: 0; }
+.task-delete:hover { color: var(--c-error); }
+
+.tasks-toggle-done {
+  margin-top: var(--sp-3); font-size: 12px; color: var(--c-text-muted);
+  text-decoration: underline; text-underline-offset: 2px;
+}
+
+/* Dashboard "today tasks" widget */
+.today-tasks-list { display: flex; flex-direction: column; }
+.today-task-row {
+  display: flex; align-items: flex-start; gap: 10px;
+  padding: 10px 16px; border-bottom: 1px solid var(--c-border-light);
+}
+.today-task-row:last-child { border-bottom: none; }
+.today-task-row.late .today-task-titre { color: var(--c-error); }
+.today-task-body { flex: 1; }
+.today-task-titre { font-size: 13px; font-weight: 600; color: var(--c-text); }
+.today-task-prospect { font-weight: 400; color: var(--c-text-muted); }
+.today-task-meta { font-size: 11px; color: var(--c-text-muted); margin-top: 3px; display: flex; align-items: center; gap: 4px; }
+
+/* ========================= CRM — Prospect quick-edit ========================= */
+
+.pipeline-inline-input {
+  width: 100%; border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  padding: 7px 10px; font-size: 13px; background: var(--c-bg-soft); color: var(--c-text);
+  margin-top: 4px;
+}
+.pipeline-inline-input:focus { outline: none; border-color: var(--c-border-focus); }
+
+.temp-toggle-row { display: flex; gap: 6px; margin-top: 6px; }
+.temp-toggle-btn {
+  display: flex; align-items: center; gap: 4px;
+  padding: 6px 10px; border-radius: var(--r-pill);
+  border: 1.5px solid var(--c-border); font-size: 11.5px; font-weight: 600;
+  color: var(--c-text-muted); background: var(--c-bg-alt);
+  transition: var(--tr-fast);
+}
+.temp-toggle-btn.active { border-color: transparent; }
+
+.tag-input-row { display: flex; gap: 6px; margin-top: 6px; }
+.tag-input-row .pipeline-inline-input { margin-top: 0; }
+.tag-add-btn {
+  background: var(--c-primary-100); color: var(--c-primary-700);
+  border-radius: var(--r-sm); padding: 0 10px; flex-shrink: 0;
+}
+
+.prospect-status-select {
+  appearance: none; border: none; cursor: pointer;
+  font: inherit; font-weight: inherit;
+}
+
+.prospect-tag-chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  background: var(--c-accent-100); color: var(--c-accent-600);
+  font-size: 11px; font-weight: 600;
+  border-radius: var(--r-pill); padding: 3px 9px;
+}
+.prospect-tag-chip svg { cursor: pointer; opacity: .6; }
+.prospect-tag-chip svg:hover { opacity: 1; }
+
+.right-consulter-item {
+  display: flex; align-items: center; gap: 10px;
+}
+.right-consulter-count {
+  margin-left: auto;
+  font-size: 11px; font-weight: 700;
+  background: var(--c-bg-soft); color: var(--c-text-muted);
+  border-radius: var(--r-pill); padding: 1px 8px;
+}
+
+/* ========================= Auth / Login ========================= */
+
+.login-page {
+  min-height: 100vh;
+  display: flex; align-items: center; justify-content: center;
+  background: linear-gradient(160deg, var(--c-primary-700) 0%, var(--c-primary-900, #14261d) 100%);
+  padding: var(--sp-5);
+}
+
+.login-card {
+  width: 100%; max-width: 400px;
+  background: var(--c-bg-alt);
+  border-radius: var(--r-xl, 16px);
+  box-shadow: 0 20px 60px rgba(0,0,0,.25);
+  padding: var(--sp-7, 40px) var(--sp-6, 32px);
+}
+
+.login-brand { display: flex; align-items: center; gap: 10px; margin-bottom: var(--sp-6); }
+.login-brand-logo {
+  width: 34px; height: 34px; border-radius: var(--r-md);
+  background: var(--c-primary); color: #fff;
+  display: flex; align-items: center; justify-content: center;
+}
+.login-brand-name { font-weight: 800; font-size: 17px; color: var(--c-text); }
+
+.login-title { font-size: 22px; font-weight: 800; color: var(--c-text); margin-bottom: 6px; }
+.login-subtitle { font-size: 13.5px; color: var(--c-text-muted); margin-bottom: var(--sp-6); line-height: 1.5; }
+
+.login-form { display: flex; flex-direction: column; gap: 12px; }
+.login-field {
+  display: flex; align-items: center; gap: 10px;
+  border: 1.5px solid var(--c-border); border-radius: var(--r-md);
+  padding: 11px 14px; color: var(--c-text-muted);
+  transition: var(--tr-fast);
+}
+.login-field:focus-within { border-color: var(--c-primary); color: var(--c-primary); }
+.login-field input { flex: 1; border: none; background: none; font-size: 14px; color: var(--c-text); }
+.login-field input:focus { outline: none; }
+
+.login-error {
+  background: #FDEDED; color: var(--c-error);
+  font-size: 12.5px; padding: 10px 12px; border-radius: var(--r-sm);
+}
+.login-info {
+  background: var(--c-primary-50, #EAF4EE); color: var(--c-primary-700);
+  font-size: 12.5px; padding: 10px 12px; border-radius: var(--r-sm); line-height: 1.5;
+}
+
+.login-submit { width: 100%; justify-content: center; margin-top: 4px; padding: 12px; }
+.login-submit .spin { animation: spin 0.8s linear infinite; }
+@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+.login-switch {
+  text-align: center; margin-top: var(--sp-5);
+  font-size: 13px; color: var(--c-text-muted);
+}
+.login-switch button { color: var(--c-primary); font-weight: 700; margin-left: 4px; }
+
+.spin { animation: spin 0.8s linear infinite; }
+
+.topbar-user-menu { position: relative; }
+.topbar-menu-backdrop { position: fixed; inset: 0; z-index: 40; }
+.topbar-menu {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 41;
+  background: var(--c-bg-alt); border: 1px solid var(--c-border-light);
+  border-radius: var(--r-md); box-shadow: var(--sh-lg, 0 12px 32px rgba(0,0,0,.15));
+  padding: var(--sp-3); min-width: 200px;
+}
+.topbar-menu-name { font-weight: 700; font-size: 13.5px; color: var(--c-text); }
+.topbar-menu-email { font-size: 11.5px; color: var(--c-text-muted); margin-bottom: 10px; }
+.topbar-menu-item {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  padding: 8px 10px; border-radius: var(--r-sm); font-size: 13px;
+  color: var(--c-error); font-weight: 600;
+}
+.topbar-menu-item:hover { background: #FDEDED; }
+
+.btn-icon-sm {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 28px; height: 28px; border-radius: var(--r-sm);
+  color: var(--c-text-muted); transition: var(--tr-fast);
+}
+.btn-icon-sm:hover { background: var(--c-bg-soft); color: var(--c-text); }
+
