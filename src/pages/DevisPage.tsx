@@ -45,9 +45,13 @@ interface DevisPageProps {
   openDevisId?: string | null
   /** Appelé une fois le devis demandé ouvert, pour que le parent nettoie son état */
   onOpenedDevis?: () => void
+  /** Prospect à préremplir en arrivant (depuis la fiche prospect, action "Continuer"). */
+  initialProspectId?: string | null
+  /** Appelé une fois le prospect initial pris en compte, pour que le parent nettoie son état. */
+  onInitialProspectHandled?: () => void
 }
 
-export function DevisPage({ openDevisId, onOpenedDevis }: DevisPageProps = {}) {
+export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onInitialProspectHandled }: DevisPageProps = {}) {
   const { profile } = useAuth()
   const [view, setView] = useState<'list' | 'editor'>('list')
   const [rows, setRows] = useState<(Devis & { prospect?: Prospect })[]>([])
@@ -104,6 +108,16 @@ export function DevisPage({ openDevisId, onOpenedDevis }: DevisPageProps = {}) {
       })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openDevisId])
+
+  // Arrivée depuis la fiche d'un prospect ("Continuer" -> générer une proposition commerciale) :
+  // on ouvre directement le formulaire de nouveau devis avec le prospect préselectionné.
+  useEffect(() => {
+    if (!initialProspectId) return
+    setNewProspectId(initialProspectId)
+    setShowNewModal(true)
+    onInitialProspectHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProspectId])
 
   async function creerDevis() {
     if (!newProspectId) return

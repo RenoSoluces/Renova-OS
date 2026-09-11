@@ -43,12 +43,25 @@ export default function App() {
   // Devis créé depuis les recommandations de travaux d'une visite technique : on bascule
   // sur la page Devis et on lui indique lequel ouvrir directement.
   const [pendingDevisId, setPendingDevisId] = useState<string | null>(null)
+  // "Continuer" depuis la fiche d'un prospect : redirige vers la VT / le devis / le dossier
+  // à créer pour ce prospect, en préremplissant directement le bon formulaire.
+  const [pendingVisiteProspectId, setPendingVisiteProspectId] = useState<string | null>(null)
+  const [pendingDevisProspectId, setPendingDevisProspectId] = useState<string | null>(null)
+  const [pendingDossierProspectId, setPendingDossierProspectId] = useState<string | null>(null)
   const [notifRefresh, setNotifRefresh] = useState(0)
 
   const navigate = useCallback((p: PageKey) => setPage(p), [])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
     setPage('devis')
+  }, [])
+  const continuerCycleProspect = useCallback((target: 'visite' | 'simulation' | 'devis' | 'dossier', prospect: { id: string }) => {
+    if (target === 'visite') setPendingVisiteProspectId(prospect.id)
+    if (target === 'devis') setPendingDevisProspectId(prospect.id)
+    if (target === 'dossier') setPendingDossierProspectId(prospect.id)
+    // Les simulations 3CL sont produites depuis l'assistant de visite technique (pas de création
+    // autonome) : on ouvre simplement la liste, qui affichera celle déjà liée au prospect.
+    setPage(target === 'visite' ? 'visites' : target === 'devis' ? 'devis' : target === 'dossier' ? 'dossiers' : 'simulations')
   }, [])
 
   // Vérifie les devis sans réponse et les tâches en retard à chaque ouverture de
@@ -78,7 +91,12 @@ export default function App() {
     return (
       <div className="app-layout">
         <Sidebar current={page} onNavigate={navigate} collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} tasksBadge={tasksBadge} />
-        <VisitesPage onBack={() => navigate('dashboard')} onCreateDevis={goToDevis} />
+        <VisitesPage
+          onBack={() => navigate('dashboard')}
+          onCreateDevis={goToDevis}
+          initialProspectId={pendingVisiteProspectId}
+          onInitialProspectHandled={() => setPendingVisiteProspectId(null)}
+        />
       </div>
     )
   }
@@ -90,10 +108,22 @@ export default function App() {
         <Topbar title={pageTitle.title} subtitle={pageTitle.subtitle} onNavigate={navigate} refreshKey={notifRefresh} />
         <div className="page-scroll">
           {page === 'dashboard' && <DashboardPage onNavigate={navigate} />}
-          {page === 'prospects' && <ProspectsPage />}
+          {page === 'prospects' && <ProspectsPage onContinueLifecycle={continuerCycleProspect} />}
           {page === 'simulations' && <SimulationsPage onNavigateToDevis={goToDevis} />}
-          {page === 'dossiers' && <DossiersPage />}
-          {page === 'devis' && <DevisPage openDevisId={pendingDevisId} onOpenedDevis={() => setPendingDevisId(null)} />}
+          {page === 'dossiers' && (
+            <DossiersPage
+              initialProspectId={pendingDossierProspectId}
+              onInitialProspectHandled={() => setPendingDossierProspectId(null)}
+            />
+          )}
+          {page === 'devis' && (
+            <DevisPage
+              openDevisId={pendingDevisId}
+              onOpenedDevis={() => setPendingDevisId(null)}
+              initialProspectId={pendingDevisProspectId}
+              onInitialProspectHandled={() => setPendingDevisProspectId(null)}
+            />
+          )}
           {page === 'catalogue' && <CataloguePage />}
           {page === 'planning' && <PlanningPage />}
           {page === 'documents' && <DocumentsPage />}

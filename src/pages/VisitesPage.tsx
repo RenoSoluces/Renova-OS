@@ -36,9 +36,13 @@ import type { DispositifAide } from '../types'
 interface Props {
   onBack: () => void
   onCreateDevis?: (devisId: string) => void
+  /** Prospect à préremplir en arrivant (depuis la fiche prospect, action "Continuer"). */
+  initialProspectId?: string | null
+  /** Appelé une fois le prospect initial pris en compte, pour que le parent nettoie son état. */
+  onInitialProspectHandled?: () => void
 }
 
-export function VisitesPage({ onBack, onCreateDevis }: Props) {
+export function VisitesPage({ onBack, onCreateDevis, initialProspectId, onInitialProspectHandled }: Props) {
   const [view, setView] = useState<'list' | 'wizard' | 'overview'>('list')
   const [visites, setVisites] = useState<Visite[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -432,6 +436,25 @@ export function VisitesPage({ onBack, onCreateDevis }: Props) {
       fetchVisites()
     }
   }, [newProspectId, newDate, newTypeVisite, newProduitCible, startVisite, fetchVisites])
+
+  // Arrivée depuis la fiche d'un prospect (bouton "Continuer" / "Nouvelle visite") : on reprend
+  // directement une VT déjà en cours pour ce prospect, sinon on ouvre le formulaire de création
+  // avec le prospect préselectionné.
+  useEffect(() => {
+    if (!initialProspectId || loading) return
+    const visiteEnCours = visites.find(v => v.prospect_id === initialProspectId && v.statut !== 'terminee')
+    if (visiteEnCours) {
+      startVisite(visiteEnCours)
+    } else {
+      setNewProspectId(initialProspectId)
+      setNewDate(new Date().toISOString().split('T')[0])
+      setNewTypeVisite('complete')
+      setNewProduitCible('')
+      setShowNewModal(true)
+    }
+    onInitialProspectHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProspectId, loading, visites, startVisite])
 
   // ===== LIST VIEW =====
   if (view === 'list') {

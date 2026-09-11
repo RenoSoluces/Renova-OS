@@ -20,6 +20,8 @@ import { useAuth } from '../lib/auth/AuthContext'
 
 interface Props {
   onProspectClick?: (p: Prospect) => void
+  /** Redirige vers la page adaptée à la prochaine étape du cycle de vie du prospect (VT, devis, dossier). */
+  onContinueLifecycle?: (target: 'visite' | 'simulation' | 'devis' | 'dossier', prospect: Prospect) => void
 }
 
 const CIVILITES = [
@@ -129,7 +131,7 @@ const EMPTY_FORM = {
   source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
 
-export function ProspectsPage({ onProspectClick }: Props) {
+export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   const { profile } = useAuth()
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
@@ -436,6 +438,15 @@ export function ProspectsPage({ onProspectClick }: Props) {
       { TresModeste: 'Très modeste', Modeste: 'Modeste', Intermediaire: 'Intermédiaire', Aisee: 'Aisée' } as Record<string, string>
     )[e.categorie_mpr] || e.categorie_mpr : null
 
+    // Cible de la prochaine étape du cycle de vie (Visite technique -> Simulation -> Devis -> Dossier).
+    const nextActionTarget: 'visite' | 'simulation' | 'devis' | 'dossier' | null =
+      currentStep <= 2 ? 'visite' : currentStep === 3 ? 'devis' : currentStep === 4 ? 'dossier' : null
+
+    function goToNextAction() {
+      if (!nextActionTarget) return
+      onContinueLifecycle?.(nextActionTarget, selected!)
+    }
+
     return (
       <div className="page-scroll">
         <div className="prospect-detail-wrap">
@@ -470,7 +481,10 @@ export function ProspectsPage({ onProspectClick }: Props) {
           </p>
 
           <div className="prospect-detail-actions">
-            <Button variant="primary" onClick={() => onProspectClick?.(selected)}>
+            <Button
+              variant="primary"
+              onClick={() => (onContinueLifecycle ? onContinueLifecycle('visite', selected) : onProspectClick?.(selected))}
+            >
               <Calendar size={16} /> Nouvelle visite
             </Button>
             {selected.telephone && (
@@ -497,7 +511,7 @@ export function ProspectsPage({ onProspectClick }: Props) {
                 {currentStep === 3 && 'Générer une proposition commerciale avec le détail des aides.'}
                 {currentStep === 4 && 'Finaliser le dossier et planiser le démarrage des travaux.'}
               </span>
-              <span className="action-rec-cta">
+              <span className="action-rec-cta" onClick={goToNextAction} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
                 Continuer <ArrowRight size={14} />
               </span>
             </div>
@@ -816,19 +830,19 @@ export function ProspectsPage({ onProspectClick }: Props) {
 
               <div className="right-mini-card">
                 <div className="right-mini-label">À consulter</div>
-                <div className="right-consulter-item" onClick={() => onProspectClick?.(selected)}>
+                <div className="right-consulter-item" onClick={() => onContinueLifecycle?.('visite', selected)}>
                   <FileText size={16} /> Visite technique
                   <span className="right-consulter-count">{linkedCounts ? linkedCounts.visites : '…'}</span>
                 </div>
-                <div className="right-consulter-item">
+                <div className="right-consulter-item" onClick={() => onContinueLifecycle?.('simulation', selected)}>
                   <Zap size={16} /> Simulation 3CL
                   <span className="right-consulter-count">{linkedCounts ? linkedCounts.simulations : '…'}</span>
                 </div>
-                <div className="right-consulter-item">
+                <div className="right-consulter-item" onClick={() => onContinueLifecycle?.('devis', selected)}>
                   <FileText size={16} /> Proposition commerciale
                   <span className="right-consulter-count">{linkedCounts ? linkedCounts.devis : '…'}</span>
                 </div>
-                <div className="right-consulter-item">
+                <div className="right-consulter-item" onClick={() => onContinueLifecycle?.('dossier', selected)}>
                   <Home size={16} /> Dossier de travaux
                   <span className="right-consulter-count">{linkedCounts ? linkedCounts.dossiers : '…'}</span>
                 </div>

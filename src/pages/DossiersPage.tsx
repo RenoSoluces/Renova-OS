@@ -23,7 +23,14 @@ const STATUTS_DOSSIER = [
   { value: 'refuse', label: 'Refusé' },
 ]
 
-export function DossiersPage() {
+interface DossiersPageProps {
+  /** Prospect à préremplir en arrivant (depuis la fiche prospect, action "Continuer"). */
+  initialProspectId?: string | null
+  /** Appelé une fois le prospect initial pris en compte, pour que le parent nettoie son état. */
+  onInitialProspectHandled?: () => void
+}
+
+export function DossiersPage({ initialProspectId, onInitialProspectHandled }: DossiersPageProps = {}) {
   const [rows, setRows] = useState<(Dossier & { prospect?: Prospect })[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
@@ -65,6 +72,16 @@ export function DossiersPage() {
     supabase.from('devis').select('*').eq('prospect_id', newProspectId).order('created_at', { ascending: false })
       .then(({ data }) => setDevisDuProspect((data || []) as Devis[]))
   }, [newProspectId])
+
+  // Arrivée depuis la fiche d'un prospect ("Continuer" -> finaliser le dossier) : on ouvre
+  // directement le formulaire de nouveau dossier avec le prospect préselectionné.
+  useEffect(() => {
+    if (!initialProspectId) return
+    setNewProspectId(initialProspectId)
+    setNewModalOpen(true)
+    onInitialProspectHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProspectId])
 
   async function creerDossier() {
     if (!newProspectId) return
