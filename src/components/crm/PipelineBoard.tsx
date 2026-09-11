@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react'
 import { Flame, Snowflake, Minus, Clock } from 'lucide-react'
 import type { Prospect, CrmTask } from '../../types'
-import { PIPELINE_STAGES, stageOf, euro, formatDueDate, isOverdue } from '../../lib/crm/constants'
+import { PIPELINE_STAGES, stageOf, euro, formatDueDate, isOverdue, isProspectTerminal } from '../../lib/crm/constants'
 
 interface Props {
   prospects: Prospect[]
@@ -22,7 +22,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
 
   const columns = useMemo(() => {
     return PIPELINE_STAGES.map(stage => {
-      const items = prospects.filter(p => stageOf(p.statut).value === stage.value)
+      const items = prospects.filter(p => !isProspectTerminal(p.statut) && stageOf(p.statut).value === stage.value)
       const total = items.reduce((s, p) => s + (Number(p.montant_potentiel) || 0), 0)
       return { stage, items, total }
     })

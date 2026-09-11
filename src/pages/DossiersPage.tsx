@@ -10,6 +10,7 @@ import { uploadDocument } from '../lib/storage/uploadDocument'
 const STATUT_BADGE: Record<string, string> = {
   en_cours: 'badge-info', cours: 'badge-info', creation: 'badge-info',
   signe: 'badge-success', accepte: 'badge-success',
+  installation: 'badge-info', installe: 'badge-success',
   refuse: 'badge-error', annule: 'badge-error',
   attente: 'badge-warning', en_attente: 'badge-warning',
 }
@@ -20,6 +21,8 @@ const STATUTS_DOSSIER = [
   { value: 'attente', label: "En attente de pièces" },
   { value: 'signe', label: 'Signé' },
   { value: 'accepte', label: 'Accepté (aides validées)' },
+  { value: 'installation', label: 'Installation' },
+  { value: 'installe', label: 'Installé' },
   { value: 'refuse', label: 'Refusé' },
 ]
 
@@ -101,6 +104,9 @@ export function DossiersPage({ initialProspectId, onInitialProspectHandled }: Do
     if (!error && data) {
       if (devisChoisi) {
         await supabase.from('devis').update({ dossier_id: data.id }).eq('id', devisChoisi.id)
+        if (devisChoisi.statut === 'signe') {
+          await supabase.from('prospects').update({ statut: 'Installation' }).eq('id', newProspectId)
+        }
       }
       await supabase.from('documents').insert([
         { dossier_id: data.id, prospect_id: newProspectId, nom: "Avis d'imposition N-2", type: 'avis_imposition', categorie: 'Administratif', recu: false },
@@ -174,8 +180,25 @@ export function DossiersPage({ initialProspectId, onInitialProspectHandled }: Do
     const { data } = await supabase.from('dossiers').update({ statut: detailStatut }).eq('id', detail.id).select('*, prospect:prospects(*)').single()
     setSavingStatut(false)
     if (data) {
-      setDetail(data as any)
-      setRows(prev => prev.map(r => r.id === detail.id ? (data as any) : r))
+      // Le pipeline commercial suit le cycle réel du dossier :
+      // signé -> installation -> installé (sortie du pipeline).
+      if (detail.prospect_id) {
+        const nextProspectStatut = detailStatut === 'installe'
+          ? 'Installé'
+          : (detailStatut === 'installation' || detailStatut === 'accepte' || detailStatut === 'signe')
+            ? 'Installation'
+            : null
+        if (nextProspectStatut) {
+          await supabase.from('prospects').update({ statut: nextProspectStatut }).eq('id', detail.prospect_id)
+        }
+      }
+      const updated = { ...(data as any) }
+      if (detail.prospect && detail.prospect_id) {
+        const { data: prospect } = await supabase.from('prospects').select('*').eq('id', detail.prospect_id).maybeSingle()
+        if (prospect) updated.prospect = prospect
+      }
+      setDetail(updated)
+      setRows(prev => prev.map(r => r.id === detail.id ? updated : r))
     }
   }
 

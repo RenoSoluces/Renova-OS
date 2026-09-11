@@ -16,6 +16,7 @@ export const PIPELINE_STAGES: PipelineStage[] = [
   { value: 'Visite faite', label: 'Visite faite', color: '#E8A317', description: 'Audit réalisé, en attente de proposition' },
   { value: 'Dossier', label: 'Dossier', color: '#8A6FD4', description: 'Devis envoyé / dossier en cours' },
   { value: 'Signé', label: 'Signé', color: '#2D8659', description: 'Affaire gagnée' },
+  { value: 'Installation', label: 'Installation', color: '#5B8C85', description: 'Travaux planifiés ou en cours' },
 ]
 
 export function normalizeStatut(s: string | null | undefined): string {
@@ -25,6 +26,13 @@ export function normalizeStatut(s: string | null | undefined): string {
     .trim()
     .toLowerCase()
     .replace(/_/g, ' ')
+}
+
+export const TERMINAL_PROSPECT_STATUTS = ['Installé', 'Terminé', 'Archive', 'Archivé']
+
+export function isProspectTerminal(statut: string | null | undefined): boolean {
+  const n = normalizeStatut(statut)
+  return ['installe', 'termine', 'archive', 'archivee'].includes(n)
 }
 
 export function stageOf(statut: string | null | undefined): PipelineStage {

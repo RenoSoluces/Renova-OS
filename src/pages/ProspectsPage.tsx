@@ -37,6 +37,8 @@ const STATUTS = [
   { value: 'Visite faite', label: 'Visite faite' },
   { value: 'Dossier', label: 'Dossier' },
   { value: 'Signé', label: 'Signé' },
+  { value: 'Installation', label: 'Installation' },
+  { value: 'Installé', label: 'Installé' },
 ]
 
 const STATUTS_OCC = [
@@ -86,6 +88,7 @@ function statutToStep(statut: string): number {
 
 function statutClass(statut: string): string {
   const s = statut?.toLowerCase() || 'nouveau'
+  if (s.includes('install')) return 'prospect-status-visite'
   if (s.includes('signé') || s.includes('signe')) return 'prospect-status-signe'
   if (s.includes('qualif')) return 'prospect-status-qualifie'
   if (s.includes('visite')) return 'prospect-status-visite'

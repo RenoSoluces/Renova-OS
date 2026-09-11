@@ -29,42 +29,9 @@ export function Section01Identification({ data, prospect, onChange, currentEtape
     notes: '', photos: [],
   }
 
-  const [query, setQuery] = useState('')
-  const [suggestions, setSuggestions] = useState<any[]>([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
-
   const update = useCallback((patch: Partial<IdentificationData>) => {
     onChange({ ...d, ...patch })
   }, [d, onChange])
-
-  const search = useCallback((q: string) => {
-    setQuery(q)
-    if (q.length < 3) {
-      setSuggestions([])
-      setShowSuggestions(false)
-      return
-    }
-    fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=5`)
-      .then(r => r.json())
-      .then(data => {
-        setSuggestions(data.features || [])
-        setShowSuggestions(true)
-      })
-      .catch(() => setSuggestions([]))
-  }, [])
-
-  const selectAddr = useCallback((feat: any) => {
-    const props = feat.properties
-    update({
-      adresse: props.name,
-      code_postal: props.postcode,
-      ville: props.city,
-      latitude: feat.geometry.coordinates[1],
-      longitude: feat.geometry.coordinates[0],
-    })
-    setQuery(`${props.name}, ${props.postcode} ${props.city}`)
-    setShowSuggestions(false)
-  }, [update])
 
   // Étape 0: Le client
   if (currentEtape === 0) {
@@ -121,6 +88,32 @@ export function Section01Identification({ data, prospect, onChange, currentEtape
 
   // Étape 1: Adresse (BAN autocomplete)
   if (currentEtape === 1) {
+    const [query, setQuery] = useState('')
+    const [suggestions, setSuggestions] = useState<any[]>([])
+    const [showSuggestions, setShowSuggestions] = useState(false)
+
+    const search = useCallback((q: string) => {
+      setQuery(q)
+      if (q.length < 3) { setSuggestions([]); return }
+      fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(q)}&limit=5`)
+        .then(r => r.json())
+        .then(data => { setSuggestions(data.features || []); setShowSuggestions(true) })
+        .catch(() => setSuggestions([]))
+    }, [])
+
+    const selectAddr = (feat: any) => {
+      const props = feat.properties
+      update({
+        adresse: props.name,
+        code_postal: props.postcode,
+        ville: props.city,
+        latitude: feat.geometry.coordinates[1],
+        longitude: feat.geometry.coordinates[0],
+      })
+      setQuery(`${props.name}, ${props.postcode} ${props.city}`)
+      setShowSuggestions(false)
+    }
+
     return (
       <div>
         <div className="audit-step-card">

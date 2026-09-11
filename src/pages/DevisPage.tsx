@@ -429,6 +429,8 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
 
       if (dossier) {
         await supabase.from('devis').update({ dossier_id: dossier.id }).eq('id', current.id)
+        // Le devis signé ouvre le cycle travaux : le prospect passe en Installation.
+        await supabase.from('prospects').update({ statut: 'Installation', derniere_interaction_at: dateSignature }).eq('id', current.prospect_id)
         // Checklist des pièces administratives usuelles à recueillir pour instruire le dossier
         await supabase.from('documents').insert([
           { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Devis signé', type: 'devis_signe', categorie: 'Contractuel', recu: true },
@@ -437,6 +439,10 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
           { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Photos avant travaux', type: 'photos', categorie: 'Technique', recu: false },
         ])
       }
+    }
+
+    if (!error && current.prospect_id && current.dossier_id) {
+      await supabase.from('prospects').update({ statut: 'Installation', derniere_interaction_at: dateSignature }).eq('id', current.prospect_id)
     }
 
     setSigning(false)

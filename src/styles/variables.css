@@ -21,13 +21,13 @@
   --c-info:#3A86C8;
 
   /* Neutrals */
-  --c-bg:#F6F8F7;
+  --c-bg:#F5F4EF;
   --c-bg-alt:#FFFFFF;
-  --c-bg-soft:#F0F4F2;
+  --c-bg-soft:#EFEDE6;
   --c-bg-dark:#1A1A1A;
-  --c-sidebar-bg:#0E2940;
-  --c-sidebar-bg-2:#12324A;
-  --c-sidebar-text:#D9E8E1;
+  --c-sidebar-bg:#1B4332;
+  --c-sidebar-bg-2:#14332A;
+  --c-sidebar-text:#D8F3DC;
   --c-sidebar-active:#52B788;
 
   --c-text:#1A1A1A;

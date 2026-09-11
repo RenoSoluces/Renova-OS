@@ -661,18 +661,3 @@
 .address-suggestion:last-child{border-bottom:none}
 .address-suggestion .label{font-weight:500}
 .address-suggestion .context{font-size:11px;color:var(--c-text-muted);margin-top:2px}
-
-/* Création d'une visite — retour d'erreur explicite */
-.visite-create-error{
-  display:flex;
-  align-items:flex-start;
-  gap:9px;
-  padding:11px 13px;
-  border:1px solid #fecaca;
-  border-radius:9px;
-  background:#fff7f7;
-  color:#b42318;
-  font-size:12px;
-  line-height:1.45;
-}
-.visite-create-error svg{flex-shrink:0;margin-top:1px}

@@ -4,6 +4,9 @@ import {
   Package, FileSignature, History, Wallet,
 } from 'lucide-react'
 import type { PageKey } from '../types'
+import { useAuth } from '../lib/auth/AuthContext'
+import { supabase } from '../lib/supabase'
+import { useEffect, useState } from 'react'
 
 interface SidebarProps {
   current: PageKey
@@ -11,14 +14,15 @@ interface SidebarProps {
   collapsed: boolean
   onToggleCollapse: () => void
   tasksBadge?: number
+  prospectsBadge?: number
 }
 
-const NAV_GROUPS: (tasksBadge?: number) => { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = (tasksBadge) => [
+const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = (prospectCount) => [
   {
     label: 'Pilotage',
     items: [
       { key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-      { key: 'prospects', label: 'Prospects', icon: Users, badge: tasksBadge },
+      { key: 'prospects', label: 'Prospects', icon: Users, badge: prospectCount },
       { key: 'visites', label: 'Visites techniques', icon: ClipboardCheck },
       { key: 'activite', label: 'Historique & activité', icon: History },
     ],
@@ -43,7 +47,21 @@ const NAV_GROUPS: (tasksBadge?: number) => { label: string; items: { key: PageKe
   },
 ]
 
-export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge }: SidebarProps) {
+export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge, prospectsBadge }: SidebarProps) {
+  const { profile } = useAuth()
+  const [prospectCount, setProspectCount] = useState(prospectsBadge ?? 0)
+
+  useEffect(() => {
+    let cancelled = false
+    supabase.from('prospects').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      if (!cancelled) setProspectCount(count || 0)
+    })
+    return () => { cancelled = true }
+  }, [prospectsBadge, profile?.id, profile?.role])
+
+  const nom = profile?.nom_complet?.trim() || profile?.email || 'Utilisateur'
+  const initials = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U'
+  const roleLabel = profile?.role === 'admin' ? 'Administrateur' : profile?.role === 'manager' ? 'Direction' : 'Commercial'
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-brand">
@@ -68,7 +86,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
       </button>
 
       <nav className="sidebar-nav">
-        {NAV_GROUPS(tasksBadge).map(group => (
+        {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
             {group.items.map(item => {
@@ -92,11 +110,11 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
 
       <div className="sidebar-footer">
         <div className="sidebar-user">
-          <div className="sidebar-user-avatar">CL</div>
+          <div className="sidebar-user-avatar">{initials}</div>
           {!collapsed && (
             <div className="sidebar-user-info">
-              <b>Cédric Lopez</b>
-              <span>Conseiller RGE</span>
+              <b>{nom}</b>
+              <span>{roleLabel}</span>
             </div>
           )}
         </div>
