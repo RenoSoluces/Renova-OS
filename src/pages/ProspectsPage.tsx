@@ -114,7 +114,14 @@ function formatDate(iso: string): string {
   return d.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short', year: 'numeric' })
 }
 
+const TYPES_PROSPECT = [
+  { value: 'particulier', label: 'Particulier' },
+  { value: 'professionnel', label: 'Professionnel (entreprise, copropriété…)' },
+]
+
 const EMPTY_FORM = {
+  type_prospect: 'particulier' as 'particulier' | 'professionnel',
+  raison_sociale: '', siret: '',
   civilite: 'M.', nom: '', prenom: '', telephone: '', email: '',
   adresse_rue: '', adresse_complement: '', code_postal: '', ville: '',
   statut_occupation: 'propriétaire_occupant', nombre_personnes_foyer: 1,
@@ -298,9 +305,12 @@ export function ProspectsPage({ onProspectClick }: Props) {
   }, [])
 
   async function saveProspect() {
-    if (!form.nom || !form.prenom) return
+    if (form.type_prospect === 'professionnel' ? !form.raison_sociale : !(form.nom && form.prenom)) return
     setSaving(true)
     const payload: any = {
+      type_prospect: form.type_prospect,
+      raison_sociale: form.type_prospect === 'professionnel' ? (form.raison_sociale || null) : null,
+      siret: form.type_prospect === 'professionnel' ? (form.siret || null) : null,
       civilite: form.civilite,
       prenom: form.prenom,
       nom: form.nom,
@@ -334,6 +344,8 @@ export function ProspectsPage({ onProspectClick }: Props) {
   function openEdit(p: Prospect) {
     const e = extended(p)
     setEditForm({
+      type_prospect: (e.type_prospect as 'particulier' | 'professionnel') || 'particulier',
+      raison_sociale: e.raison_sociale || '', siret: e.siret || '',
       civilite: e.civilite || 'M.',
       nom: p.nom || '', prenom: p.prenom || '',
       telephone: p.telephone || '', email: p.email || '',
@@ -359,6 +371,9 @@ export function ProspectsPage({ onProspectClick }: Props) {
     const ileDeFranceEdit = estIleDeFrance(editForm.code_postal)
     const cat = rfrEditNum > 0 ? determinerCategorieRevenu(rfrEditNum, editForm.nombre_personnes_foyer, ileDeFranceEdit) : null
     const payload: any = {
+      type_prospect: editForm.type_prospect,
+      raison_sociale: editForm.type_prospect === 'professionnel' ? (editForm.raison_sociale || null) : null,
+      siret: editForm.type_prospect === 'professionnel' ? (editForm.siret || null) : null,
       civilite: editForm.civilite,
       prenom: editForm.prenom, nom: editForm.nom,
       telephone: editForm.telephone || null,
@@ -408,7 +423,9 @@ export function ProspectsPage({ onProspectClick }: Props) {
     fetchProspects()
   }
 
-  const stepValid = form.nom && form.prenom && form.adresse_rue
+  const stepValid = form.adresse_rue && (
+    form.type_prospect === 'professionnel' ? !!form.raison_sociale : !!(form.nom && form.prenom)
+  )
 
   // ===== DETAIL VIEW =====
   if (selected) {
@@ -669,20 +686,33 @@ export function ProspectsPage({ onProspectClick }: Props) {
                 <TasksPanel prospectId={selected.id} onChanged={fetchOpenTasks} defaultAssigne={profile?.nom_complet || ''} />
               </div>
 
-              {/* Danger zone */}
-              <div className="danger-zone">
-                <div className="danger-zone-title">
-                  <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                  Zone de danger
+              {/* Danger zone : suppression réservée à l'administration */}
+              {isAdmin ? (
+                <div className="danger-zone">
+                  <div className="danger-zone-title">
+                    <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    Zone de danger
+                  </div>
+                  <div className="danger-zone-desc">
+                    Supprimer ce prospect et toutes les données associées. Cette action est irréversible.
+                  </div>
+                  <button className="btn-danger-zone" onClick={() => setConfirmDelete(selected)}>
+                    <Trash2 size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    Supprimer le prospect
+                  </button>
                 </div>
-                <div className="danger-zone-desc">
-                  Supprimer ce prospect et toutes les données associées. Cette action est irréversible.
+              ) : (
+                <div className="danger-zone">
+                  <div className="danger-zone-title">
+                    <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
+                    Suppression
+                  </div>
+                  <div className="danger-zone-desc">
+                    Seul un administrateur peut supprimer définitivement un prospect. Vous pouvez continuer
+                    à le modifier librement.
+                  </div>
                 </div>
-                <button className="btn-danger-zone" onClick={() => setConfirmDelete(selected)}>
-                  <Trash2 size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />
-                  Supprimer le prospect
-                </button>
-              </div>
+              )}
             </div>
 
             {/* RIGHT — Mini panels */}
@@ -987,10 +1017,14 @@ export function ProspectsPage({ onProspectClick }: Props) {
                     className="prospect-row-avatar"
                     style={{ background: avatarColor(`${p.prenom} ${p.nom}`) }}
                   >
-                    {initials(p.prenom, p.nom)}
+                    {e.type_prospect === 'professionnel' ? <Users size={16} /> : initials(p.prenom, p.nom)}
                   </div>
                   <div className="prospect-row-info">
-                    <div className="prospect-row-name">{e.civilite} {p.prenom} {p.nom}</div>
+                    <div className="prospect-row-name">
+                      {e.type_prospect === 'professionnel'
+                        ? (e.raison_sociale || `${p.prenom} ${p.nom}`)
+                        : `${e.civilite} ${p.prenom} ${p.nom}`}
+                    </div>
                     <div className="prospect-row-sub">
                       <span>{p.ville || '—'}</span>
                       {p.telephone && <span>{p.telephone}</span>}
@@ -1001,6 +1035,7 @@ export function ProspectsPage({ onProspectClick }: Props) {
                     <span className={`prospect-status-tag ${statutClass(e.statut)}`}>
                       {statutLabel(e.statut)}
                     </span>
+                    {e.type_prospect === 'professionnel' && <span className="badge badge-info">Pro</span>}
                     {ceeCount > 0 && <span className="prospect-cee-tag">{ceeCount} CEE</span>}
                     {isAdmin && (
                       <span className="badge badge-neutral">{p.commercial || 'Non attribué'}</span>
@@ -1061,6 +1096,31 @@ export function ProspectsPage({ onProspectClick }: Props) {
           <>
             <div className="pw-heading" style={{ marginBottom: 16 }}>Informations du bénéficiaire</div>
 
+            <div className="grid grid-2 gap-3" style={{ marginBottom: 4 }}>
+              <FloatSelect
+                label="Type de prospect"
+                value={form.type_prospect}
+                onChange={v => set('type_prospect', v as 'particulier' | 'professionnel')}
+                options={TYPES_PROSPECT}
+              />
+              <div />
+            </div>
+
+            {form.type_prospect === 'professionnel' && (
+              <>
+                <div style={{ marginTop: 12, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
+                  Entreprise
+                </div>
+                <div className="grid grid-2 gap-3">
+                  <FloatInput label="Raison sociale" value={form.raison_sociale} onChange={v => set('raison_sociale', v)} placeholder="ex : SCI Les Tilleuls" />
+                  <FloatInput label="SIRET" value={form.siret} onChange={v => set('siret', v)} placeholder="14 chiffres" />
+                </div>
+                <div style={{ marginTop: 12, marginBottom: 4, fontSize: 12, color: 'var(--c-text-muted)' }}>
+                  Coordonnées du contact au sein de l'entreprise :
+                </div>
+              </>
+            )}
+
             <div className="grid grid-2 gap-3">
               <FloatSelect
                 label="Civilité"
@@ -1071,11 +1131,11 @@ export function ProspectsPage({ onProspectClick }: Props) {
               <div />
             </div>
             <div className="grid grid-2 gap-3 mt-4">
-              <FloatInput label="Prénom" value={form.prenom} onChange={v => set('prenom', v)} placeholder="Jean" />
-              <FloatInput label="Nom" value={form.nom} onChange={v => set('nom', v)} placeholder="Dupont" />
+              <FloatInput label={form.type_prospect === 'professionnel' ? 'Prénom du contact' : 'Prénom'} value={form.prenom} onChange={v => set('prenom', v)} placeholder="Jean" />
+              <FloatInput label={form.type_prospect === 'professionnel' ? 'Nom du contact' : 'Nom'} value={form.nom} onChange={v => set('nom', v)} placeholder="Dupont" />
             </div>
 
-            {form.civilite === 'M. et Mme' && (
+            {form.civilite === 'M. et Mme' && form.type_prospect === 'particulier' && (
               <div className="grid grid-2 gap-3 mt-4">
                 <FloatInput label="Prénom du conjoint" value={form.prenom_conjoint} onChange={v => set('prenom_conjoint', v)} />
                 <FloatInput label="Nom du conjoint" value={form.nom_conjoint} onChange={v => set('nom_conjoint', v)} />
@@ -1116,34 +1176,38 @@ export function ProspectsPage({ onProspectClick }: Props) {
               options={STATUTS_OCC}
             />
 
-            <div style={{ marginTop: 24, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
-              Foyer fiscal — MaPrimeRénov'
-            </div>
-
-            <div className="grid grid-2 gap-3">
-              <FloatInput
-                label="Revenu fiscal de référence (€)"
-                type="number"
-                value={form.rfr}
-                onChange={v => set('rfr', v)}
-                placeholder="ex: 28000"
-              />
-              <FloatSelect
-                label="Nombre de personnes au foyer"
-                value={String(form.nombre_personnes_foyer)}
-                onChange={v => set('nombre_personnes_foyer', parseInt(v))}
-                options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: String(n), label: String(n) }))}
-              />
-            </div>
-
-            {categorie && (
-              <div className="foyer-card" style={{ marginTop: 16 }}>
-                <div className="foyer-card-label">Catégorie MaPrimeRénov'</div>
-                <div className="foyer-card-value">{categorie.label}</div>
-                <div className="foyer-card-hint" style={{ fontSize: 12, color: 'var(--c-text-muted)', marginTop: 4 }}>
-                  RFR : {Math.round(rfrNum).toLocaleString('fr-FR')} € · {form.nombre_personnes_foyer} personne(s) · {ileDeFrance ? 'Île-de-France' : 'Hors Île-de-France'}
+            {form.type_prospect === 'particulier' && (
+              <>
+                <div style={{ marginTop: 24, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
+                  Foyer fiscal — MaPrimeRénov'
                 </div>
-              </div>
+
+                <div className="grid grid-2 gap-3">
+                  <FloatInput
+                    label="Revenu fiscal de référence (€)"
+                    type="number"
+                    value={form.rfr}
+                    onChange={v => set('rfr', v)}
+                    placeholder="ex: 28000"
+                  />
+                  <FloatSelect
+                    label="Nombre de personnes au foyer"
+                    value={String(form.nombre_personnes_foyer)}
+                    onChange={v => set('nombre_personnes_foyer', parseInt(v))}
+                    options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: String(n), label: String(n) }))}
+                  />
+                </div>
+
+                {categorie && (
+                  <div className="foyer-card" style={{ marginTop: 16 }}>
+                    <div className="foyer-card-label">Catégorie MaPrimeRénov'</div>
+                    <div className="foyer-card-value">{categorie.label}</div>
+                    <div className="foyer-card-hint" style={{ fontSize: 12, color: 'var(--c-text-muted)', marginTop: 4 }}>
+                      RFR : {Math.round(rfrNum).toLocaleString('fr-FR')} € · {form.nombre_personnes_foyer} personne(s) · {ileDeFrance ? 'Île-de-France' : 'Hors Île-de-France'}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </>
         )}
@@ -1221,14 +1285,20 @@ function EditFormBody({
   return (
     <>
       <div className="grid grid-2 gap-3">
+        <FloatSelect label="Type de prospect" value={form.type_prospect} onChange={v => set('type_prospect', v as 'particulier' | 'professionnel')} options={TYPES_PROSPECT} />
         <FloatSelect label="Civilité" value={form.civilite} onChange={v => set('civilite', v)} options={CIVILITES} />
-        <FloatSelect label="Statut" value={STATUTS.find(s => s.label === form.source)?.value || 'Nouveau'} onChange={() => {}} options={STATUTS} />
       </div>
+      {form.type_prospect === 'professionnel' && (
+        <div className="grid grid-2 gap-3 mt-4">
+          <FloatInput label="Raison sociale" value={form.raison_sociale} onChange={v => set('raison_sociale', v)} />
+          <FloatInput label="SIRET" value={form.siret} onChange={v => set('siret', v)} />
+        </div>
+      )}
       <div className="grid grid-2 gap-3 mt-4">
-        <FloatInput label="Prénom" value={form.prenom} onChange={v => set('prenom', v)} />
-        <FloatInput label="Nom" value={form.nom} onChange={v => set('nom', v)} />
+        <FloatInput label={form.type_prospect === 'professionnel' ? 'Prénom du contact' : 'Prénom'} value={form.prenom} onChange={v => set('prenom', v)} />
+        <FloatInput label={form.type_prospect === 'professionnel' ? 'Nom du contact' : 'Nom'} value={form.nom} onChange={v => set('nom', v)} />
       </div>
-      {form.civilite === 'M. et Mme' && (
+      {form.civilite === 'M. et Mme' && form.type_prospect === 'particulier' && (
         <div className="grid grid-2 gap-3 mt-4">
           <FloatInput label="Prénom du conjoint" value={form.prenom_conjoint} onChange={v => set('prenom_conjoint', v)} />
           <FloatInput label="Nom du conjoint" value={form.nom_conjoint} onChange={v => set('nom_conjoint', v)} />

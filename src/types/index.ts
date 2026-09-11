@@ -1,6 +1,8 @@
 export type PageKey =
   | 'dashboard' | 'prospects' | 'visites' | 'simulations'
-  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'documents' | 'parametres' | 'activite'
+  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'documents' | 'parametres' | 'activite' | 'commissions'
+
+export type TypeProspect = 'particulier' | 'professionnel'
 
 export interface Prospect {
   id: string
@@ -31,6 +33,12 @@ export interface Prospect {
   montant_potentiel: number | null
   temperature: 'chaud' | 'tiede' | 'froid' | null
   derniere_interaction_at: string | null
+  // Prospects professionnels (personne morale) — nom/prenom/email/telephone restent
+  // les coordonnées du contact au sein de l'entreprise.
+  type_prospect: TypeProspect
+  raison_sociale: string | null
+  siret: string | null
+  forme_juridique: string | null
   created_at: string
 }
 
@@ -300,7 +308,45 @@ export interface PlanningEvent {
   adresse: string
   notes: string
   user_id: string | null
+  // Renseignés uniquement pour une VT (type === 'visite') attribuée à un commercial ou
+  // technicien : montant réellement reversé vs. coût/prix côté société. Si absents, le
+  // barème actif de type 'vt' (commission_bareme) s'applique automatiquement.
+  commission_montant_commercial?: number | null
+  commission_montant_societe?: number | null
   created_at?: string
+}
+
+// ── Commissions ──────────────────────────────────────────────────────────────
+export type CommissionType = 'vt' | 'devis_signe' | 'manuel'
+export type CommissionStatut = 'en_attente' | 'validee' | 'payee' | 'annulee'
+
+export interface CommissionBareme {
+  id: string
+  type: CommissionType
+  libelle: string
+  montant_commercial: number
+  montant_societe: number
+  pourcentage_commercial: number | null
+  actif: boolean
+  created_at: string
+  updated_at?: string
+}
+
+export interface Commission {
+  id: string
+  commercial_id: string | null
+  type: CommissionType
+  libelle: string
+  reference_type: string | null
+  reference_id: string | null
+  montant_commercial: number
+  montant_societe: number
+  statut: CommissionStatut
+  date_generation: string
+  date_validation: string | null
+  notes: string | null
+  created_at: string
+  commercial?: { id: string; nom_complet: string; couleur?: string } | null
 }
 
 export interface Document {

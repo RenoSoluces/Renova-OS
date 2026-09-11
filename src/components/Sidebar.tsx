@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History,
+  Package, FileSignature, History, Wallet,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 
@@ -31,6 +31,7 @@ const NAV_GROUPS: (tasksBadge?: number) => { label: string; items: { key: PageKe
       { key: 'dossiers', label: 'Dossiers', icon: FolderOpen },
       { key: 'planning', label: 'Planning', icon: Calendar },
       { key: 'documents', label: 'Documents', icon: FileText },
+      { key: 'commissions', label: 'Commissions', icon: Wallet },
     ],
   },
   {

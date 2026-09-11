@@ -2,10 +2,10 @@ import { useEffect, useMemo, useState, useRef } from 'react'
 import {
   Plus, Users, ClipboardCheck, Calculator, FileText,
   TrendingUp, ArrowRight, Calendar,
-  Wallet, FileSignature, Percent, MapPin, Download, FileSpreadsheet, FileDown,
+  Wallet, FileSignature, Percent, MapPin, Download, FileSpreadsheet, FileDown, Clock,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import type { Prospect, Visite, PageKey, Interaction, Devis, Simulation, PlanningEvent, Entreprise } from '../types'
+import type { Prospect, Visite, PageKey, Interaction, Devis, Simulation, PlanningEvent, Entreprise, Commission } from '../types'
 import { PIPELINE_STAGES, stageOf, euro, timeAgo } from '../lib/crm/constants'
 import { dpeColor } from '../lib/3cl/moteur3CL'
 import { TodayTasksWidget } from '../components/crm/TodayTasksWidget'
@@ -23,6 +23,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: PageKey) => void
   const [activity, setActivity] = useState<Interaction[]>([])
   const [agendaEvents, setAgendaEvents] = useState<PlanningEvent[]>([])
   const [entreprise, setEntreprise] = useState<Entreprise | null>(null)
+  const [commissionsEnAttente, setCommissionsEnAttente] = useState<Commission[]>([])
   const [loading, setLoading] = useState(true)
   const [exportMenuOpen, setExportMenuOpen] = useState(false)
   const exportMenuRef = useRef<HTMLDivElement>(null)
@@ -61,7 +62,11 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: PageKey) => void
       supabase.from('interactions').select('*, prospect:prospects(*)').order('created_at', { ascending: false }).limit(6),
       agendaQuery,
       supabase.from('entreprises').select('*').limit(1).maybeSingle(),
-    ]).then(([p, v, d, s, a, ag, ent]) => {
+      (isAdmin
+        ? supabase.from('commissions').select('*, commercial:profiles(id, nom_complet, couleur)').eq('statut', 'en_attente').order('date_generation', { ascending: false })
+        : supabase.from('commissions').select('*, commercial:profiles(id, nom_complet, couleur)').eq('statut', 'en_attente').eq('commercial_id', profile?.id || '').order('date_generation', { ascending: false })
+      ),
+    ]).then(([p, v, d, s, a, ag, ent, com]) => {
       setProspects(p.data || [])
       setVisites((v.data || []) as any)
       setDevis((d.data || []) as Devis[])
@@ -69,6 +74,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: PageKey) => void
       setActivity((a.data || []) as any)
       setAgendaEvents((ag.data || []) as PlanningEvent[])
       setEntreprise((ent.data as Entreprise) || null)
+      setCommissionsEnAttente((com.data || []) as unknown as Commission[])
       setLoading(false)
     })
   }, [isAdmin, profile?.id])
@@ -118,6 +124,7 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: PageKey) => void
 
   const avatarColors = ['#52B788', '#3A86C8', '#D4A574', '#E8A317', '#B3D300', '#FC7400']
   const TYPE_LABEL: Record<string, string> = { visite: 'Visite technique', rdv: 'Rendez-vous', formation: 'Formation' }
+  const totalCommissionsEnAttente = commissionsEnAttente.reduce((s, c) => s + (Number(c.montant_commercial) || 0), 0)
 
   return (
     <div className="page">
@@ -347,6 +354,50 @@ export function DashboardPage({ onNavigate }: { onNavigate: (p: PageKey) => void
               <div className="kpi-tile-label">Panier moyen signé</div>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Commissions en attente */}
+      <div className="card mb-4">
+        <div className="card-header">
+          <div className="card-title flex items-center gap-2">
+            <Wallet size={16} /> {isAdmin ? 'Commissions en attente (équipe)' : 'Mes commissions en attente'}
+          </div>
+          <button className="btn btn-ghost btn-sm" onClick={() => onNavigate('commissions')}>
+            Voir tout <ArrowRight size={16} />
+          </button>
+        </div>
+        <div className="card-body">
+          {commissionsEnAttente.length === 0 ? (
+            <div style={{ color: 'var(--c-text-muted)', padding: '8px 0' }}>
+              Aucune commission en attente pour le moment. Elles apparaîtront automatiquement dès
+              qu'une VT vous sera attribuée ou qu'un de vos devis sera signé.
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2 mb-4" style={{ fontSize: 26, fontWeight: 700, fontFamily: 'var(--font-display)' }}>
+                <Clock size={20} style={{ color: 'var(--c-warning, #E8A317)' }} /> {euro(totalCommissionsEnAttente)}
+                <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--c-text-muted)' }}>
+                  · {commissionsEnAttente.length} commission{commissionsEnAttente.length > 1 ? 's' : ''}
+                </span>
+              </div>
+              <div className="activity-list">
+                {commissionsEnAttente.slice(0, 5).map(c => (
+                  <div className="activity-item" key={c.id}>
+                    <div className="activity-dot amber" />
+                    <div className="activity-content">
+                      <div className="activity-text">
+                        {c.libelle}
+                        {isAdmin && c.commercial?.nom_complet && <> — <b>{c.commercial.nom_complet}</b></>}
+                      </div>
+                      <div className="activity-time">{timeAgo(c.date_generation)}</div>
+                    </div>
+                    <div className="font-semibold">{euro(c.montant_commercial)}</div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
       </div>
 

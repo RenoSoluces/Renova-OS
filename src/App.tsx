@@ -12,6 +12,7 @@ import { CataloguePage } from './pages/CataloguePage'
 import { DevisPage } from './pages/DevisPage'
 import { ParametresPage } from './pages/ParametresPage'
 import { ActivitePage } from './pages/ActivitePage'
+import { CommissionsPage } from './pages/CommissionsPage'
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
@@ -31,6 +32,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   documents: { title: 'Documents', subtitle: 'Gestion documentaire' },
   parametres: { title: 'Paramètres', subtitle: 'Configuration de l\'application' },
   activite: { title: 'Historique & activité', subtitle: 'Flux centralisé des échanges' },
+  commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
 }
 
 export default function App() {
@@ -97,6 +99,7 @@ export default function App() {
           {page === 'documents' && <DocumentsPage />}
           {page === 'parametres' && <ParametresPage />}
           {page === 'activite' && <ActivitePage />}
+          {page === 'commissions' && <CommissionsPage />}
         </div>
       </div>
     </div>

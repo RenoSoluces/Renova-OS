@@ -1,14 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Plus, Calendar, MapPin, Clock, ChevronLeft, ChevronRight, Users, User as UserIcon } from 'lucide-react'
+import { Plus, Calendar, MapPin, Clock, ChevronLeft, ChevronRight, Users, User as UserIcon, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
-import type { PlanningEvent } from '../types'
+import type { PlanningEvent, CommissionBareme } from '../types'
 import { FloatInput, FloatSelect, FloatTextarea } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
+import { euro } from '../lib/crm/constants'
 
 const TYPES = [
-  { value: 'visite', label: 'Visite technique' },
+  { value: 'visite', label: 'Visite technique (VT)' },
   { value: 'rdv', label: 'Rendez-vous' },
   { value: 'formation', label: 'Formation' },
 ]
@@ -32,7 +33,10 @@ function startOfWeek(d = new Date()) {
   return date
 }
 
-const EMPTY = { titre: '', date: '', heure: '09:00', type: 'visite', adresse: '', notes: '', user_id: '' }
+const EMPTY = {
+  titre: '', date: '', heure: '09:00', type: 'visite', adresse: '', notes: '', user_id: '',
+  commission_commercial: '', commission_societe: '',
+}
 
 export function PlanningPage() {
   const { profile } = useAuth()
@@ -47,6 +51,8 @@ export function PlanningPage() {
   const [weekOffset, setWeekOffset] = useState(0)
   // Vue admin/manager : 'all' = agenda de toute l'équipe, sinon l'id du commercial filtré.
   const [filtreCommercial, setFiltreCommercial] = useState<string>('all')
+  // Barème VT actif, pour préremplir les montants de commission par défaut.
+  const [baremeVt, setBaremeVt] = useState<CommissionBareme | null>(null)
 
   const start = useMemo(() => {
     const s = startOfWeek()
@@ -87,6 +93,19 @@ export function PlanningPage() {
   useEffect(() => { fetchCommerciaux() }, [fetchCommerciaux])
   useEffect(() => { setLoading(true); fetchEvents().finally(() => setLoading(false)) }, [fetchEvents])
 
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase
+      .from('commission_bareme')
+      .select('*')
+      .eq('type', 'vt')
+      .eq('actif', true)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+      .then(({ data }) => setBaremeVt((data as CommissionBareme) || null))
+  }, [isAdmin])
+
   const commercialById = useCallback(
     (id: string | null) => commerciaux.find(c => c.id === id) || null,
     [commerciaux]
@@ -96,10 +115,13 @@ export function PlanningPage() {
     if (!form.titre || !form.date) return
     setSaving(true)
     const assigneA = isAdmin ? (form.user_id || profile?.id || null) : (profile?.id || null)
+    const estVt = isAdmin && form.type === 'visite' && !!assigneA
     const { error } = await supabase.from('planning_events').insert({
       titre: form.titre, date: form.date, heure: form.heure,
       type: form.type, adresse: form.adresse, notes: form.notes,
       user_id: assigneA,
+      commission_montant_commercial: estVt ? (parseFloat(form.commission_commercial) || 0) : null,
+      commission_montant_societe: estVt ? (parseFloat(form.commission_societe) || 0) : null,
     })
     setSaving(false)
     if (error) { alert(`Échec de l'enregistrement : ${error.message}`); return }
@@ -121,8 +143,24 @@ export function PlanningPage() {
     d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })
 
   function openNewEventModal(dateKey: string) {
-    setForm({ ...EMPTY, date: dateKey, user_id: isAdmin ? (profile?.id || '') : '' })
+    setForm({
+      ...EMPTY,
+      date: dateKey,
+      user_id: isAdmin ? (profile?.id || '') : '',
+      commission_commercial: isAdmin && baremeVt ? String(baremeVt.montant_commercial) : '',
+      commission_societe: isAdmin && baremeVt ? String(baremeVt.montant_societe) : '',
+    })
     setModalOpen(true)
+  }
+
+  function onTypeChange(v: string) {
+    setForm(f => ({
+      ...f,
+      type: v,
+      // Préremplissage depuis le barème VT actif dès qu'on bascule sur une VT.
+      commission_commercial: v === 'visite' && isAdmin && baremeVt ? String(baremeVt.montant_commercial) : f.commission_commercial,
+      commission_societe: v === 'visite' && isAdmin && baremeVt ? String(baremeVt.montant_societe) : f.commission_societe,
+    }))
   }
 
   return (
@@ -232,6 +270,12 @@ export function PlanningPage() {
                                   <UserIcon size={11} /> {commercial?.nom_complet || 'Non attribué'}
                                 </span>
                               )}
+                              {e.type === 'visite' && e.user_id && (e.commission_montant_commercial || 0) > 0 && (
+                                <span className="badge badge-success flex items-center gap-1" title="Commission générée pour cette VT">
+                                  <Wallet size={11} /> {euro(e.commission_montant_commercial)}
+                                  {isAdmin && <> / {euro(e.commission_montant_societe)} société</>}
+                                </span>
+                              )}
                             </div>
                           </div>
                         </div>
@@ -264,16 +308,41 @@ export function PlanningPage() {
           <FloatInput label="Heure" type="time" value={form.heure} onChange={v => setForm({ ...form, heure: v })} />
         </div>
         <div className="mt-4">
-          <FloatSelect label="Type" value={form.type} onChange={v => setForm({ ...form, type: v })} options={TYPES} />
+          <FloatSelect label="Type" value={form.type} onChange={onTypeChange} options={TYPES} />
         </div>
         {isAdmin && (
           <div className="mt-4">
             <FloatSelect
-              label="Attribué à"
+              label="Attribué à (commercial ou technicien)"
               value={form.user_id}
               onChange={v => setForm({ ...form, user_id: v })}
               options={commerciaux.map(c => ({ value: c.id, label: c.nom_complet || c.role }))}
             />
+          </div>
+        )}
+        {isAdmin && form.type === 'visite' && (
+          <div className="card" style={{ marginTop: 16, padding: 12, background: 'var(--c-bg-soft, #F5F7F5)' }}>
+            <div className="flex items-center gap-2 text-sm font-semibold" style={{ marginBottom: 8 }}>
+              <Wallet size={14} /> Commission de cette VT
+            </div>
+            <p className="text-sm text-muted" style={{ marginBottom: 10 }}>
+              Montant reversé au commercial/technicien et coût réel côté société. Préremplis depuis le
+              barème par défaut (page Commissions), modifiables au cas par cas.
+            </p>
+            <div className="grid grid-2 gap-3">
+              <FloatInput
+                label="Montant commercial (€)"
+                type="number"
+                value={form.commission_commercial}
+                onChange={v => setForm({ ...form, commission_commercial: v })}
+              />
+              <FloatInput
+                label="Montant société (€)"
+                type="number"
+                value={form.commission_societe}
+                onChange={v => setForm({ ...form, commission_societe: v })}
+              />
+            </div>
           </div>
         )}
         <div className="mt-4">
