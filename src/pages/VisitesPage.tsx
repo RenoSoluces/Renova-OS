@@ -55,6 +55,7 @@ export function VisitesPage({ onBack, onCreateDevis, initialProspectId, onInitia
   const [newDate, setNewDate] = useState(new Date().toISOString().split('T')[0])
   const [newTypeVisite, setNewTypeVisite] = useState<'complete' | 'produit'>('complete')
   const [newProduitCible, setNewProduitCible] = useState('')
+  const [createError, setCreateError] = useState<string | null>(null)
   const [dpeResult, setDpeResult] = useState<ReturnType<typeof calculDPE> | null>(null)
   const [deperditionsResult, setDeperditionsResult] = useState<ReturnType<typeof calculDeperditions> | null>(null)
   const [travauxResult, setTravauxResult] = useState<ReturnType<typeof proposerTravaux> | null>(null)
@@ -417,24 +418,50 @@ export function VisitesPage({ onBack, onCreateDevis, initialProspectId, onInitia
   }, [])
 
   const createVisite = useCallback(async () => {
-    if (!newProspectId) return
-    if (newTypeVisite === 'produit' && !newProduitCible) return
-    const { data } = await supabase.from('visites').insert({
+    if (!newProspectId) {
+      setCreateError('Sélectionnez un prospect avant de continuer.')
+      return
+    }
+    if (newTypeVisite === 'produit' && !newProduitCible) {
+      setCreateError('Sélectionnez le produit à auditer.')
+      return
+    }
+
+    setCreateError(null)
+
+    const payload = {
       prospect_id: newProspectId,
       date_visite: newDate,
       statut: 'en_cours',
       audit_data: {},
       type_visite: newTypeVisite,
       produit_cible: newTypeVisite === 'produit' ? newProduitCible : null,
-    }).select('*, prospect(*)').single()
-    if (data) {
-      setShowNewModal(false)
-      setNewProspectId('')
-      setNewTypeVisite('complete')
-      setNewProduitCible('')
-      startVisite(data as any)
-      fetchVisites()
     }
+
+    const { data, error } = await supabase
+      .from('visites')
+      .insert(payload)
+      .select('*, prospect(*)')
+      .single()
+
+    if (error) {
+      console.error('[RENOVA OS] Création visite impossible:', error)
+      setCreateError(`Impossible de créer la visite : ${error.message}`)
+      return
+    }
+
+    if (!data) {
+      setCreateError('La visite n’a pas pu être créée. Aucun enregistrement n’a été retourné.')
+      return
+    }
+
+    setShowNewModal(false)
+    setNewProspectId('')
+    setNewTypeVisite('complete')
+    setNewProduitCible('')
+    setCreateError(null)
+    startVisite(data as any)
+    fetchVisites()
   }, [newProspectId, newDate, newTypeVisite, newProduitCible, startVisite, fetchVisites])
 
   // Arrivée depuis la fiche d'un prospect (bouton "Continuer" / "Nouvelle visite") : on reprend
@@ -463,7 +490,7 @@ export function VisitesPage({ onBack, onCreateDevis, initialProspectId, onInitia
         <div className="topbar">
           <button className="btn btn-ghost" onClick={onBack}><ArrowLeft size={18} /> Retour</button>
           <div className="topbar-spacer" />
-          <button className="btn btn-primary" onClick={() => setShowNewModal(true)}>
+          <button className="btn btn-primary" onClick={() => { setCreateError(null); setShowNewModal(true) }}>
             <Plus size={18} /> Nouvelle visite
           </button>
         </div>
@@ -483,7 +510,7 @@ export function VisitesPage({ onBack, onCreateDevis, initialProspectId, onInitia
                 <ClipboardCheck />
                 <h3>Aucune visite technique</h3>
                 <p>Créez votre première visite technique pour démarrer un audit énergétique.</p>
-                <button className="btn btn-primary" onClick={() => setShowNewModal(true)}>
+                <button className="btn btn-primary" onClick={() => { setCreateError(null); setShowNewModal(true) }}>
                   <Plus size={18} /> Nouvelle visite
                 </button>
               </div>
@@ -582,6 +609,12 @@ export function VisitesPage({ onBack, onCreateDevis, initialProspectId, onInitia
             )}
             {newTypeVisite === 'produit' && newProduitCible && (
               <p className="text-sm text-muted">{produitVisiteById(newProduitCible)?.description}</p>
+            )}
+            {createError && (
+              <div className="visite-create-error" role="alert">
+                <AlertTriangle size={16} />
+                <span>{createError}</span>
+              </div>
             )}
           </div>
         </Modal>
