@@ -13,6 +13,7 @@ import { DevisPage } from './pages/DevisPage'
 import { ParametresPage } from './pages/ParametresPage'
 import { ActivitePage } from './pages/ActivitePage'
 import { CommissionsPage } from './pages/CommissionsPage'
+import { SuiviChantierPage } from './pages/SuiviChantierPage'
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
@@ -33,6 +34,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   parametres: { title: 'Paramètres', subtitle: 'Configuration de l\'application' },
   activite: { title: 'Historique & activité', subtitle: 'Flux centralisé des échanges' },
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
+  suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
 }
 
 export default function App() {
@@ -130,6 +132,7 @@ export default function App() {
           {page === 'parametres' && <ParametresPage />}
           {page === 'activite' && <ActivitePage />}
           {page === 'commissions' && <CommissionsPage />}
+          {page === 'suivi_chantier' && <SuiviChantierPage />}
         </div>
       </div>
     </div>

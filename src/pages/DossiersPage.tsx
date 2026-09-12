@@ -366,6 +366,26 @@ export function DossiersPage({ initialProspectId, onInitialProspectHandled }: Do
               </Button>
             </div>
 
+            <div className="recap-card" style={{ padding: 14 }}>
+              {(() => {
+                const attendues = pieces.length
+                const recues = pieces.filter(p => p.recu || p.url).length
+                const score = attendues ? Math.round((recues / attendues) * 100) : 0
+                const actions = [] as string[]
+                if (score < 100) actions.push(`${attendues - recues} pièce(s) encore manquante(s)`)
+                if (!detail.visite_id) actions.push('Visite technique non rattachée')
+                if (!detail.devis_id) actions.push('Devis non rattaché')
+                if (detail.statut === 'installation' && !detail.installateur_id) actions.push('Installateur à affecter')
+                return <>
+                  <div style={{ display:'flex', justifyContent:'space-between', gap:12, alignItems:'center' }}>
+                    <div><div className="text-sm text-muted">État du dossier</div><strong style={{ fontSize:22 }}>{score}% complet</strong></div>
+                    <span className={`badge ${score===100?'badge-success':score>=70?'badge-warning':'badge-error'}`}>{score===100?'Prêt':score>=70?'À compléter':'Incomplet'}</span>
+                  </div>
+                  {actions.length>0 && <div className="text-sm text-muted" style={{marginTop:8}}>Prochaines actions : {actions.join(' · ')}</div>}
+                </>
+              })()}
+            </div>
+
             <div>
               <div className="section-label" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <FileText size={16} /> Pièces à recueillir

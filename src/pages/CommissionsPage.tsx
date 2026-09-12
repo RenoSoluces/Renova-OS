@@ -1,356 +1,48 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import {
-  Wallet, Plus, Percent, Settings2, Clock, CheckCircle2, Banknote, XCircle,
-  ClipboardCheck, FileSignature, Pencil,
-} from 'lucide-react'
+import { Wallet, Plus, Percent, Settings2, Clock, CheckCircle2, Banknote, XCircle, ClipboardCheck, FileSignature, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
-import type { Commission, CommissionBareme, CommissionType, CommissionStatut } from '../types'
+import type { Commission, CommissionBareme, CommissionType } from '../types'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
-import { euro, timeAgo } from '../lib/crm/constants'
+import { euro } from '../lib/crm/constants'
 
-const TYPE_LABEL: Record<CommissionType, string> = {
-  vt: 'Visite technique (VT)',
-  devis_signe: 'Devis signé',
-  manuel: 'Commission manuelle',
-}
-const TYPE_ICON: Record<CommissionType, any> = { vt: ClipboardCheck, devis_signe: FileSignature, manuel: Wallet }
+const TYPES: Record<CommissionType,string>={vt:'Visite technique',devis_signe:'Devis signé',manuel:'Commission manuelle'}
+const EMPTY={type:'devis_signe' as CommissionType,libelle:'',commercial_id:'',produit_id:'',montant_commercial:'',montant_societe:'',pourcentage_commercial:'',mode:'fixe',base_pourcentage:'montant_ht',priorite:'0',date_debut:'',date_fin:'',actif:true}
 
-const STATUT_LABEL: Record<CommissionStatut, string> = {
-  en_attente: 'En attente', validee: 'Validée', payee: 'Payée', annulee: 'Annulée',
-}
-const STATUT_BADGE: Record<CommissionStatut, string> = {
-  en_attente: 'badge-warning', validee: 'badge-info', payee: 'badge-success', annulee: 'badge-neutral',
-}
-const STATUT_ICON: Record<CommissionStatut, any> = {
-  en_attente: Clock, validee: CheckCircle2, payee: Banknote, annulee: XCircle,
-}
-
-const EMPTY_BAREME = {
-  type: 'vt' as CommissionType, libelle: '', montant_commercial: '', montant_societe: '',
-  pourcentage_commercial: '', actif: true,
-}
-
-export function CommissionsPage() {
-  const { profile } = useAuth()
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
-
-  const [tab, setTab] = useState<'commissions' | 'bareme'>('commissions')
-  const [commissions, setCommissions] = useState<Commission[]>([])
-  const [bareme, setBareme] = useState<CommissionBareme[]>([])
-  const [commerciaux, setCommerciaux] = useState<{ id: string; nom_complet: string; role: string }[]>([])
-  const [loading, setLoading] = useState(true)
-  const [filtreCommercial, setFiltreCommercial] = useState('tous')
-  const [filtreStatut, setFiltreStatut] = useState('tous')
-
-  const [baremeModal, setBaremeModal] = useState(false)
-  const [baremeForm, setBaremeForm] = useState({ ...EMPTY_BAREME })
-  const [editingBaremeId, setEditingBaremeId] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-
-  const fetchCommissions = useCallback(async () => {
-    let query = supabase
-      .from('commissions')
-      .select('*, commercial:profiles(id, nom_complet, couleur)')
-      .order('date_generation', { ascending: false })
-    if (!isAdmin && profile?.id) query = query.eq('commercial_id', profile.id)
-    const { data } = await query
-    setCommissions((data || []) as unknown as Commission[])
-  }, [isAdmin, profile?.id])
-
-  const fetchBareme = useCallback(async () => {
-    const { data } = await supabase.from('commission_bareme').select('*').order('created_at', { ascending: false })
-    setBareme((data || []) as CommissionBareme[])
-  }, [])
-
-  useEffect(() => {
-    setLoading(true)
-    const jobs: PromiseLike<any>[] = [fetchCommissions(), fetchBareme()]
-    if (isAdmin) jobs.push(supabase.from('profiles').select('id, nom_complet, role').order('nom_complet').then(({ data }) => setCommerciaux((data || []) as any)))
-    Promise.all(jobs).finally(() => setLoading(false))
-  }, [fetchCommissions, fetchBareme, isAdmin])
-
-  const filtered = useMemo(() => commissions.filter(c =>
-    (filtreCommercial === 'tous' || c.commercial_id === filtreCommercial) &&
-    (filtreStatut === 'tous' || c.statut === filtreStatut)
-  ), [commissions, filtreCommercial, filtreStatut])
-
-  const totaux = useMemo(() => {
-    const sum = (statut: CommissionStatut) => commissions
-      .filter(c => c.statut === statut && (filtreCommercial === 'tous' || c.commercial_id === filtreCommercial))
-      .reduce((s, c) => s + (Number(c.montant_commercial) || 0), 0)
-    return { en_attente: sum('en_attente'), validee: sum('validee'), payee: sum('payee') }
-  }, [commissions, filtreCommercial])
-
-  async function changerStatut(c: Commission, statut: CommissionStatut) {
-    setCommissions(cs => cs.map(x => x.id === c.id ? { ...x, statut } : x))
-    await supabase.from('commissions').update({
-      statut, date_validation: statut === 'validee' || statut === 'payee' ? new Date().toISOString() : c.date_validation,
-    }).eq('id', c.id)
-  }
-
-  function openNewBareme() {
-    setBaremeForm({ ...EMPTY_BAREME })
-    setEditingBaremeId(null)
-    setBaremeModal(true)
-  }
-
-  function openEditBareme(b: CommissionBareme) {
-    setBaremeForm({
-      type: b.type, libelle: b.libelle,
-      montant_commercial: String(b.montant_commercial ?? ''),
-      montant_societe: String(b.montant_societe ?? ''),
-      pourcentage_commercial: b.pourcentage_commercial != null ? String(b.pourcentage_commercial) : '',
-      actif: b.actif,
-    })
-    setEditingBaremeId(b.id)
-    setBaremeModal(true)
-  }
-
-  async function saveBareme() {
-    if (!baremeForm.libelle) return
-    setSaving(true)
-    const payload = {
-      type: baremeForm.type,
-      libelle: baremeForm.libelle,
-      montant_commercial: parseFloat(baremeForm.montant_commercial) || 0,
-      montant_societe: parseFloat(baremeForm.montant_societe) || 0,
-      pourcentage_commercial: baremeForm.pourcentage_commercial ? parseFloat(baremeForm.pourcentage_commercial) : null,
-      actif: baremeForm.actif,
-    }
-    if (editingBaremeId) {
-      await supabase.from('commission_bareme').update(payload).eq('id', editingBaremeId)
-    } else {
-      await supabase.from('commission_bareme').insert(payload)
-    }
-    setSaving(false)
-    setBaremeModal(false)
-    fetchBareme()
-  }
-
-  async function toggleActif(b: CommissionBareme) {
-    setBareme(bs => bs.map(x => x.id === b.id ? { ...x, actif: !x.actif } : x))
-    await supabase.from('commission_bareme').update({ actif: !b.actif }).eq('id', b.id)
-  }
-
-  return (
-    <div className="page">
-      <div className="page-header">
-        <div>
-          <h1 className="page-title">Commissions</h1>
-          <p className="page-subtitle">
-            {isAdmin
-              ? 'Barème prédéfini et suivi des commissions de toute l\'équipe.'
-              : 'Vos commissions générées automatiquement (VT, devis signés…).'}
-          </p>
-        </div>
-        {isAdmin && tab === 'bareme' && (
-          <div className="page-actions">
-            <Button variant="primary" onClick={openNewBareme}>
-              <Plus size={18} /> Nouvelle règle
-            </Button>
-          </div>
-        )}
-      </div>
-
-      {isAdmin && (
-        <div className="view-toggle" style={{ marginBottom: 16 }}>
-          <button className={`view-toggle-btn ${tab === 'commissions' ? 'active' : ''}`} onClick={() => setTab('commissions')}>
-            <Wallet size={15} /> Commissions
-          </button>
-          <button className={`view-toggle-btn ${tab === 'bareme' ? 'active' : ''}`} onClick={() => setTab('bareme')}>
-            <Settings2 size={15} /> Barème
-          </button>
-        </div>
-      )}
-
-      {(tab === 'commissions' || !isAdmin) && (
-        <>
-          <div className="kpi-grid" style={{ marginBottom: 20 }}>
-            <div className="kpi-tile">
-              <div className="kpi-tile-top"><div className="kpi-tile-icon amber"><Clock size={20} /></div></div>
-              <div className="kpi-tile-value">{euro(totaux.en_attente)}</div>
-              <div className="kpi-tile-label">En attente</div>
-            </div>
-            <div className="kpi-tile">
-              <div className="kpi-tile-top"><div className="kpi-tile-icon blue"><CheckCircle2 size={20} /></div></div>
-              <div className="kpi-tile-value">{euro(totaux.validee)}</div>
-              <div className="kpi-tile-label">Validées</div>
-            </div>
-            <div className="kpi-tile">
-              <div className="kpi-tile-top"><div className="kpi-tile-icon green"><Banknote size={20} /></div></div>
-              <div className="kpi-tile-value">{euro(totaux.payee)}</div>
-              <div className="kpi-tile-label">Payées</div>
-            </div>
-          </div>
-
-          <div className="pro-list-filters" style={{ flexWrap: 'wrap', marginBottom: 16 }}>
-            {isAdmin && commerciaux.length > 0 && (
-              <select className="pro-filter-select" value={filtreCommercial} onChange={e => setFiltreCommercial(e.target.value)}>
-                <option value="tous">Tous les commerciaux</option>
-                {commerciaux.map(c => <option key={c.id} value={c.id}>{c.nom_complet || c.role}</option>)}
-              </select>
-            )}
-            <select className="pro-filter-select" value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)}>
-              <option value="tous">Tous les statuts</option>
-              {Object.entries(STATUT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
-          </div>
-
-          {loading ? (
-            <div className="card"><div className="card-pad text-muted">Chargement…</div></div>
-          ) : filtered.length === 0 ? (
-            <div className="card">
-              <div className="empty-state">
-                <Wallet size={40} />
-                <h3>Aucune commission</h3>
-                <p>
-                  {isAdmin
-                    ? 'Les commissions apparaissent automatiquement dès qu\'une VT est attribuée ou qu\'un devis est signé.'
-                    : 'Vos VT et devis signés généreront automatiquement des commissions ici.'}
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="prospect-list-card">
-              {filtered.map(c => {
-                const TIcon = TYPE_ICON[c.type] || Wallet
-                const SIcon = STATUT_ICON[c.statut] || Clock
-                return (
-                  <div key={c.id} className="prospect-row" style={{ cursor: 'default' }}>
-                    <div className="prospect-row-avatar" style={{ background: 'var(--c-primary-400)' }}>
-                      <TIcon size={16} />
-                    </div>
-                    <div className="prospect-row-info">
-                      <div className="prospect-row-name">{c.libelle || TYPE_LABEL[c.type]}</div>
-                      <div className="prospect-row-sub">
-                        <span>{TYPE_LABEL[c.type]}</span>
-                        {isAdmin && <span>{c.commercial?.nom_complet || 'Non attribué'}</span>}
-                        <span>{timeAgo(c.date_generation)}</span>
-                      </div>
-                    </div>
-                    <div className="prospect-row-tags" style={{ alignItems: 'flex-end' }}>
-                      <span className={`badge ${STATUT_BADGE[c.statut]} flex items-center gap-1`}>
-                        <SIcon size={11} /> {STATUT_LABEL[c.statut]}
-                      </span>
-                      <span className="font-semibold">{euro(c.montant_commercial)}</span>
-                      {isAdmin && <span className="text-sm text-muted">société : {euro(c.montant_societe)}</span>}
-                    </div>
-                    {isAdmin && c.statut !== 'annulee' && (
-                      <div className="flex items-center gap-1" style={{ marginLeft: 12 }}>
-                        {c.statut === 'en_attente' && (
-                          <Button variant="ghost" size="sm" onClick={() => changerStatut(c, 'validee')}>Valider</Button>
-                        )}
-                        {c.statut === 'validee' && (
-                          <Button variant="ghost" size="sm" onClick={() => changerStatut(c, 'payee')}>Marquer payée</Button>
-                        )}
-                        {c.statut !== 'payee' && (
-                          <Button variant="ghost" size="sm" onClick={() => changerStatut(c, 'annulee')}>Annuler</Button>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </>
-      )}
-
-      {isAdmin && tab === 'bareme' && (
-        loading ? (
-          <div className="card"><div className="card-pad text-muted">Chargement…</div></div>
-        ) : bareme.length === 0 ? (
-          <div className="card">
-            <div className="empty-state">
-              <Settings2 size={40} />
-              <h3>Aucune règle de commission</h3>
-              <p>Définissez un barème (VT, devis signé…) pour que les commissions se génèrent automatiquement.</p>
-              <Button variant="primary" onClick={openNewBareme}><Plus size={18} /> Nouvelle règle</Button>
-            </div>
-          </div>
-        ) : (
-          <div className="prospect-list-card">
-            {bareme.map(b => {
-              const TIcon = TYPE_ICON[b.type] || Wallet
-              return (
-                <div key={b.id} className="prospect-row" style={{ cursor: 'default', opacity: b.actif ? 1 : 0.5 }}>
-                  <div className="prospect-row-avatar" style={{ background: 'var(--c-primary-400)' }}>
-                    <TIcon size={16} />
-                  </div>
-                  <div className="prospect-row-info">
-                    <div className="prospect-row-name">{b.libelle}</div>
-                    <div className="prospect-row-sub">
-                      <span>{TYPE_LABEL[b.type]}</span>
-                      <span>Commercial : {euro(b.montant_commercial)}{b.pourcentage_commercial ? ` + ${b.pourcentage_commercial}%` : ''}</span>
-                      <span>Société : {euro(b.montant_societe)}</span>
-                    </div>
-                  </div>
-                  <div className="prospect-row-tags">
-                    <span className={`badge ${b.actif ? 'badge-success' : 'badge-neutral'}`}>{b.actif ? 'Actif' : 'Inactif'}</span>
-                  </div>
-                  <div className="flex items-center gap-1" style={{ marginLeft: 12 }}>
-                    <Button variant="ghost" size="sm" onClick={() => openEditBareme(b)}><Pencil size={14} /></Button>
-                    <Button variant="ghost" size="sm" onClick={() => toggleActif(b)}>{b.actif ? 'Désactiver' : 'Activer'}</Button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        )
-      )}
-
-      <Modal
-        open={baremeModal}
-        onClose={() => setBaremeModal(false)}
-        title={editingBaremeId ? 'Modifier la règle' : 'Nouvelle règle de commission'}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setBaremeModal(false)}>Annuler</Button>
-            <Button variant="primary" onClick={saveBareme} disabled={saving}>
-              {saving ? 'Enregistrement…' : 'Enregistrer'}
-            </Button>
-          </>
-        }
-      >
-        <FloatSelect
-          label="Type d'événement"
-          value={baremeForm.type}
-          onChange={v => setBaremeForm(f => ({ ...f, type: v as CommissionType }))}
-          options={[
-            { value: 'vt', label: 'Visite technique (VT)' },
-            { value: 'devis_signe', label: 'Devis signé' },
-            { value: 'manuel', label: 'Commission manuelle' },
-          ]}
-        />
-        <div className="mt-4">
-          <FloatInput label="Libellé" value={baremeForm.libelle} onChange={v => setBaremeForm(f => ({ ...f, libelle: v }))} placeholder="ex : VT standard, Commission devis signé…" />
-        </div>
-        <div className="grid grid-2 gap-3 mt-4">
-          <FloatInput label="Montant commercial (€)" type="number" value={baremeForm.montant_commercial} onChange={v => setBaremeForm(f => ({ ...f, montant_commercial: v }))} />
-          <FloatInput label="Montant société (€)" type="number" value={baremeForm.montant_societe} onChange={v => setBaremeForm(f => ({ ...f, montant_societe: v }))} />
-        </div>
-        {baremeForm.type === 'devis_signe' && (
-          <div className="mt-4">
-            <FloatInput
-              label="Pourcentage additionnel sur le montant HT (%)"
-              type="number"
-              value={baremeForm.pourcentage_commercial}
-              onChange={v => setBaremeForm(f => ({ ...f, pourcentage_commercial: v }))}
-            />
-            <p className="text-sm text-muted" style={{ marginTop: 4 }}>
-              <Percent size={12} style={{ display: 'inline', marginRight: 4 }} />
-              S'ajoute au montant commercial fixe : commission = montant fixe + % × montant HT du devis.
-            </p>
-          </div>
-        )}
-        <div className="mt-4 flex items-center gap-2">
-          <input type="checkbox" checked={baremeForm.actif} onChange={e => setBaremeForm(f => ({ ...f, actif: e.target.checked }))} id="bareme-actif" />
-          <label htmlFor="bareme-actif" className="text-sm">Règle active (appliquée automatiquement)</label>
-        </div>
-      </Modal>
-    </div>
-  )
+export function CommissionsPage(){
+ const {profile}=useAuth(); const admin=profile?.role==='admin'||profile?.role==='manager'
+ const [tab,setTab]=useState<'suivi'|'bareme'>('suivi'); const [rows,setRows]=useState<Commission[]>([]); const [rules,setRules]=useState<CommissionBareme[]>([])
+ const [commerciaux,setCommerciaux]=useState<any[]>([]); const [produits,setProduits]=useState<any[]>([]); const [modal,setModal]=useState(false); const [form,setForm]=useState<any>(EMPTY); const [editing,setEditing]=useState<string|null>(null); const [loading,setLoading]=useState(true); const [saving,setSaving]=useState(false)
+ const load=useCallback(async()=>{setLoading(true); const [c,b,p,u]=await Promise.all([
+   supabase.from('commissions').select('*, commercial:profiles(id,nom_complet)').order('date_generation',{ascending:false}),
+   supabase.from('commission_bareme').select('*').order('priorite',{ascending:false}).order('created_at',{ascending:false}),
+   supabase.from('catalogue_produits').select('id,nom,categorie').eq('actif',true).order('nom'),
+   supabase.from('profiles').select('id,nom_complet,role').in('role',['commercial','manager','admin']).eq('actif',true).order('nom_complet')
+ ]); setRows((c.data||[]) as any); setRules((b.data||[]) as any); setProduits(p.data||[]); setCommerciaux(u.data||[]); setLoading(false)},[])
+ useEffect(()=>{load()},[load])
+ const total=useMemo(()=>rows.reduce((s,r)=>s+Number(r.montant_commercial||0),0),[rows])
+ function openNew(){setEditing(null);setForm({...EMPTY});setModal(true)}
+ function openEdit(r:any){setEditing(r.id);setForm({type:r.type,libelle:r.libelle,commercial_id:r.commercial_id||'',produit_id:r.produit_id||'',montant_commercial:String(r.montant_commercial??''),montant_societe:String(r.montant_societe??''),pourcentage_commercial:r.pourcentage_commercial==null?'':String(r.pourcentage_commercial),mode:r.mode||'fixe',base_pourcentage:r.base_pourcentage||'montant_ht',priorite:String(r.priorite||0),date_debut:r.date_debut||'',date_fin:r.date_fin||'',actif:r.actif});setModal(true)}
+ async function save(){if(!form.libelle)return;setSaving(true);const payload={type:form.type,libelle:form.libelle,commercial_id:form.commercial_id||null,produit_id:form.produit_id||null,montant_commercial:Number(form.montant_commercial)||0,montant_societe:Number(form.montant_societe)||0,pourcentage_commercial:form.pourcentage_commercial===''?null:Number(form.pourcentage_commercial),mode:form.mode,base_pourcentage:form.base_pourcentage,priorite:Number(form.priorite)||0,date_debut:form.date_debut||null,date_fin:form.date_fin||null,actif:form.actif}; const q=editing?supabase.from('commission_bareme').update(payload).eq('id',editing):supabase.from('commission_bareme').insert(payload); const {error}=await q; setSaving(false); if(error){alert(error.message);return}setModal(false);load()}
+ async function remove(id:string){if(!confirm('Supprimer cette règle ?'))return;await supabase.from('commission_bareme').delete().eq('id',id);load()}
+ async function status(c:Commission,s:'validee'|'payee'|'annulee'){await supabase.from('commissions').update({statut:s,date_validation:s!=='annulee'?new Date().toISOString():null}).eq('id',c.id);load()}
+ return <div className="page">
+  <div className="page-header"><div><h1 className="page-title">Commissions</h1><p className="page-subtitle">Rémunération pilotée par commercial, produit et événement.</p></div>{admin&&tab==='bareme'&&<Button variant="primary" onClick={openNew}><Plus size={18}/> Nouvelle règle</Button>}</div>
+  {admin&&<div className="view-toggle" style={{marginBottom:16}}><button className={`view-toggle-btn ${tab==='suivi'?'active':''}`} onClick={()=>setTab('suivi')}><Wallet size={15}/> Suivi</button><button className={`view-toggle-btn ${tab==='bareme'?'active':''}`} onClick={()=>setTab('bareme')}><Settings2 size={15}/> Matrice de rémunération</button></div>}
+  {tab==='suivi'||!admin?<><div className="kpi-grid" style={{marginBottom:20}}><div className="kpi-tile"><div className="kpi-tile-icon amber"><Clock size={20}/></div><div className="kpi-tile-value">{euro(rows.filter(r=>r.statut==='en_attente').reduce((s,r)=>s+Number(r.montant_commercial||0),0))}</div><div className="kpi-tile-label">En attente</div></div><div className="kpi-tile"><div className="kpi-tile-icon blue"><CheckCircle2 size={20}/></div><div className="kpi-tile-value">{euro(rows.filter(r=>r.statut==='validee').reduce((s,r)=>s+Number(r.montant_commercial||0),0))}</div><div className="kpi-tile-label">Validées</div></div><div className="kpi-tile"><div className="kpi-tile-icon green"><Banknote size={20}/></div><div className="kpi-tile-value">{euro(rows.filter(r=>r.statut==='payee').reduce((s,r)=>s+Number(r.montant_commercial||0),0))}</div><div className="kpi-tile-label">Payées</div></div><div className="kpi-tile"><div className="kpi-tile-icon purple"><Wallet size={20}/></div><div className="kpi-tile-value">{euro(total)}</div><div className="kpi-tile-label">Total généré</div></div></div><div className="prospect-list-card">{loading?<div className="card-pad text-muted">Chargement…</div>:rows.length===0?<div className="empty-state"><Wallet size={40}/><h3>Aucune commission</h3><p>Les commissions apparaîtront automatiquement selon la matrice définie.</p></div>:rows.map(c=><div className="prospect-row" key={c.id}><div className="prospect-row-avatar"><Wallet size={16}/></div><div className="prospect-row-info"><div className="prospect-row-name">{c.libelle}</div><div className="prospect-row-sub"><span>{c.commercial?.nom_complet||'—'}</span><span>{TYPES[c.type]}</span><span>{euro(c.montant_commercial)}</span></div></div><div className="prospect-row-tags"><span className={`badge ${c.statut==='payee'?'badge-success':c.statut==='validee'?'badge-info':'badge-warning'}`}>{c.statut==='payee'?'Payée':c.statut==='validee'?'Validée':c.statut==='annulee'?'Annulée':'En attente'}</span></div>{admin&&c.statut!=='annulee'&&<div className="flex items-center gap-1">{c.statut==='en_attente'&&<Button variant="ghost" size="sm" onClick={()=>status(c,'validee')}>Valider</Button>}{c.statut==='validee'&&<Button variant="ghost" size="sm" onClick={()=>status(c,'payee')}>Marquer payée</Button>}{c.statut!=='payee'&&<Button variant="ghost" size="sm" onClick={()=>status(c,'annulee')}><XCircle size={14}/></Button>}</div>}</div>)}</div></>:null}
+  {admin&&tab==='bareme'&&<div className="card"><div className="card-pad"><div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 140px',gap:0}} className="commission-table-head"><b>Règle</b><b>Commercial</b><b>Produit</b><b>Rémunération</b><b>Priorité</b></div>{rules.length===0?<div className="empty-state"><Settings2 size={40}/><h3>Aucune règle</h3><p>Créez votre première règle de rémunération.</p></div>:rules.map((r:any)=><div key={r.id} style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr 1fr 140px',alignItems:'center',padding:'16px 0',borderTop:'1px solid var(--c-border)'}}><div><strong>{r.libelle}</strong><div className="text-sm text-muted">{TYPES[r.type]} · {r.actif?'Actif':'Inactif'}</div></div><span>{commerciaux.find(c=>c.id===r.commercial_id)?.nom_complet||'Tous les commerciaux'}</span><span>{produits.find(p=>p.id===r.produit_id)?.nom||'Tous les produits'}</span><span>{euro(r.montant_commercial)}{r.pourcentage_commercial?` + ${r.pourcentage_commercial}%`:''}<div className="text-sm text-muted">Société : {euro(r.montant_societe)}</div></span><span className="flex items-center gap-1"><b>{r.priorite}</b><Button variant="ghost" size="sm" onClick={()=>openEdit(r)}><Pencil size={14}/></Button><Button variant="ghost" size="sm" onClick={()=>remove(r.id)}><Trash2 size={14}/></Button></span></div>)}</div></div>}
+  <Modal open={modal} onClose={()=>setModal(false)} title={editing?'Modifier la règle':'Nouvelle règle de rémunération'} footer={<><Button variant="ghost" onClick={()=>setModal(false)}>Annuler</Button><Button variant="primary" onClick={save} disabled={saving}>{saving?'Enregistrement…':'Enregistrer'}</Button></>}>
+   <FloatSelect label="Événement" value={form.type} onChange={v=>setForm((f:any)=>({...f,type:v}))} options={Object.entries(TYPES).map(([value,label])=>({value,label}))}/>
+   <div className="mt-4"><FloatInput label="Libellé" value={form.libelle} onChange={v=>setForm((f:any)=>({...f,libelle:v}))} placeholder="Ex : PAC Air/Eau — Jean"/></div>
+   <div className="grid grid-2 gap-3 mt-4"><FloatSelect label="Commercial" value={form.commercial_id} onChange={v=>setForm((f:any)=>({...f,commercial_id:v}))} options={[{value:'',label:'Tous les commerciaux'},...commerciaux.map(c=>({value:c.id,label:c.nom_complet||c.email}))]}/><FloatSelect label="Produit" value={form.produit_id} onChange={v=>setForm((f:any)=>({...f,produit_id:v}))} options={[{value:'',label:'Tous les produits'},...produits.map(p=>({value:p.id,label:p.nom}))]}/></div>
+   <div className="grid grid-2 gap-3 mt-4"><FloatInput label="Montant commercial (€)" type="number" value={form.montant_commercial} onChange={v=>setForm((f:any)=>({...f,montant_commercial:v}))}/><FloatInput label="Montant société (€)" type="number" value={form.montant_societe} onChange={v=>setForm((f:any)=>({...f,montant_societe:v}))}/></div>
+   <div className="grid grid-2 gap-3 mt-4"><FloatInput label="Pourcentage commercial (%)" type="number" value={form.pourcentage_commercial} onChange={v=>setForm((f:any)=>({...f,pourcentage_commercial:v}))}/><FloatSelect label="Base du pourcentage" value={form.base_pourcentage} onChange={v=>setForm((f:any)=>({...f,base_pourcentage:v}))} options={[{value:'montant_ht',label:'Montant HT'},{value:'montant_ttc',label:'Montant TTC'},{value:'reste_a_charge',label:'Reste à charge'}]}/></div>
+   <div className="grid grid-2 gap-3 mt-4"><FloatInput label="Priorité" type="number" value={form.priorite} onChange={v=>setForm((f:any)=>({...f,priorite:v}))}/><FloatSelect label="Mode" value={form.mode} onChange={v=>setForm((f:any)=>({...f,mode:v}))} options={[{value:'fixe',label:'Fixe'},{value:'pourcentage',label:'Pourcentage'},{value:'fixe_pourcentage',label:'Fixe + pourcentage'}]}/></div>
+   <div className="grid grid-2 gap-3 mt-4"><FloatInput label="Valable à partir du" type="date" value={form.date_debut} onChange={v=>setForm((f:any)=>({...f,date_debut:v}))}/><FloatInput label="Valable jusqu'au" type="date" value={form.date_fin} onChange={v=>setForm((f:any)=>({...f,date_fin:v}))}/></div>
+   <div className="mt-4 flex items-center gap-2"><input type="checkbox" checked={form.actif} onChange={e=>setForm((f:any)=>({...f,actif:e.target.checked}))}/><span className="text-sm">Règle active</span></div>
+   <p className="text-sm text-muted" style={{marginTop:12}}><Percent size={12} style={{display:'inline'}}/> La règle la plus spécifique est automatiquement prioritaire : <b>commercial + produit</b>, puis commercial, puis produit, puis règle générale.</p>
+  </Modal>
+ </div>
 }

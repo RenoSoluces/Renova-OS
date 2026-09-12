@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History, Wallet,
+  Package, FileSignature, History, Wallet, HardHat,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -35,6 +35,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
       { key: 'dossiers', label: 'Dossiers', icon: FolderOpen },
       { key: 'planning', label: 'Planning', icon: Calendar },
       { key: 'documents', label: 'Documents', icon: FileText },
+      { key: 'suivi_chantier', label: 'Suivi chantier', icon: HardHat },
       { key: 'commissions', label: 'Commissions', icon: Wallet },
     ],
   },

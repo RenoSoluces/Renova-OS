@@ -1,6 +1,6 @@
 export type PageKey =
   | 'dashboard' | 'prospects' | 'visites' | 'simulations'
-  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'documents' | 'parametres' | 'activite' | 'commissions'
+  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'suivi_chantier' | 'documents' | 'parametres' | 'activite' | 'commissions'
 
 export type TypeProspect = 'particulier' | 'professionnel'
 
@@ -294,6 +294,11 @@ export interface Dossier {
   montant_total: number | null
   aides_montant: number | null
   reste_a_charge: number | null
+  installateur_id?: string | null
+  date_installation_prevue?: string | null
+  date_installation?: string | null
+  garantie_fin?: string | null
+  notes_installation?: string | null
   created_at: string
   prospect?: Prospect
 }
@@ -328,6 +333,13 @@ export interface CommissionBareme {
   montant_societe: number
   pourcentage_commercial: number | null
   actif: boolean
+  commercial_id?: string | null
+  produit_id?: string | null
+  mode?: string
+  base_pourcentage?: string
+  priorite?: number
+  date_debut?: string | null
+  date_fin?: string | null
   created_at: string
   updated_at?: string
 }
