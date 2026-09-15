@@ -11,6 +11,11 @@ import './styles/crm.css'
 import './index.css'
 import App from './App'
 import { AuthProvider } from './lib/auth/AuthContext'
+import { registerSW } from 'virtual:pwa-register'
+
+// Met à jour automatiquement l'appli en arrière-plan dès qu'une nouvelle
+// version est déployée (pas besoin de désinstaller/réinstaller).
+registerSW({ immediate: true })
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

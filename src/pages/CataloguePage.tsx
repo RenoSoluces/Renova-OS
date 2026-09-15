@@ -49,6 +49,8 @@ interface FormState {
   fiche_cee: string
   actif: boolean
   zones_prix: { zone: string; prix_unitaire_ht: string }[]
+  forfait_pose_ht: string
+  forfait_evacuation_ht: string
 }
 
 function emptyForm(): FormState {
@@ -58,6 +60,7 @@ function emptyForm(): FormState {
     prix_unitaire_ht: '', unite: 'unite', tva_taux: 5.5,
     eligible_mpr: false, eligible_cee: false, fiche_cee: '', actif: true,
     zones_prix: [],
+    forfait_pose_ht: '', forfait_evacuation_ht: '',
   }
 }
 
@@ -106,6 +109,7 @@ export function CataloguePage() {
       eligible_mpr: p.eligible_mpr, eligible_cee: p.eligible_cee, fiche_cee: p.fiche_cee,
       actif: p.actif,
       zones_prix: (p.zones_prix || []).map(z => ({ zone: z.zone, prix_unitaire_ht: String(z.prix_unitaire_ht) })),
+      forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''),
     })
     setModalOpen(true)
   }
@@ -124,6 +128,7 @@ export function CataloguePage() {
       eligible_mpr: p.eligible_mpr, eligible_cee: p.eligible_cee, fiche_cee: p.fiche_cee,
       actif: true,
       zones_prix: (p.zones_prix || []).map(z => ({ zone: z.zone, prix_unitaire_ht: String(z.prix_unitaire_ht) })),
+      forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''),
     })
     setModalOpen(true)
   }
@@ -173,6 +178,8 @@ export function CataloguePage() {
       zones_prix: form.zones_prix
         .filter(z => z.zone.trim() && z.prix_unitaire_ht !== '')
         .map(z => ({ zone: z.zone.trim(), prix_unitaire_ht: parseFloat(z.prix_unitaire_ht) || 0 })),
+      forfait_pose_ht: parseFloat(form.forfait_pose_ht) || 0,
+      forfait_evacuation_ht: parseFloat(form.forfait_evacuation_ht) || 0,
     }
 
     if (editing) {
@@ -453,6 +460,21 @@ export function CataloguePage() {
               </select>
             </label>
           </div>
+
+          <div className="grid grid-2">
+            <label className="field">
+              <span>Forfait pose HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
+              <input type="number" step="0.01" value={form.forfait_pose_ht} onChange={e => setForm(f => ({ ...f, forfait_pose_ht: e.target.value }))} placeholder="0.00" />
+            </label>
+            <label className="field">
+              <span>Forfait évacuation des déchets HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
+              <input type="number" step="0.01" value={form.forfait_evacuation_ht} onChange={e => setForm(f => ({ ...f, forfait_evacuation_ht: e.target.value }))} placeholder="0.00" />
+            </label>
+          </div>
+          <p className="text-xs text-muted mb-2" style={{ marginTop: -8 }}>
+            Si renseignés, ces forfaits sont ajoutés automatiquement en lignes séparées
+            dans le devis dès que ce produit est sélectionné (laisser à 0 si non applicable).
+          </p>
 
           <div className="grid grid-2">
             <label className="checkbox-field">

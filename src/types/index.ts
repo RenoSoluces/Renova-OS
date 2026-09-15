@@ -412,6 +412,8 @@ export interface Produit {
   prix_unitaire_ht: number
   unite: 'm2' | 'unite' | 'forfait' | 'kw' | 'kwc' | 'ml'
   zones_prix: { zone: string; prix_unitaire_ht: number }[]
+  forfait_pose_ht: number
+  forfait_evacuation_ht: number
   tva_taux: number
   eligible_mpr: boolean
   eligible_cee: boolean

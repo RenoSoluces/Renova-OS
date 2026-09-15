@@ -211,6 +211,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
 
   function ajouterProduit(produit: Produit) {
     const prixApplicable = prixProduitPourZone(produit, p?.code_postal)
+    const ordreBase = lignes.length
     const ligne: DevisLigne = {
       id: `tmp_${Date.now()}_${Math.random()}`,
       devis_id: current!.id,
@@ -222,10 +223,49 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
       prix_unitaire_ht: prixApplicable,
       tva_taux: produit.tva_taux,
       montant_ht: prixApplicable,
-      ordre: lignes.length,
+      ordre: ordreBase,
       created_at: new Date().toISOString(),
     }
-    setLignes(ls => [...ls, ligne])
+    const lignesAjoutees: DevisLigne[] = [ligne]
+
+    // Pose et évacuation des déchets : ajoutées automatiquement à la suite du
+    // produit si un forfait est renseigné dans le catalogue, avec la même
+    // quantité (elles suivront donc la quantité du produit si l'utilisateur
+    // l'ajuste ensuite). Non liées à produit_id : ce sont des lignes de
+    // prestation, pas des rachats du même produit.
+    if (produit.forfait_pose_ht > 0) {
+      lignesAjoutees.push({
+        id: `tmp_${Date.now()}_${Math.random()}`,
+        devis_id: current!.id,
+        produit_id: null,
+        designation: `Pose — ${produit.nom}`,
+        description: '',
+        caracteristiques: {},
+        quantite: 1,
+        prix_unitaire_ht: produit.forfait_pose_ht,
+        tva_taux: produit.tva_taux,
+        montant_ht: produit.forfait_pose_ht,
+        ordre: ordreBase + 1,
+        created_at: new Date().toISOString(),
+      })
+    }
+    if (produit.forfait_evacuation_ht > 0) {
+      lignesAjoutees.push({
+        id: `tmp_${Date.now()}_${Math.random()}`,
+        devis_id: current!.id,
+        produit_id: null,
+        designation: `Évacuation des déchets — ${produit.nom}`,
+        description: '',
+        caracteristiques: {},
+        quantite: 1,
+        prix_unitaire_ht: produit.forfait_evacuation_ht,
+        tva_taux: produit.tva_taux,
+        montant_ht: produit.forfait_evacuation_ht,
+        ordre: ordreBase + 2,
+        created_at: new Date().toISOString(),
+      })
+    }
+    setLignes(ls => [...ls, ...lignesAjoutees])
 
     if (produit.eligible_mpr && profilMPR) {
       const gesteId = CATEGORIE_VERS_GESTE_MPR[produit.categorie]
@@ -264,16 +304,46 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
   }
 
   function updateLigne(id: string, patch: Partial<DevisLigne>) {
-    setLignes(ls => ls.map(l => {
-      if (l.id !== id) return l
-      const updated = { ...l, ...patch }
-      updated.montant_ht = calculMontantLigneHT(updated)
+    setLignes(ls => {
+      const cible = ls.find(l => l.id === id)
+      const updated = ls.map(l => {
+        if (l.id !== id) return l
+        const u = { ...l, ...patch }
+        u.montant_ht = calculMontantLigneHT(u)
+        return u
+      })
+      // Si on modifie la quantité d'une ligne "produit" (celle qui porte le
+      // produit_id), on répercute la même quantité sur ses lignes de pose et
+      // d'évacuation des déchets associées (reconnues par leur libellé), pour
+      // qu'elles restent cohérentes avec la surface/quantité réellement posée.
+      if (cible?.produit_id && patch.quantite !== undefined) {
+        return updated.map(l => {
+          if (l.produit_id) return l
+          const estPoseOuEvacuation =
+            l.designation === `Pose — ${cible.designation}` ||
+            l.designation === `Évacuation des déchets — ${cible.designation}`
+          if (!estPoseOuEvacuation) return l
+          const u = { ...l, quantite: patch.quantite! }
+          u.montant_ht = calculMontantLigneHT(u)
+          return u
+        })
+      }
       return updated
-    }))
+    })
   }
 
   function removeLigne(id: string) {
-    setLignes(ls => ls.filter(l => l.id !== id))
+    setLignes(ls => {
+      const cible = ls.find(l => l.id === id)
+      if (cible?.produit_id) {
+        return ls.filter(l =>
+          l.id !== id &&
+          l.designation !== `Pose — ${cible.designation}` &&
+          l.designation !== `Évacuation des déchets — ${cible.designation}`
+        )
+      }
+      return ls.filter(l => l.id !== id)
+    })
   }
 
   function removeAide(id: string) {
