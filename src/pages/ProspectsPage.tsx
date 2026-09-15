@@ -66,6 +66,7 @@ const FICHES_CEE = [
   { code: 'BAR-TH-174', cat: 'Rénovation d\'ampleur', title: 'Rénovation d\'ampleur (BAR TH 174)', desc: 'Rénovation globale par saut de classes DPE', group: 'Rénovation globale' },
   { code: 'BAR-VENT-132', cat: 'VMC double flux', title: 'VMC double flux', desc: 'Ventilation mécanique double flux', group: 'Ventilation' },
   { code: 'BAR-EN-104-FEN', cat: 'Fenêtres', title: 'Fenêtres double vitrage', desc: 'Remplacement des menuiseries', group: 'Isolation' },
+  { code: 'VISITE-TECHNIQUE', cat: 'Visite technique', title: 'Visite technique / audit', desc: 'Audit énergétique préalable, sans engagement contractuel', group: 'Services' },
 ]
 
 const LIFECYCLE_STEPS = [
