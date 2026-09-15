@@ -1,4 +1,7 @@
 import * as pdfjsLib from 'pdfjs-dist'
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
 
 export interface PdfTextExtractionResult {
   success: boolean
@@ -7,13 +10,6 @@ export interface PdfTextExtractionResult {
   erreurs: string[]
 }
 
-/**
- * Extrait le texte brut d'un fichier PDF avec pdfjs-dist.
- *
- * Cette fonction ne fait pas encore d'OCR :
- * elle fonctionne avec les PDF dont le texte est réellement
- * présent dans le document.
- */
 export async function extractPdfText(
   file: File,
 ): Promise<PdfTextExtractionResult> {
@@ -34,7 +30,6 @@ export async function extractPdfText(
       pageNumber += 1
     ) {
       const page = await pdf.getPage(pageNumber)
-
       const content = await page.getTextContent()
 
       const pageText = content.items
