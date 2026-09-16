@@ -356,6 +356,8 @@ export interface Commission {
   statut: CommissionStatut
   date_generation: string
   date_validation: string | null
+  date_paiement_commercial?: string | null
+  date_paiement_societe?: string | null
   notes: string | null
   created_at: string
   commercial?: { id: string; nom_complet: string; couleur?: string } | null

@@ -213,7 +213,7 @@ export function DashboardPage({
    */
   const commissionsEnCours = useMemo(() => {
     return commissions
-      .filter(c => c.statut !== 'payee')
+      .filter(c => c.statut !== 'annulee' && !c.date_paiement_commercial)
       .reduce(
         (sum, c) =>
           sum + (Number(c.montant_commercial) || 0),
@@ -276,21 +276,28 @@ export function DashboardPage({
     }
   }, [simulations])
 
+  const totalCommissionsPayees = useMemo(() => {
+    return commissions
+      .filter(c => !!c.date_paiement_commercial)
+      .reduce(
+        (sum, c) =>
+          sum + (Number(c.montant_commercial) || 0),
+        0,
+      )
+  }, [commissions])
+
   const totalCommissionsPayeesMois = useMemo(() => {
     const now = new Date()
 
     return commissions
       .filter(c => {
-        const date = new Date(
-          c.date_validation ||
-            c.date_generation,
-        )
+        if (!c.date_paiement_commercial) return false
+
+        const date = new Date(c.date_paiement_commercial)
 
         return (
-          c.statut === 'payee' &&
           date.getMonth() === now.getMonth() &&
-          date.getFullYear() ===
-            now.getFullYear()
+          date.getFullYear() === now.getFullYear()
         )
       })
       .reduce(
@@ -306,7 +313,7 @@ export function DashboardPage({
   ).length
 
   const commissionsActives = commissions.filter(
-    c => c.statut !== 'payee',
+    c => c.statut !== 'annulee' && !c.date_paiement_commercial,
   ).length
 
   const todayKey = new Date()
@@ -494,12 +501,12 @@ export function DashboardPage({
           <span className="dashboard-kpi-main">
             <strong>
               {euro(
-                totalCommissionsPayeesMois,
+                totalCommissionsPayees,
               )}
             </strong>
 
             <span>
-              Commissions payées
+              Commissions déjà payées
             </span>
           </span>
 
