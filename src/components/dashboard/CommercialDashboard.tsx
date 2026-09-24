@@ -11,7 +11,7 @@ import { useAuth } from '../../lib/auth/AuthContext'
 
 type Partner = { id: string; nom: string; telephone?: string | null }
 type InteractionRef = { id: string; prospect_id: string; type: string; created_at: string; contenu?: string | null }
-type ProspectRef = Prospect & { updated_at?: string | null }
+type ProspectRef = Prospect & { updated_at?: string | null; installateur_id?: string | null }
 
 const DEFAULT_OBJECTIVE = 10000
 
