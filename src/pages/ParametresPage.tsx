@@ -4,6 +4,7 @@ import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth/AuthContext'
 import type { DispositifAide, Entreprise } from '../types'
 
 const TABS = [
@@ -41,14 +42,25 @@ const CATEGORIES_DISPOSITIF = [
 ]
 
 export function ParametresPage() {
+  const { profile } = useAuth()
   const [tab, setTab] = useState('profil')
-  const [profil, setProfil] = useState({ nom: 'Dupont', prenom: 'Cédric', email: 'cedric@renova-os.fr', telephone: '06 12 34 56 78' })
+  const [profil, setProfil] = useState({ nom: '', prenom: '', email: '', telephone: '' })
+  const [profilLoading, setProfilLoading] = useState(true)
+  const [profilSaving, setProfilSaving] = useState(false)
+  const [profilSaved, setProfilSaved] = useState(false)
   const [entreprise, setEntreprise] = useState<Partial<Entreprise>>(ENTREPRISE_VIDE)
   const [entrepriseLoading, setEntrepriseLoading] = useState(true)
   const [savingEntreprise, setSavingEntreprise] = useState(false)
   const [entrepriseSaved, setEntrepriseSaved] = useState(false)
   const [integrations, setIntegrations] = useState({ mpr: '', apiAdresse: '' })
   const [notif, setNotif] = useState({ email: true, push: false, sms: false })
+
+  useEffect(() => {
+    if (!profile) return
+    const parts = (profile.nom_complet || '').trim().split(/\s+/).filter(Boolean)
+    setProfil({ nom: parts.length > 1 ? parts.slice(1).join(' ') : parts[0] || '', prenom: parts.length > 1 ? parts[0] : '', email: profile.email || '', telephone: profile.telephone || '' })
+    setProfilLoading(false)
+  }, [profile])
 
   useEffect(() => {
     supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => {
@@ -141,8 +153,16 @@ export function ParametresPage() {
     }
   }
 
-  function save() {
-    alert('Paramètres enregistrés localement.')
+  async function save() {
+    if (!profile?.id) return
+    setProfilSaving(true)
+    const nom_complet = `${profil.prenom} ${profil.nom}`.trim()
+    const { error } = await supabase.from('profiles').update({ nom_complet, email: profil.email, telephone: profil.telephone }).eq('id', profile.id)
+    setProfilSaving(false)
+    if (error) { alert(error.message); return }
+    setProfilSaved(true)
+    setTimeout(() => setProfilSaved(false), 2500)
+    window.location.reload()
   }
 
   return (
@@ -153,8 +173,8 @@ export function ParametresPage() {
           <p className="page-subtitle">Gérez votre compte, votre entreprise et vos intégrations</p>
         </div>
         <div className="page-actions">
-          <Button variant="primary" onClick={tab === 'entreprise' ? saveEntreprise : save} disabled={tab === 'entreprise' && savingEntreprise}>
-            <Save size={18} /> {tab === 'entreprise' ? (savingEntreprise ? 'Enregistrement…' : entrepriseSaved ? 'Enregistré ✓' : 'Enregistrer') : 'Enregistrer'}
+          <Button variant="primary" onClick={tab === 'entreprise' ? saveEntreprise : save} disabled={(tab === 'entreprise' && savingEntreprise) || (tab === 'profil' && profilSaving)}>
+            <Save size={18} /> {tab === 'entreprise' ? (savingEntreprise ? 'Enregistrement…' : entrepriseSaved ? 'Enregistré ✓' : 'Enregistrer') : tab === 'profil' ? (profilSaving ? 'Enregistrement…' : profilSaved ? 'Enregistré ✓' : 'Enregistrer') : 'Enregistrer'}
           </Button>
         </div>
       </div>
@@ -175,6 +195,7 @@ export function ParametresPage() {
         <div className="card-body">
           {tab === 'profil' && (
             <div className="grid grid-2 gap-3">
+              {profilLoading && <div className="text-sm text-muted" style={{gridColumn:'1 / -1'}}>Chargement de votre profil…</div>}
               <FloatInput label="Nom" value={profil.nom} onChange={v => setProfil({ ...profil, nom: v })} />
               <FloatInput label="Prénom" value={profil.prenom} onChange={v => setProfil({ ...profil, prenom: v })} />
               <FloatInput label="Email" type="email" value={profil.email} onChange={v => setProfil({ ...profil, email: v })} />

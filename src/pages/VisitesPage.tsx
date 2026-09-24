@@ -14,8 +14,11 @@ import {
   WifiOff,
   RefreshCw,
   CheckCircle2,
+  Trash2,
+  FileText,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../lib/auth/AuthContext'
 import { creerDevisDepuisTravaux } from '../lib/devis/creerDevisDepuisTravaux'
 import { creerDevisDepuisPV } from '../lib/devis/creerDevisDepuisPV'
 import type {
@@ -74,6 +77,26 @@ import { ImportRapportVT } from '../components/visites/ImportRapportVT'
 import type { ImportVTResult } from '../lib/pdf/import/importVT'
 import type { DispositifAide } from '../types'
 
+/** Mappe une catégorie du Catalogue produits vers le parcours VT correspondant.
+ * Le produit reste la source de vérité : la VT est créée avec l'id exact du produit
+ * (vt_produit_id), et ce mapping ne sert qu'à choisir les sections du wizard.
+ */
+function categorieVersProduitVisite(categorie: string | null | undefined): string | null {
+  switch ((categorie || '').trim().toLowerCase()) {
+    case 'combles': return 'combles'
+    case 'murs': return 'murs'
+    case 'plancher': return 'plancher'
+    case 'menuiseries': return 'menuiseries'
+    case 'pac_air_eau':
+    case 'pac_geothermie': return 'pac'
+    case 'pac_air_air': return 'pac_air_air'
+    case 'ballon_thermodynamique': return 'ballon_thermodynamique'
+    case 'vmc': return 'vmc'
+    case 'photovoltaique': return 'photovoltaique'
+    default: return null
+  }
+}
+
 interface Props {
   onBack: () => void
   onCreateDevis?: (devisId: string) => void
@@ -89,6 +112,9 @@ export function VisitesPage({
   initialProspectId,
   onInitialProspectHandled,
 }: Props) {
+  const { profile } = useAuth()
+  const admin = profile?.role === 'admin' || profile?.role === 'manager'
+
   const [view, setView] = useState<'list' | 'wizard' | 'overview'>('list')
   const [visites, setVisites] = useState<Visite[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -104,10 +130,7 @@ export function VisitesPage({
   const [newDate, setNewDate] = useState(
     new Date().toISOString().split('T')[0],
   )
-  const [newTypeVisite, setNewTypeVisite] = useState<
-    'complete' | 'produit'
-  >('complete')
-  const [newProduitCible, setNewProduitCible] = useState('')
+  const [newProduitId, setNewProduitId] = useState('')
   const [createError, setCreateError] = useState<string | null>(null)
 
   const [dpeResult, setDpeResult] = useState<
@@ -368,17 +391,13 @@ export function VisitesPage({
     [auditData],
   )
 
-  const activeSections = useMemo(
-    () =>
-      sectionsPourVisite(
-        currentVisite?.type_visite,
-        currentVisite?.produit_cible,
-      ),
-    [
-      currentVisite?.type_visite,
-      currentVisite?.produit_cible,
-    ],
-  )
+  const activeSections = useMemo(() => {
+    const base = sectionsPourVisite(currentVisite?.type_visite, currentVisite?.produit_cible)
+    const prospect = currentVisite?.prospect as Prospect | undefined
+    const isTh174 = (prospect?.fiches_cee || []).some(code => code === 'BAR-TH-174' || code === 'BAR TH 174')
+    const isPvVisit = currentVisite?.produit_cible === 'photovoltaique'
+    return isTh174 && !isPvVisit ? base.filter(id => id !== 10) : base
+  }, [currentVisite?.type_visite, currentVisite?.produit_cible, currentVisite?.prospect])
 
   const produitCibleInfo = produitVisiteById(
     currentVisite?.produit_cible,
@@ -416,9 +435,12 @@ export function VisitesPage({
     )
 
   const simulationPV = useMemo(() => {
+    const prospect = currentVisite?.prospect as Prospect | undefined
+    const isTh174 = (prospect?.fiches_cee || []).some(code => code === 'BAR-TH-174' || code === 'BAR TH 174')
     const pv = auditData.photovoltaique
 
     if (
+      (isTh174 && currentVisite?.produit_cible !== 'photovoltaique') ||
       !pv ||
       !pv.orientation_toiture ||
       (!pv.surface_disponible_m2 &&
@@ -435,6 +457,7 @@ export function VisitesPage({
     )
   }, [
     auditData.photovoltaique,
+    currentVisite?.prospect,
     batiment3CL.zoneClimatique,
     parametresTarifairesPV,
     prixCataloguePV,
@@ -821,12 +844,10 @@ export function VisitesPage({
 
       setCurrentVisite(visiteAOuvrir)
 
-      setCurrentSection(
-        sectionsPourVisite(
-          visite.type_visite,
-          visite.produit_cible,
-        )[0] || 1,
-      )
+      const isTh174 = ((visite.prospect as Prospect | undefined)?.fiches_cee || []).some(code => code === 'BAR-TH-174' || code === 'BAR TH 174')
+      const isPvVisit = visite.produit_cible === 'photovoltaique'
+      const sections = sectionsPourVisite(visite.type_visite, visite.produit_cible).filter(id => !(isTh174 && !isPvVisit && id === 10))
+      setCurrentSection(sections[0] || 1)
 
       setCurrentEtape(0)
       setDpeResult(null)
@@ -838,6 +859,26 @@ export function VisitesPage({
     [],
   )
 
+  const deleteVisite = useCallback(async (visite: Visite) => {
+    if (!admin) return
+    const p = visite.prospect as Prospect | undefined
+    const nom = p ? `${p.prenom} ${p.nom}` : 'ce client'
+    if (!confirm(`Supprimer définitivement la visite technique de ${nom} ?`)) return
+    const { error } = await supabase.from('visites').delete().eq('id', visite.id)
+    if (error) { alert(`Impossible de supprimer la visite : ${error.message}`); return }
+    await fetchVisites()
+  }, [admin, fetchVisites])
+
+  useEffect(() => {
+    if (!admin || visites.length === 0) return
+    const pendingId = localStorage.getItem('renova_pending_vt_id')
+    if (!pendingId) return
+    const visite = visites.find(v => v.id === pendingId)
+    if (!visite) return
+    localStorage.removeItem('renova_pending_vt_id')
+    startVisite(visite)
+  }, [admin, visites, startVisite])
+
   const createVisite = useCallback(async () => {
     if (!newProspectId) {
       setCreateError(
@@ -846,16 +887,18 @@ export function VisitesPage({
       return
     }
 
-    if (
-      newTypeVisite === 'produit' &&
-      !newProduitCible
-    ) {
-      setCreateError(
-        'Sélectionnez le produit à auditer.',
-      )
+    if (!newProduitId) {
+      setCreateError('Sélectionnez le produit qui fait l’objet de la visite technique.')
       return
     }
 
+    const selectedProduit = catalogueProduits.find(p => p.id === newProduitId)
+    if (!selectedProduit) {
+      setCreateError('Le produit sélectionné n’est plus disponible dans le catalogue.')
+      return
+    }
+
+    const produitCible = categorieVersProduitVisite(selectedProduit.categorie)
     setCreateError(null)
 
     const payload = {
@@ -863,11 +906,9 @@ export function VisitesPage({
       date_visite: newDate,
       statut: 'en_cours',
       audit_data: {},
-      type_visite: newTypeVisite,
-      produit_cible:
-        newTypeVisite === 'produit'
-          ? newProduitCible
-          : null,
+      type_visite: produitCible ? 'produit' : 'complete',
+      produit_cible: produitCible,
+      vt_produit_id: newProduitId,
     }
 
     const { data, error } = await supabase
@@ -899,8 +940,7 @@ export function VisitesPage({
 
     setShowNewModal(false)
     setNewProspectId('')
-    setNewTypeVisite('complete')
-    setNewProduitCible('')
+    setNewProduitId('')
     setCreateError(null)
 
     startVisite(data as any)
@@ -908,8 +948,9 @@ export function VisitesPage({
   }, [
     newProspectId,
     newDate,
-    newTypeVisite,
-    newProduitCible,
+    newProduitId,
+    catalogueProduits,
+    categorieVersProduitVisite,
     startVisite,
     fetchVisites,
   ])
@@ -930,13 +971,26 @@ export function VisitesPage({
 
       setCreateError(null)
 
+      if (!newProduitId) {
+        setCreateError('Sélectionnez d’abord le produit concerné par ce rapport de VT.')
+        return
+      }
+
+      const selectedProduit = catalogueProduits.find(p => p.id === newProduitId)
+      if (!selectedProduit) {
+        setCreateError('Le produit sélectionné n’est plus disponible dans le catalogue.')
+        return
+      }
+      const produitCible = categorieVersProduitVisite(selectedProduit.categorie)
+
       const payload = {
         prospect_id: newProspectId,
         date_visite: newDate,
         statut: 'en_cours',
         audit_data: importedAuditData,
-        type_visite: 'complete' as const,
-        produit_cible: null,
+        type_visite: (produitCible ? 'produit' : 'complete') as 'produit' | 'complete',
+        produit_cible: produitCible,
+        vt_produit_id: newProduitId,
       }
 
       const { data, error } = await supabase
@@ -970,8 +1024,7 @@ export function VisitesPage({
       setShowNewModal(false)
 
       setNewProspectId('')
-      setNewTypeVisite('complete')
-      setNewProduitCible('')
+          setNewProduitId('')
       setCreateError(null)
 
       startVisite(data as Visite)
@@ -981,6 +1034,9 @@ export function VisitesPage({
     [
       newProspectId,
       newDate,
+      newProduitId,
+      catalogueProduits,
+      categorieVersProduitVisite,
       startVisite,
       fetchVisites,
     ],
@@ -1002,8 +1058,7 @@ export function VisitesPage({
       setNewDate(
         new Date().toISOString().split('T')[0],
       )
-      setNewTypeVisite('complete')
-      setNewProduitCible('')
+          setNewProduitId('')
       setShowNewModal(true)
     }
 
@@ -1062,6 +1117,12 @@ export function VisitesPage({
                 </div>
               </div>
             </div>
+
+            <section className="dashboard-kpis page-kpi-strip">
+              <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><ClipboardCheck size={19}/></span><span className="dashboard-kpi-main"><strong>{visites.filter(v => v.statut !== 'terminee').length}</strong><span>Visites en cours</span></span><span className="dashboard-kpi-note">À terminer</span></div>
+              <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><CheckCircle2 size={19}/></span><span className="dashboard-kpi-main"><strong>{visites.filter(v => v.statut === 'terminee').length}</strong><span>Visites terminées</span></span><span className="dashboard-kpi-note">Audits validés</span></div>
+              <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><FileText size={19}/></span><span className="dashboard-kpi-main"><strong>{new Set(visites.map(v => (v as any).vt_produit_id).filter(Boolean)).size}</strong><span>Produits VT utilisés</span></span><span className="dashboard-kpi-note">Catalogue</span></div>
+            </section>
 
             {loading && (
               <div className="text-muted">
@@ -1173,6 +1234,7 @@ export function VisitesPage({
                   </div>
 
                   <div className="flex items-center gap-3">
+                    {admin && <button className="btn btn-sm btn-ghost" title="Supprimer cette visite technique" onClick={e => { e.stopPropagation(); deleteVisite(v) }}><Trash2 size={15} /></button>}
                     <div
                       className="progress-bar"
                       style={{
@@ -1250,7 +1312,7 @@ export function VisitesPage({
                 onClick={() =>
                   setShowImportVT(true)
                 }
-                disabled={!newProspectId}
+                disabled={!newProspectId || !newProduitId}
                 title={
                   !newProspectId
                     ? 'Sélectionnez d’abord un prospect'
@@ -1264,12 +1326,7 @@ export function VisitesPage({
               <button
                 className="btn btn-primary"
                 onClick={createVisite}
-                disabled={
-                  !newProspectId ||
-                  (newTypeVisite ===
-                    'produit' &&
-                    !newProduitCible)
-                }
+                disabled={!newProspectId || !newProduitId}
               >
                 Démarrer la visite
               </button>
@@ -1296,89 +1353,35 @@ export function VisitesPage({
               onChange={setNewDate}
             />
 
-            <div>
-              <div
-                className="section-label"
-                style={{
-                  marginBottom: 8,
-                }}
-              >
-                Type de visite
+            <div className="vt-create-product-block">
+              <div className="vt-create-product-head">
+                <div>
+                  <div className="font-semibold">Produit concerné par la visite</div>
+                  <div className="text-sm text-muted">Chaque produit du catalogue possède son propre parcours de visite technique.</div>
+                </div>
+                <span className="badge badge-info">Obligatoire</span>
               </div>
-
-              <div
-                style={{
-                  display: 'flex',
-                  gap: 8,
-                }}
-              >
-                <button
-                  type="button"
-                  className={`btn ${
-                    newTypeVisite ===
-                    'complete'
-                      ? 'btn-primary'
-                      : 'btn-secondary'
-                  }`}
-                  style={{ flex: 1 }}
-                  onClick={() =>
-                    setNewTypeVisite(
-                      'complete',
-                    )
-                  }
-                >
-                  Audit complet
-                  (10 sections)
-                </button>
-
-                <button
-                  type="button"
-                  className={`btn ${
-                    newTypeVisite ===
-                    'produit'
-                      ? 'btn-primary'
-                      : 'btn-secondary'
-                  }`}
-                  style={{ flex: 1 }}
-                  onClick={() =>
-                    setNewTypeVisite(
-                      'produit',
-                    )
-                  }
-                >
-                  Produit spécifique
-                </button>
+              <div className="vt-product-picker">
+                {catalogueProduits.map(p => {
+                  const cible = categorieVersProduitVisite(p.categorie)
+                  return (
+                    <button
+                      key={p.id}
+                      type="button"
+                      className={`vt-product-option ${newProduitId === p.id ? 'selected' : ''}`}
+                      onClick={() => {
+                        setNewProduitId(p.id)
+                      }}
+                    >
+                      <span className="vt-product-option-icon"><Wrench size={17}/></span>
+                      <span><strong>{p.nom}</strong><small>{p.categorie || 'Produit catalogue'}{cible ? ` · ${produitVisiteById(cible)?.label || ''}` : ''}</small></span>
+                      <span className="vt-choice-radio"/>
+                    </button>
+                  )
+                })}
               </div>
+              {catalogueProduits.length === 0 && <div className="vt-modern-empty"><Wrench size={20}/><div><strong>Aucun produit actif disponible</strong><span>Vérifiez le catalogue produits.</span></div></div>}
             </div>
-
-            {newTypeVisite ===
-              'produit' && (
-              <FloatSelect
-                label="Produit visité"
-                value={newProduitCible}
-                onChange={
-                  setNewProduitCible
-                }
-                options={PRODUITS_VISITE.map(
-                  p => ({
-                    value: p.id,
-                    label: p.label,
-                  }),
-                )}
-              />
-            )}
-
-            {newTypeVisite ===
-              'produit' &&
-              newProduitCible && (
-                <p className="text-sm text-muted">
-                  {
-                    produitVisiteById(
-                      newProduitCible,
-                    )?.description
-                  }
-                </p>
-              )}
 
             {createError && (
               <div
@@ -1885,11 +1888,27 @@ export function VisitesPage({
 
         <button
           className="btn btn-primary"
-          onClick={() =>
+          onClick={async () => {
+            if (!currentVisite) return
+
+            const { data, error } = await supabase
+              .from('visites')
+              .update({ statut: 'terminee' })
+              .eq('id', currentVisite.id)
+              .select('*, prospect:prospects(*)')
+              .single()
+
+            if (error) {
+              alert(`Impossible de valider la visite : ${error.message}`)
+              return
+            }
+
+            setCurrentVisite(data as Visite)
+            await fetchVisites()
             setView('list')
-          }
+          }}
         >
-          Terminer
+          Valider la VT
         </button>
       </div>
 

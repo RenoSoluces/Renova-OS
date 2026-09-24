@@ -170,3 +170,46 @@
 ::-webkit-scrollbar-track{background:transparent}
 ::-webkit-scrollbar-thumb{background:var(--c-border-dark);border-radius:4px}
 ::-webkit-scrollbar-thumb:hover{background:var(--c-text-muted)}
+
+/* Responsive shell — desktop, tablette et mobile */
+@media (max-width: 1100px){
+  .sidebar{width:82px;min-width:82px}
+  .sidebar-brand{justify-content:center;padding:16px 10px}
+  .sidebar-brand-text,.sidebar-section-label,.sidebar-item-label,.sidebar-item-badge,.sidebar-user-info{display:none}
+  .sidebar-nav{padding:12px 8px}
+  .sidebar-item{justify-content:center;padding:11px 8px}
+  .sidebar-item.active::before{left:0}
+  .sidebar-footer{padding:10px 8px}
+  .sidebar-user{justify-content:center;padding:8px}
+  .topbar{padding:0 16px;gap:10px}
+  .topbar-search{width:min(240px,28vw)}
+  .page{padding:22px 20px}
+  .grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media (max-width: 760px){
+  .app-layout{min-height:100dvh}
+  .sidebar{width:64px;min-width:64px}
+  .sidebar-brand{padding:12px 8px}
+  .sidebar-brand-logo{width:34px;height:34px;font-size:16px}
+  .sidebar-nav{padding:8px 6px;gap:4px}
+  .sidebar-item{width:52px;height:46px;padding:8px;border-radius:12px}
+  .sidebar-item svg{width:19px;height:19px}
+  .sidebar-footer{display:none}
+  .topbar{height:auto;min-height:58px;padding:9px 10px;gap:7px;flex-wrap:nowrap}
+  .topbar-title{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .topbar-sub{display:none}
+  .topbar-search{display:none}
+  .topbar-icon-btn{width:34px;height:34px;flex:0 0 34px}
+  .topbar-avatar{width:31px;height:31px;flex:0 0 31px}
+  .page{padding:16px 12px 28px}
+  .page-header{flex-direction:column;gap:12px;margin-bottom:18px}
+  .page-title{font-size:22px}
+  .page-actions{width:100%;flex-wrap:wrap}
+  .page-actions > *{max-width:100%}
+  .grid,.grid-2,.grid-3,.grid-4,.grid-12{grid-template-columns:1fr!important}
+  .card-header,.card-body,.card-pad{padding:14px}
+  .field input,.field select,.field textarea{font-size:16px}
+  .table-wrap,.data-table-wrap,.responsive-table{overflow-x:auto;-webkit-overflow-scrolling:touch}
+  table{min-width:680px}
+  .modal{width:calc(100vw - 24px)!important;max-width:calc(100vw - 24px)!important;max-height:calc(100dvh - 24px);overflow:auto}
+}

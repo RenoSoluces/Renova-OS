@@ -10,12 +10,17 @@ import {
   Pencil,
   Trash2,
   Building2,
-  UserRound,
-  CalendarDays,
+  Search,
+  Filter,
+  RotateCcw,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
-import type { Commission, CommissionBareme, CommissionType } from '../types'
+import type {
+  Commission,
+  CommissionBareme,
+  CommissionType,
+} from '../types'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
@@ -44,9 +49,18 @@ const EMPTY = {
 }
 
 type PaymentTarget = 'commercial' | 'societe'
+type PaymentFilter = 'toutes' | 'a_payer' | 'payees'
+
+type CommissionWithCommercial = Commission & {
+  commercial?: {
+    id: string
+    nom_complet: string
+    couleur?: string
+  } | null
+}
 
 function formatDate(value?: string | null) {
-  if (!value) return 'Non payée'
+  if (!value) return '—'
   return new Date(value).toLocaleDateString('fr-FR')
 }
 
@@ -54,97 +68,326 @@ function todayInput() {
   return new Date().toISOString().slice(0, 10)
 }
 
+function firstName(name?: string | null) {
+  return (name || 'Commercial').split(' ')[0]
+}
+
+function amount(value: unknown) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : 0
+}
+
 export function CommissionsPage() {
   const { profile } = useAuth()
-  const admin = profile?.role === 'admin' || profile?.role === 'manager'
+  const admin =
+    profile?.role === 'admin' || profile?.role === 'manager'
 
   const [tab, setTab] = useState<'suivi' | 'bareme'>('suivi')
-  const [rows, setRows] = useState<Commission[]>([])
+  const [rows, setRows] = useState<CommissionWithCommercial[]>([])
   const [rules, setRules] = useState<CommissionBareme[]>([])
   const [commerciaux, setCommerciaux] = useState<any[]>([])
   const [produits, setProduits] = useState<any[]>([])
+
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>(EMPTY)
   const [editing, setEditing] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+
   const [paymentModal, setPaymentModal] = useState(false)
-  const [paymentTarget, setPaymentTarget] = useState<PaymentTarget>('commercial')
-  const [paymentCommission, setPaymentCommission] = useState<Commission | null>(null)
+  const [paymentTarget, setPaymentTarget] =
+    useState<PaymentTarget>('commercial')
+  const [paymentCommission, setPaymentCommission] =
+    useState<CommissionWithCommercial | null>(null)
   const [paymentDate, setPaymentDate] = useState(todayInput())
   const [paymentSaving, setPaymentSaving] = useState(false)
 
+  const [search, setSearch] = useState('')
+  const [commercialFilter, setCommercialFilter] =
+    useState('all')
+  const [periodStart, setPeriodStart] = useState('')
+  const [periodEnd, setPeriodEnd] = useState('')
+  const [paymentFilter, setPaymentFilter] =
+    useState<PaymentFilter>('toutes')
+
   const load = useCallback(async () => {
     setLoading(true)
-    const [c, b, p, u] = await Promise.all([
-      supabase
-        .from('commissions')
-        .select('*, commercial:profiles(id, nom_complet)')
-        .order('date_generation', { ascending: false }),
-      supabase
-        .from('commission_bareme')
-        .select('*')
-        .order('priorite', { ascending: false })
-        .order('created_at', { ascending: false }),
-      supabase
-        .from('catalogue_produits')
-        .select('id,nom,categorie')
-        .eq('actif', true)
-        .order('nom'),
-      supabase
-        .from('profiles')
-        .select('id,nom_complet,role')
-        .in('role', ['commercial', 'manager', 'admin'])
-        .order('nom_complet'),
+
+    const commissionQuery = supabase
+      .from('commissions')
+      .select(
+        '*, commercial:profiles(id, nom_complet)',
+      )
+      .order('date_generation', {
+        ascending: false,
+      })
+
+    const baremeQuery = supabase
+      .from('commission_bareme')
+      .select('*')
+      .order('priorite', {
+        ascending: false,
+      })
+      .order('created_at', {
+        ascending: false,
+      })
+
+    const produitsQuery = supabase
+      .from('catalogue_produits')
+      .select('id,nom,categorie')
+      .eq('actif', true)
+      .order('nom')
+
+    const commerciauxQuery = supabase
+      .from('profiles')
+      .select('id,nom_complet,role')
+      .in('role', [
+        'commercial',
+        'manager',
+        'admin',
+      ])
+      .order('nom_complet')
+
+    const [
+      commissionResult,
+      baremeResult,
+      produitsResult,
+      commerciauxResult,
+    ] = await Promise.all([
+      commissionQuery,
+      baremeQuery,
+      produitsQuery,
+      commerciauxQuery,
     ])
 
-    if (c.error) console.error('[RENOVA OS] Chargement commissions:', c.error)
-    if (b.error) console.error('[RENOVA OS] Chargement barèmes:', b.error)
+    if (commissionResult.error) {
+      console.error(
+        '[RENOVA OS] Chargement commissions:',
+        commissionResult.error,
+      )
+    }
 
-    setRows((c.data || []) as Commission[])
-    setRules((b.data || []) as CommissionBareme[])
-    setProduits(p.data || [])
-    setCommerciaux(u.data || [])
+    if (baremeResult.error) {
+      console.error(
+        '[RENOVA OS] Chargement barèmes:',
+        baremeResult.error,
+      )
+    }
+
+    const baseRows =
+      (commissionResult.data || []) as CommissionWithCommercial[]
+
+    /*
+     * Important :
+     * un commercial ne doit voir que ses commissions.
+     *
+     * La RLS commissions fait déjà ce filtrage côté DB,
+     * mais on conserve aussi une sécurité côté interface.
+     */
+    const visibleRows = admin
+      ? baseRows
+      : baseRows.filter(
+          (row) =>
+            row.commercial_id === profile?.id,
+        )
+
+    setRows(visibleRows)
+
+    setRules(
+      (baremeResult.data || []) as CommissionBareme[],
+    )
+
+    setProduits(produitsResult.data || [])
+    setCommerciaux(commerciauxResult.data || [])
     setLoading(false)
-  }, [])
+  }, [admin, profile?.id])
 
   useEffect(() => {
     load()
   }, [load])
 
+  /*
+   * FILTRES
+   */
+  const filteredRows = useMemo(() => {
+    const query = search.trim().toLowerCase()
+
+    return rows.filter((r) => {
+      if (
+        admin &&
+        commercialFilter !== 'all' &&
+        r.commercial_id !== commercialFilter
+      ) {
+        return false
+      }
+
+      const generated =
+        r.date_generation?.slice(0, 10) || ''
+
+      if (
+        periodStart &&
+        generated < periodStart
+      ) {
+        return false
+      }
+
+      if (
+        periodEnd &&
+        generated > periodEnd
+      ) {
+        return false
+      }
+
+      if (
+        paymentFilter === 'a_payer' &&
+        !!r.date_paiement_commercial
+      ) {
+        return false
+      }
+
+      if (
+        paymentFilter === 'payees' &&
+        !r.date_paiement_commercial
+      ) {
+        return false
+      }
+
+      if (query) {
+        const haystack = [
+          r.libelle,
+          r.commercial?.nom_complet,
+          TYPES[r.type],
+          r.reference_type,
+          r.reference_id,
+        ]
+          .filter(Boolean)
+          .join(' ')
+          .toLowerCase()
+
+        if (!haystack.includes(query)) {
+          return false
+        }
+      }
+
+      return true
+    })
+  }, [
+    rows,
+    admin,
+    commercialFilter,
+    periodStart,
+    periodEnd,
+    paymentFilter,
+    search,
+  ])
+
+  /*
+   * COMMISSIONS COMMERCIAL
+   */
   const totalCommercial = useMemo(
-    () => rows.reduce((s, r) => s + Number(r.montant_commercial || 0), 0),
-    [rows],
+    () =>
+      filteredRows
+        .filter(
+          (r) => r.statut !== 'annulee',
+        )
+        .reduce(
+          (sum, r) =>
+            sum + amount(r.montant_commercial),
+          0,
+        ),
+    [filteredRows],
   )
 
   const commercialEnAttente = useMemo(
-    () => rows
-      .filter(r => r.statut !== 'annulee' && !r.date_paiement_commercial)
-      .reduce((s, r) => s + Number(r.montant_commercial || 0), 0),
-    [rows],
+    () =>
+      filteredRows
+        .filter(
+          (r) =>
+            r.statut !== 'annulee' &&
+            !r.date_paiement_commercial,
+        )
+        .reduce(
+          (sum, r) =>
+            sum + amount(r.montant_commercial),
+          0,
+        ),
+    [filteredRows],
   )
 
   const commercialPaye = useMemo(
-    () => rows
-      .filter(r => !!r.date_paiement_commercial)
-      .reduce((s, r) => s + Number(r.montant_commercial || 0), 0),
-    [rows],
+    () =>
+      filteredRows
+        .filter(
+          (r) =>
+            !!r.date_paiement_commercial,
+        )
+        .reduce(
+          (sum, r) =>
+            sum + amount(r.montant_commercial),
+          0,
+        ),
+    [filteredRows],
   )
 
-  const societeEnAttente = useMemo(
-    () => rows
-      .filter(r => r.statut !== 'annulee' && !r.date_paiement_societe)
-      .reduce((s, r) => s + Number(r.montant_societe || 0), 0),
-    [rows],
+  /*
+   * COMMISSION POTENTIELLE RENO SOLUCES
+   */
+  const renovaEnAttente = useMemo(
+    () =>
+      filteredRows
+        .filter(
+          (r) =>
+            r.statut !== 'annulee' &&
+            !r.date_paiement_societe,
+        )
+        .reduce(
+          (sum, r) =>
+            sum + amount(r.montant_societe),
+          0,
+        ),
+    [filteredRows],
   )
 
-  const societePaye = useMemo(
-    () => rows
-      .filter(r => !!r.date_paiement_societe)
-      .reduce((s, r) => s + Number(r.montant_societe || 0), 0),
-    [rows],
+  const renovaPaye = useMemo(
+    () =>
+      filteredRows
+        .filter(
+          (r) =>
+            !!r.date_paiement_societe,
+        )
+        .reduce(
+          (sum, r) =>
+            sum + amount(r.montant_societe),
+          0,
+        ),
+    [filteredRows],
   )
 
+  const renovaTotal = useMemo(
+    () =>
+      filteredRows
+        .filter(
+          (r) => r.statut !== 'annulee',
+        )
+        .reduce(
+          (sum, r) =>
+            sum + amount(r.montant_societe),
+          0,
+        ),
+    [filteredRows],
+  )
+
+  function resetFilters() {
+    setSearch('')
+    setCommercialFilter('all')
+    setPeriodStart('')
+    setPeriodEnd('')
+    setPaymentFilter('toutes')
+  }
+
+  /*
+   * MATRICE DE RÉMUNÉRATION
+   */
   function openNew() {
     setEditing(null)
     setForm({ ...EMPTY })
@@ -153,49 +396,95 @@ export function CommissionsPage() {
 
   function openEdit(r: any) {
     setEditing(r.id)
+
     setForm({
       type: r.type,
       libelle: r.libelle,
-      commercial_id: r.commercial_id || '',
-      produit_id: r.produit_id || '',
-      montant_commercial: String(r.montant_commercial ?? ''),
-      montant_societe: String(r.montant_societe ?? ''),
-      pourcentage_commercial: r.pourcentage_commercial == null ? '' : String(r.pourcentage_commercial),
+      commercial_id:
+        r.commercial_id || '',
+      produit_id:
+        r.produit_id || '',
+      montant_commercial:
+        String(
+          r.montant_commercial ?? '',
+        ),
+      montant_societe:
+        String(
+          r.montant_societe ?? '',
+        ),
+      pourcentage_commercial:
+        r.pourcentage_commercial == null
+          ? ''
+          : String(
+              r.pourcentage_commercial,
+            ),
       mode: r.mode || 'fixe',
-      base_pourcentage: r.base_pourcentage || 'montant_ht',
-      priorite: String(r.priorite || 0),
-      date_debut: r.date_debut || '',
-      date_fin: r.date_fin || '',
+      base_pourcentage:
+        r.base_pourcentage ||
+        'montant_ht',
+      priorite: String(
+        r.priorite || 0,
+      ),
+      date_debut:
+        r.date_debut || '',
+      date_fin:
+        r.date_fin || '',
       actif: r.actif,
     })
+
     setModal(true)
   }
 
   async function save() {
     if (!form.libelle) return
+
     setSaving(true)
 
     const payload = {
       type: form.type,
       libelle: form.libelle,
-      commercial_id: form.commercial_id || null,
-      produit_id: form.produit_id || null,
-      montant_commercial: Number(form.montant_commercial) || 0,
-      montant_societe: Number(form.montant_societe) || 0,
-      pourcentage_commercial: form.pourcentage_commercial === '' ? null : Number(form.pourcentage_commercial),
+      commercial_id:
+        form.commercial_id || null,
+      produit_id:
+        form.produit_id || null,
+      montant_commercial:
+        Number(
+          form.montant_commercial,
+        ) || 0,
+      montant_societe:
+        Number(
+          form.montant_societe,
+        ) || 0,
+      pourcentage_commercial:
+        form.pourcentage_commercial ===
+        ''
+          ? null
+          : Number(
+              form.pourcentage_commercial,
+            ),
       mode: form.mode,
-      base_pourcentage: form.base_pourcentage,
-      priorite: Number(form.priorite) || 0,
-      date_debut: form.date_debut || null,
-      date_fin: form.date_fin || null,
+      base_pourcentage:
+        form.base_pourcentage,
+      priorite:
+        Number(form.priorite) || 0,
+      date_debut:
+        form.date_debut || null,
+      date_fin:
+        form.date_fin || null,
       actif: form.actif,
     }
 
     const q = editing
-      ? supabase.from('commission_bareme').update(payload).eq('id', editing)
-      : supabase.from('commission_bareme').insert(payload)
+      ? supabase
+          .from('commission_bareme')
+          .update(payload)
+          .eq('id', editing)
+      : supabase
+          .from('commission_bareme')
+          .insert(payload)
 
     const { error } = await q
+
     setSaving(false)
 
     if (error) {
@@ -208,17 +497,41 @@ export function CommissionsPage() {
   }
 
   async function remove(id: string) {
-    if (!confirm('Supprimer cette règle ?')) return
-    await supabase.from('commission_bareme').delete().eq('id', id)
+    if (
+      !confirm(
+        'Supprimer cette règle ?',
+      )
+    ) {
+      return
+    }
+
+    const { error } = await supabase
+      .from('commission_bareme')
+      .delete()
+      .eq('id', id)
+
+    if (error) {
+      alert(error.message)
+    }
+
     load()
   }
 
-  async function status(c: Commission, s: 'validee' | 'annulee') {
+  /*
+   * VALIDATION / ANNULATION
+   */
+  async function status(
+    c: CommissionWithCommercial,
+    s: 'validee' | 'annulee',
+  ) {
     const { error } = await supabase
       .from('commissions')
       .update({
         statut: s,
-        date_validation: s === 'validee' ? new Date().toISOString() : null,
+        date_validation:
+          s === 'validee'
+            ? new Date().toISOString()
+            : null,
       })
       .eq('id', c.id)
 
@@ -230,41 +543,88 @@ export function CommissionsPage() {
     load()
   }
 
-  function openPayment(c: Commission, target: PaymentTarget) {
+  /*
+   * PAIEMENT
+   */
+  function openPayment(
+    c: CommissionWithCommercial,
+    target: PaymentTarget,
+  ) {
     setPaymentCommission(c)
     setPaymentTarget(target)
-    const current = target === 'commercial'
-      ? c.date_paiement_commercial
-      : c.date_paiement_societe
-    setPaymentDate(current ? current.slice(0, 10) : todayInput())
+
+    const current =
+      target === 'commercial'
+        ? c.date_paiement_commercial
+        : c.date_paiement_societe
+
+    setPaymentDate(
+      current
+        ? current.slice(0, 10)
+        : todayInput(),
+    )
+
     setPaymentModal(true)
   }
 
   async function savePayment() {
-    if (!paymentCommission || !paymentDate) return
+    if (
+      !paymentCommission ||
+      !paymentDate
+    ) {
+      return
+    }
+
     setPaymentSaving(true)
 
-    const paymentIso = new Date(`${paymentDate}T12:00:00`).toISOString()
-    const field = paymentTarget === 'commercial'
-      ? 'date_paiement_commercial'
-      : 'date_paiement_societe'
+    const paymentIso = new Date(
+      `${paymentDate}T12:00:00`,
+    ).toISOString()
 
-    const nextCommercialDate = paymentTarget === 'commercial'
-      ? paymentIso
-      : paymentCommission.date_paiement_commercial
-    const nextSocieteDate = paymentTarget === 'societe'
-      ? paymentIso
-      : paymentCommission.date_paiement_societe
+    const field =
+      paymentTarget === 'commercial'
+        ? 'date_paiement_commercial'
+        : 'date_paiement_societe'
 
-    const bothPaid = !!nextCommercialDate && !!nextSocieteDate
+    const nextCommercialDate =
+      paymentTarget ===
+      'commercial'
+        ? paymentIso
+        : paymentCommission.date_paiement_commercial
 
-    const { error } = await supabase
-      .from('commissions')
-      .update({
-        [field]: paymentIso,
-        ...(bothPaid ? { statut: 'payee' } : {}),
-      })
-      .eq('id', paymentCommission.id)
+    const nextSocieteDate =
+      paymentTarget === 'societe'
+        ? paymentIso
+        : paymentCommission.date_paiement_societe
+
+    const bothPaid =
+      !!nextCommercialDate &&
+      !!nextSocieteDate
+
+    const { error } =
+      await supabase
+        .from('commissions')
+        .update({
+          [field]: paymentIso,
+
+          /*
+           * Une commission est entièrement payée
+           * uniquement lorsque les deux paiements
+           * existent.
+           */
+          ...(bothPaid
+            ? {
+                statut: 'payee',
+              }
+            : {
+                statut:
+                  'validee',
+              }),
+        })
+        .eq(
+          'id',
+          paymentCommission.id,
+        )
 
     setPaymentSaving(false)
 
@@ -275,32 +635,54 @@ export function CommissionsPage() {
 
     setPaymentModal(false)
     setPaymentCommission(null)
+
     load()
   }
 
-  async function clearPayment(c: Commission, target: PaymentTarget) {
-    const label = target === 'commercial' ? 'commercial' : 'société'
-    if (!confirm(`Retirer la date de paiement du ${label} ?`)) return
+  async function clearPayment(
+    c: CommissionWithCommercial,
+    target: PaymentTarget,
+  ) {
+    const label =
+      target === 'commercial'
+        ? 'commercial'
+        : 'Reno Soluces'
 
-    const field = target === 'commercial'
-      ? 'date_paiement_commercial'
-      : 'date_paiement_societe'
+    if (
+      !confirm(
+        `Retirer la date de paiement du ${label} ?`,
+      )
+    ) {
+      return
+    }
 
-    const otherPaid = target === 'commercial'
-      ? !!c.date_paiement_societe
-      : !!c.date_paiement_commercial
+    const field =
+      target === 'commercial'
+        ? 'date_paiement_commercial'
+        : 'date_paiement_societe'
 
-    const { error } = await supabase
-      .from('commissions')
-      .update({
-        [field]: null,
-        ...(c.statut === 'payee' ? { statut: otherPaid ? 'validee' : 'en_attente' } : {}),
-      })
-      .eq('id', c.id)
+    const otherPaid =
+      target === 'commercial'
+        ? !!c.date_paiement_societe
+        : !!c.date_paiement_commercial
+
+    const { error } =
+      await supabase
+        .from('commissions')
+        .update({
+          [field]: null,
+          ...(c.statut === 'payee'
+            ? {
+                statut: otherPaid
+                  ? 'validee'
+                  : 'en_attente',
+              }
+            : {}),
+        })
+        .eq('id', c.id)
 
     if (error) {
       alert(error.message)
-      return
     }
 
     load()
@@ -310,218 +692,1383 @@ export function CommissionsPage() {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Commissions</h1>
-          <p className="page-subtitle">Suivi séparé des commissions commerciales et de la part société.</p>
+          <h1 className="page-title">
+            {admin
+              ? 'Suivi financier'
+              : 'Mes commissions'}
+          </h1>
+
+          <p className="page-subtitle">
+            {admin
+              ? 'Pilotage des commissions commerciales et du suivi des paiements.'
+              : `Bonjour ${firstName(
+                  profile?.nom_complet,
+                )}, voici le suivi de vos commissions.`}
+          </p>
         </div>
-        {admin && tab === 'bareme' && (
-          <Button variant="primary" onClick={openNew}>
-            <Plus size={18} /> Nouvelle règle
-          </Button>
-        )}
+
+        {admin &&
+          tab === 'bareme' && (
+            <Button
+              variant="primary"
+              onClick={openNew}
+            >
+              <Plus size={18} />
+              Nouvelle règle
+            </Button>
+          )}
       </div>
 
       {admin && (
-        <div className="view-toggle" style={{ marginBottom: 16 }}>
-          <button className={`view-toggle-btn ${tab === 'suivi' ? 'active' : ''}`} onClick={() => setTab('suivi')}>
-            <Wallet size={15} /> Suivi
+        <div
+          className="view-toggle"
+          style={{
+            marginBottom: 16,
+          }}
+        >
+          <button
+            className={`view-toggle-btn ${
+              tab === 'suivi'
+                ? 'active'
+                : ''
+            }`}
+            onClick={() =>
+              setTab('suivi')
+            }
+          >
+            <Wallet size={15} />
+            Suivi financier
           </button>
-          <button className={`view-toggle-btn ${tab === 'bareme' ? 'active' : ''}`} onClick={() => setTab('bareme')}>
-            <Settings2 size={15} /> Matrice de rémunération
+
+          <button
+            className={`view-toggle-btn ${
+              tab === 'bareme'
+                ? 'active'
+                : ''
+            }`}
+            onClick={() =>
+              setTab('bareme')
+            }
+          >
+            <Settings2 size={15} />
+            Matrice de rémunération
           </button>
         </div>
       )}
 
-      {(tab === 'suivi' || !admin) && (
+      {(tab === 'suivi' ||
+        !admin) && (
         <>
-          <div className="kpi-grid" style={{ marginBottom: 20 }}>
+          <div
+            className="kpi-grid page-kpi-strip"
+            style={{
+              marginBottom: 20,
+            }}
+          >
             <div className="kpi-tile">
-              <div className="kpi-tile-icon amber"><Clock size={20} /></div>
-              <div className="kpi-tile-value">{euro(commercialEnAttente)}</div>
-              <div className="kpi-tile-label">Commercial à payer</div>
+              <div className="kpi-tile-icon amber">
+                <Clock size={20} />
+              </div>
+
+              <div className="kpi-tile-value">
+                {euro(
+                  commercialEnAttente,
+                )}
+              </div>
+
+              <div className="kpi-tile-label">
+                {admin
+                  ? 'Commissions commerciales en cours'
+                  : 'Mes commissions en cours'}
+              </div>
             </div>
+
             <div className="kpi-tile">
-              <div className="kpi-tile-icon green"><Banknote size={20} /></div>
-              <div className="kpi-tile-value">{euro(commercialPaye)}</div>
-              <div className="kpi-tile-label">Commercial déjà payé</div>
+              <div className="kpi-tile-icon green">
+                <Banknote size={20} />
+              </div>
+
+              <div className="kpi-tile-value">
+                {euro(
+                  commercialPaye,
+                )}
+              </div>
+
+              <div className="kpi-tile-label">
+                {admin
+                  ? 'Commissions commerciales payées'
+                  : 'Mes commissions payées'}
+              </div>
             </div>
+
+            <div className="kpi-tile">
+              <div className="kpi-tile-icon blue">
+                <CheckCircle2 size={20} />
+              </div>
+
+              <div className="kpi-tile-value">
+                {euro(
+                  totalCommercial,
+                )}
+              </div>
+
+              <div className="kpi-tile-label">
+                Total commissions commerciales
+              </div>
+            </div>
+
             {admin && (
-              <>
-                <div className="kpi-tile">
-                  <div className="kpi-tile-icon amber"><Building2 size={20} /></div>
-                  <div className="kpi-tile-value">{euro(societeEnAttente)}</div>
-                  <div className="kpi-tile-label">Société à payer</div>
+              <div className="kpi-tile">
+                <div className="kpi-tile-icon purple">
+                  <Building2 size={20} />
                 </div>
-                <div className="kpi-tile">
-                  <div className="kpi-tile-icon green"><CheckCircle2 size={20} /></div>
-                  <div className="kpi-tile-value">{euro(societePaye)}</div>
-                  <div className="kpi-tile-label">Société déjà payée</div>
+
+                <div className="kpi-tile-value">
+                  {euro(
+                    renovaEnAttente,
+                  )}
                 </div>
-              </>
+
+                <div className="kpi-tile-label">
+                  Commission potentielle Reno Soluces
+                  en cours
+                </div>
+              </div>
             )}
-            <div className="kpi-tile">
-              <div className="kpi-tile-icon purple"><Wallet size={20} /></div>
-              <div className="kpi-tile-value">{euro(totalCommercial)}</div>
-              <div className="kpi-tile-label">Total commissions commerciales</div>
+          </div>
+
+          {admin && (
+            <div
+              className="kpi-grid page-kpi-strip"
+              style={{
+                marginBottom: 20,
+              }}
+            >
+              <div className="kpi-tile">
+                <div className="kpi-tile-icon purple">
+                  <Building2 size={20} />
+                </div>
+
+                <div className="kpi-tile-value">
+                  {euro(
+                    renovaTotal,
+                  )}
+                </div>
+
+                <div className="kpi-tile-label">
+                  Total potentiel Reno Soluces
+                </div>
+              </div>
+
+              <div className="kpi-tile">
+                <div className="kpi-tile-icon green">
+                  <Banknote size={20} />
+                </div>
+
+                <div className="kpi-tile-value">
+                  {euro(
+                    renovaPaye,
+                  )}
+                </div>
+
+                <div className="kpi-tile-label">
+                  Reno Soluces payé
+                </div>
+              </div>
+            </div>
+          )}
+
+          <div
+            className="card"
+            style={{
+              marginBottom: 16,
+            }}
+          >
+            <div className="card-pad">
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems:
+                    'center',
+                  gap: 8,
+                  marginBottom: 12,
+                }}
+              >
+                <Filter size={16} />
+                <strong>
+                  Filtres
+                </strong>
+              </div>
+
+              <div
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns:
+                    admin
+                      ? '1.4fr 1fr 1fr 1fr 1fr'
+                      : '1.5fr 1fr 1fr 1fr',
+                  gap: 10,
+                }}
+              >
+                <div
+                  style={{
+                    position:
+                      'relative',
+                  }}
+                >
+                  <Search
+                    size={15}
+                    style={{
+                      position:
+                        'absolute',
+                      left: 10,
+                      top: 12,
+                      zIndex: 1,
+                    }}
+                  />
+
+                  <input
+                    value={search}
+                    onChange={(e) =>
+                      setSearch(
+                        e.target.value,
+                      )
+                    }
+                    placeholder="Client, référence, libellé…"
+                    style={{
+                      width:
+                        '100%',
+                      padding:
+                        '10px 10px 10px 32px',
+                      border:
+                        '1px solid var(--c-border)',
+                      borderRadius: 8,
+                      background:
+                        'white',
+                    }}
+                  />
+                </div>
+
+                {admin && (
+                  <select
+                    value={
+                      commercialFilter
+                    }
+                    onChange={(e) =>
+                      setCommercialFilter(
+                        e.target.value,
+                      )
+                    }
+                    style={{
+                      width:
+                        '100%',
+                      padding: 10,
+                      border:
+                        '1px solid var(--c-border)',
+                      borderRadius: 8,
+                      background:
+                        'white',
+                    }}
+                  >
+                    <option value="all">
+                      Tous les commerciaux
+                    </option>
+
+                    {commerciaux.map(
+                      (c) => (
+                        <option
+                          key={c.id}
+                          value={c.id}
+                        >
+                          {c.nom_complet ||
+                            c.email}
+                        </option>
+                      ),
+                    )}
+                  </select>
+                )}
+
+                <input
+                  type="date"
+                  value={periodStart}
+                  onChange={(e) =>
+                    setPeriodStart(
+                      e.target.value,
+                    )
+                  }
+                  style={{
+                    width:
+                      '100%',
+                    padding: 10,
+                    border:
+                      '1px solid var(--c-border)',
+                    borderRadius: 8,
+                  }}
+                />
+
+                <input
+                  type="date"
+                  value={periodEnd}
+                  onChange={(e) =>
+                    setPeriodEnd(
+                      e.target.value,
+                    )
+                  }
+                  style={{
+                    width:
+                      '100%',
+                    padding: 10,
+                    border:
+                      '1px solid var(--c-border)',
+                    borderRadius: 8,
+                  }}
+                />
+
+                <select
+                  value={
+                    paymentFilter
+                  }
+                  onChange={(e) =>
+                    setPaymentFilter(
+                      e.target
+                        .value as PaymentFilter,
+                    )
+                  }
+                  style={{
+                    width:
+                      '100%',
+                    padding: 10,
+                    border:
+                      '1px solid var(--c-border)',
+                    borderRadius: 8,
+                    background:
+                      'white',
+                  }}
+                >
+                  <option value="toutes">
+                    Tous les paiements
+                  </option>
+
+                  <option value="a_payer">
+                    À payer
+                  </option>
+
+                  <option value="payees">
+                    Payées
+                  </option>
+                </select>
+              </div>
+
+              <div
+                style={{
+                  display:
+                    'flex',
+                  justifyContent:
+                    'flex-end',
+                  marginTop: 10,
+                }}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={
+                    resetFilters
+                  }
+                >
+                  <RotateCcw
+                    size={14}
+                  />
+                  Réinitialiser
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="prospect-list-card">
-            {loading ? (
-              <div className="card-pad text-muted">Chargement…</div>
-            ) : rows.length === 0 ? (
-              <div className="empty-state">
-                <Wallet size={40} />
-                <h3>Aucune commission</h3>
-                <p>Les commissions apparaîtront automatiquement selon la matrice définie.</p>
+          <div
+            className="card"
+            style={{
+              overflowX:
+                'auto',
+            }}
+          >
+            <div
+              style={{
+                minWidth:
+                  admin
+                    ? 1150
+                    : 980,
+              }}
+            >
+              <div
+                style={{
+                  display:
+                    'grid',
+                  gridTemplateColumns:
+                    admin
+                      ? '1.35fr 1fr .95fr 1.05fr 1.05fr 1.2fr 220px'
+                      : '1.35fr 1fr 1.05fr 1.15fr 1.15fr 180px',
+                  gap: 12,
+                  padding:
+                    '14px 18px',
+                  background:
+                    'var(--c-surface-2)',
+                  borderBottom:
+                    '1px solid var(--c-border)',
+                  fontSize: 12,
+                  fontWeight: 700,
+                }}
+              >
+                <span>
+                  Origine
+                </span>
+
+                <span>
+                  Commercial
+                </span>
+
+                {admin && (
+                  <span>
+                    Commission Reno
+                  </span>
+                )}
+
+                <span>
+                  Commission commerciale
+                </span>
+
+                <span>
+                  Paiement commercial
+                </span>
+
+                <span>
+                  {admin
+                    ? 'Paiement Reno Soluces'
+                    : 'Générée le'}
+                </span>
+
+                <span>
+                  Actions
+                </span>
               </div>
-            ) : (
-              rows.map(c => (
-                <div className="prospect-row" key={c.id}>
-                  <div className="prospect-row-avatar"><Wallet size={16} /></div>
 
-                  <div className="prospect-row-info">
-                    <div className="prospect-row-name">{c.libelle}</div>
-                    <div className="prospect-row-sub">
-                      <span>{c.commercial?.nom_complet || '—'}</span>
-                      <span>{TYPES[c.type]}</span>
-                      <span>Générée le {formatDate(c.date_generation)}</span>
-                    </div>
-                  </div>
+              {loading ? (
+                <div className="card-pad text-muted">
+                  Chargement…
+                </div>
+              ) : filteredRows.length ===
+                0 ? (
+                <div className="empty-state">
+                  <Wallet
+                    size={40}
+                  />
 
-                  <div style={{ display: 'grid', gap: 5, minWidth: 230 }}>
-                    <div className="text-sm" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <UserRound size={14} />
-                      <strong>Commercial : {euro(c.montant_commercial)}</strong>
-                      {c.date_paiement_commercial ? (
-                        <span className="badge badge-success">Payé</span>
-                      ) : (
-                        <span className="badge badge-warning">À payer</span>
+                  <h3>
+                    Aucune commission
+                  </h3>
+
+                  <p>
+                    Les commissions
+                    apparaîtront
+                    automatiquement
+                    lorsqu'un devis
+                    sera signé.
+                  </p>
+                </div>
+              ) : (
+                filteredRows.map(
+                  (c) => (
+                    <div
+                      key={c.id}
+                      style={{
+                        display:
+                          'grid',
+                        gridTemplateColumns:
+                          admin
+                            ? '1.35fr 1fr .95fr 1.05fr 1.05fr 1.2fr 220px'
+                            : '1.35fr 1fr 1.05fr 1.15fr 1.15fr 180px',
+                        gap: 12,
+                        alignItems:
+                          'center',
+                        padding:
+                          '15px 18px',
+                        borderBottom:
+                          '1px solid var(--c-border)',
+                        fontSize: 13,
+                      }}
+                    >
+                      <div
+                        style={{
+                          minWidth: 0,
+                        }}
+                      >
+                        <strong
+                          style={{
+                            display:
+                              'block',
+                            overflow:
+                              'hidden',
+                            textOverflow:
+                              'ellipsis',
+                            whiteSpace:
+                              'nowrap',
+                          }}
+                        >
+                          {c.libelle ||
+                            'Commission'}
+                        </strong>
+
+                        <span className="text-sm text-muted">
+                          {c.reference_id
+                            ? `Réf. ${c.reference_id.slice(
+                                0,
+                                8,
+                              )}`
+                            : 'Sans référence'}{' '}
+                          ·{' '}
+                          {TYPES[
+                            c.type
+                          ]}
+                        </span>
+                      </div>
+
+                      <div>
+                        {c.commercial
+                          ?.nom_complet ||
+                          '—'}
+                      </div>
+
+                      {admin && (
+                        <div>
+                          <strong>
+                            {euro(
+                              amount(
+                                c.montant_societe,
+                              ),
+                            )}
+                          </strong>
+
+                          <div className="text-sm text-muted">
+                            {c.date_paiement_societe
+                              ? `Payée le ${formatDate(
+                                  c.date_paiement_societe,
+                                )}`
+                              : 'En cours'}
+                          </div>
+                        </div>
                       )}
-                    </div>
-                    <div className="text-sm text-muted" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                      <CalendarDays size={13} />
-                      {c.date_paiement_commercial
-                        ? `Payé le ${formatDate(c.date_paiement_commercial)}`
-                        : 'Aucune date de paiement'}
-                    </div>
-                    {admin && (
-                      <div className="text-sm" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <Building2 size={14} />
-                        <strong>Société : {euro(c.montant_societe)}</strong>
-                        {c.date_paiement_societe ? (
-                          <span className="badge badge-success">Payée</span>
+
+                      <div>
+                        <strong>
+                          {euro(
+                            amount(
+                              c.montant_commercial,
+                            ),
+                          )}
+                        </strong>
+                      </div>
+
+                      <div>
+                        <div
+                          style={{
+                            display:
+                              'flex',
+                            alignItems:
+                              'center',
+                            gap: 6,
+                          }}
+                        >
+                          {c.date_paiement_commercial ? (
+                            <span className="badge badge-success">
+                              Payée
+                            </span>
+                          ) : (
+                            <span className="badge badge-warning">
+                              En cours
+                            </span>
+                          )}
+                        </div>
+
+                        <div
+                          className="text-sm text-muted"
+                          style={{
+                            marginTop: 4,
+                          }}
+                        >
+                          {c.date_paiement_commercial
+                            ? formatDate(
+                                c.date_paiement_commercial,
+                              )
+                            : '—'}
+                        </div>
+                      </div>
+
+                      <div>
+                        {admin ? (
+                          <>
+                            <div
+                              style={{
+                                display:
+                                  'flex',
+                                alignItems:
+                                  'center',
+                                gap: 6,
+                              }}
+                            >
+                              {c.date_paiement_societe ? (
+                                <span className="badge badge-success">
+                                  Payée
+                                </span>
+                              ) : (
+                                <span className="badge badge-warning">
+                                  En cours
+                                </span>
+                              )}
+                            </div>
+
+                            <div
+                              className="text-sm text-muted"
+                              style={{
+                                marginTop: 4,
+                              }}
+                            >
+                              {c.date_paiement_societe
+                                ? formatDate(
+                                    c.date_paiement_societe,
+                                  )
+                                : '—'}
+                            </div>
+                          </>
                         ) : (
-                          <span className="badge badge-warning">À payer</span>
+                          <span className="text-sm text-muted">
+                            {formatDate(
+                              c.date_generation,
+                            )}
+                          </span>
                         )}
                       </div>
-                    )}
-                    {admin && (
-                      <div className="text-sm text-muted" style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
-                        <CalendarDays size={13} />
-                        {c.date_paiement_societe
-                          ? `Société payée le ${formatDate(c.date_paiement_societe)}`
-                          : 'Société : aucune date de paiement'}
+
+                      <div
+                        style={{
+                          display:
+                            'flex',
+                          flexWrap:
+                            'wrap',
+                          gap: 5,
+                          justifyContent:
+                            'flex-end',
+                        }}
+                      >
+                        {admin &&
+                          c.statut !==
+                            'annulee' && (
+                            <>
+                              {c.statut ===
+                                'en_attente' && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    status(
+                                      c,
+                                      'validee',
+                                    )
+                                  }
+                                >
+                                  Valider
+                                </Button>
+                              )}
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  openPayment(
+                                    c,
+                                    'commercial',
+                                  )
+                                }
+                              >
+                                {c.date_paiement_commercial
+                                  ? 'Modifier'
+                                  : 'Payer'}{' '}
+                                commercial
+                              </Button>
+
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  openPayment(
+                                    c,
+                                    'societe',
+                                  )
+                                }
+                              >
+                                {c.date_paiement_societe
+                                  ? 'Modifier'
+                                  : 'Payer'}{' '}
+                                Reno Soluces
+                              </Button>
+
+                              {c.date_paiement_commercial && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    clearPayment(
+                                      c,
+                                      'commercial',
+                                    )
+                                  }
+                                >
+                                  ×
+                                </Button>
+                              )}
+
+                              {c.date_paiement_societe && (
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() =>
+                                    clearPayment(
+                                      c,
+                                      'societe',
+                                    )
+                                  }
+                                >
+                                  ×
+                                </Button>
+                              )}
+
+                              {!c.date_paiement_commercial &&
+                                !c.date_paiement_societe &&
+                                c.statut !==
+                                  'payee' && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() =>
+                                      status(
+                                        c,
+                                        'annulee',
+                                      )
+                                    }
+                                  >
+                                    <XCircle
+                                      size={
+                                        14
+                                      }
+                                    />
+                                  </Button>
+                                )}
+                            </>
+                          )}
+
+                        {!admin && (
+                          <span className="badge badge-info">
+                            Lecture seule
+                          </span>
+                        )}
                       </div>
-                    )}
-                  </div>
-
-                  <div className="prospect-row-tags">
-                    <span className={`badge ${c.statut === 'payee' ? 'badge-success' : c.statut === 'validee' ? 'badge-info' : c.statut === 'annulee' ? 'badge-danger' : 'badge-warning'}`}>
-                      {c.statut === 'payee' ? 'Payée' : c.statut === 'validee' ? 'Validée' : c.statut === 'annulee' ? 'Annulée' : 'En attente'}
-                    </span>
-                  </div>
-
-                  {admin && c.statut !== 'annulee' && (
-                    <div className="flex items-center gap-1" style={{ flexWrap: 'wrap', justifyContent: 'flex-end' }}>
-                      {c.statut === 'en_attente' && (
-                        <Button variant="ghost" size="sm" onClick={() => status(c, 'validee')}>Valider</Button>
-                      )}
-                      {!c.date_paiement_commercial && (
-                        <Button variant="ghost" size="sm" onClick={() => openPayment(c, 'commercial')}>Payer commercial</Button>
-                      )}
-                      {c.date_paiement_commercial && (
-                        <Button variant="ghost" size="sm" onClick={() => openPayment(c, 'commercial')}>Modifier commercial</Button>
-                      )}
-                      {!c.date_paiement_societe && (
-                        <Button variant="ghost" size="sm" onClick={() => openPayment(c, 'societe')}>Payer société</Button>
-                      )}
-                      {c.date_paiement_societe && (
-                        <Button variant="ghost" size="sm" onClick={() => openPayment(c, 'societe')}>Modifier société</Button>
-                      )}
-                      {c.date_paiement_commercial && (
-                        <Button variant="ghost" size="sm" onClick={() => clearPayment(c, 'commercial')}>
-                          Annuler paiement commercial
-                        </Button>
-                      )}
-                      {c.date_paiement_societe && (
-                        <Button variant="ghost" size="sm" onClick={() => clearPayment(c, 'societe')}>
-                          Annuler paiement société
-                        </Button>
-                      )}
-                      {!c.date_paiement_commercial && !c.date_paiement_societe && c.statut !== 'payee' && (
-                        <Button variant="ghost" size="sm" onClick={() => status(c, 'annulee')}><XCircle size={14} /></Button>
-                      )}
                     </div>
-                  )}
-                </div>
-              ))
-            )}
+                  ),
+                )
+              )}
+
+              {!loading &&
+                filteredRows.length >
+                  0 && (
+                  <div
+                    style={{
+                      display:
+                        'grid',
+                      gridTemplateColumns:
+                        admin
+                          ? '1.35fr 1fr .95fr .95fr 1.05fr 1.05fr 1.2fr 220px'
+                          : '1.35fr 1fr .95fr 1.05fr 1.15fr 1.15fr 180px',
+                      gap: 12,
+                      padding:
+                        '16px 18px',
+                      background:
+                        'var(--c-surface-2)',
+                      fontWeight: 700,
+                    }}
+                  >
+                    <span>
+                      TOTAUX
+                    </span>
+
+                    <span>
+                      {
+                        filteredRows.filter(
+                          (r) =>
+                            r.statut !==
+                            'annulee',
+                        ).length
+                      }{' '}
+                      commission(s)
+                    </span>
+
+                    {admin && (
+                      <span>
+                        {euro(
+                          renovaTotal,
+                        )}
+                      </span>
+                    )}
+
+                    <span>
+                      {euro(
+                        totalCommercial,
+                      )}
+                    </span>
+
+                    <span>
+                      {euro(
+                        commercialEnAttente,
+                      )}{' '}
+                      en cours ·{' '}
+                      {euro(
+                        commercialPaye,
+                      )}{' '}
+                      payées
+                    </span>
+
+                    <span>
+                      {admin
+                        ? `${euro(
+                            renovaEnAttente,
+                          )} en cours · ${euro(
+                            renovaPaye,
+                          )} payées`
+                        : '—'}
+                    </span>
+
+                    <span />
+                  </div>
+                )}
+            </div>
           </div>
         </>
       )}
 
-      {admin && tab === 'bareme' && (
-        <div className="card">
-          <div className="card-pad">
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 140px', gap: 0 }} className="commission-table-head">
-              <b>Règle</b><b>Commercial</b><b>Produit</b><b>Rémunération</b><b>Priorité</b>
+      {admin &&
+        tab === 'bareme' && (
+          <div className="card">
+            <div className="card-pad">
+              <div
+                style={{
+                  display:
+                    'grid',
+                  gridTemplateColumns:
+                    '1fr 1fr 1fr 1fr 140px',
+                  gap: 0,
+                }}
+                className="commission-table-head"
+              >
+                <b>Règle</b>
+                <b>Commercial</b>
+                <b>Produit</b>
+                <b>
+                  Rémunération
+                </b>
+                <b>Priorité</b>
+              </div>
+
+              {rules.length ===
+              0 ? (
+                <div className="empty-state">
+                  <Settings2
+                    size={40}
+                  />
+
+                  <h3>
+                    Aucune règle
+                  </h3>
+
+                  <p>
+                    Créez votre
+                    première règle
+                    de rémunération.
+                  </p>
+                </div>
+              ) : (
+                rules.map(
+                  (r: any) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        display:
+                          'grid',
+                        gridTemplateColumns:
+                          '1fr 1fr 1fr 1fr 140px',
+                        alignItems:
+                          'center',
+                        padding:
+                          '16px 0',
+                        borderTop:
+                          '1px solid var(--c-border)',
+                      }}
+                    >
+                      <div>
+                        <strong>
+                          {r.libelle}
+                        </strong>
+
+                        <div className="text-sm text-muted">
+                          {
+                            TYPES[
+                              r.type as CommissionType
+                            ]
+                          }{' '}
+                          ·{' '}
+                          {r.actif
+                            ? 'Actif'
+                            : 'Inactif'}
+                        </div>
+                      </div>
+
+                      <span>
+                        {commerciaux.find(
+                          (c) =>
+                            c.id ===
+                            r.commercial_id,
+                        )
+                          ?.nom_complet ||
+                          'Tous les commerciaux'}
+                      </span>
+
+                      <span>
+                        {produits.find(
+                          (p) =>
+                            p.id ===
+                            r.produit_id,
+                        )?.nom ||
+                          'Tous les produits'}
+                      </span>
+
+                      <span>
+                        {euro(
+                          r.montant_commercial,
+                        )}
+
+                        {r.pourcentage_commercial
+                          ? ` + ${r.pourcentage_commercial}%`
+                          : ''}
+
+                        <div className="text-sm text-muted">
+                          Reno Soluces :{' '}
+                          {euro(
+                            r.montant_societe,
+                          )}
+                        </div>
+                      </span>
+
+                      <span className="flex items-center gap-1">
+                        <b>
+                          {
+                            r.priorite
+                          }
+                        </b>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            openEdit(
+                              r,
+                            )
+                          }
+                        >
+                          <Pencil
+                            size={
+                              14
+                            }
+                          />
+                        </Button>
+
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() =>
+                            remove(
+                              r.id,
+                            )
+                          }
+                        >
+                          <Trash2
+                            size={
+                              14
+                            }
+                          />
+                        </Button>
+                      </span>
+                    </div>
+                  ),
+                )
+              )}
             </div>
-            {rules.length === 0 ? (
-              <div className="empty-state">
-                <Settings2 size={40} /><h3>Aucune règle</h3><p>Créez votre première règle de rémunération.</p>
-              </div>
-            ) : rules.map((r: any) => (
-              <div key={r.id} style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr 1fr 140px', alignItems: 'center', padding: '16px 0', borderTop: '1px solid var(--c-border)' }}>
-                <div><strong>{r.libelle}</strong><div className="text-sm text-muted">{TYPES[r.type as CommissionType]} · {r.actif ? 'Actif' : 'Inactif'}</div></div>
-                <span>{commerciaux.find(c => c.id === r.commercial_id)?.nom_complet || 'Tous les commerciaux'}</span>
-                <span>{produits.find(p => p.id === r.produit_id)?.nom || 'Tous les produits'}</span>
-                <span>{euro(r.montant_commercial)}{r.pourcentage_commercial ? ` + ${r.pourcentage_commercial}%` : ''}<div className="text-sm text-muted">Société : {euro(r.montant_societe)}</div></span>
-                <span className="flex items-center gap-1"><b>{r.priorite}</b><Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil size={14} /></Button><Button variant="ghost" size="sm" onClick={() => remove(r.id)}><Trash2 size={14} /></Button></span>
-              </div>
-            ))}
           </div>
-        </div>
-      )}
+        )}
 
       <Modal
         open={modal}
-        onClose={() => setModal(false)}
-        title={editing ? 'Modifier la règle' : 'Nouvelle règle de rémunération'}
-        footer={<><Button variant="ghost" onClick={() => setModal(false)}>Annuler</Button><Button variant="primary" onClick={save} disabled={saving}>{saving ? 'Enregistrement…' : 'Enregistrer'}</Button></>}
+        onClose={() =>
+          setModal(false)
+        }
+        title={
+          editing
+            ? 'Modifier la règle'
+            : 'Nouvelle règle de rémunération'
+        }
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                setModal(false)
+              }
+            >
+              Annuler
+            </Button>
+
+            <Button
+              variant="primary"
+              onClick={save}
+              disabled={saving}
+            >
+              {saving
+                ? 'Enregistrement…'
+                : 'Enregistrer'}
+            </Button>
+          </>
+        }
       >
-        <FloatSelect label="Événement" value={form.type} onChange={v => setForm((f: any) => ({ ...f, type: v }))} options={Object.entries(TYPES).map(([value, label]) => ({ value, label }))} />
-        <div className="mt-4"><FloatInput label="Libellé" value={form.libelle} onChange={v => setForm((f: any) => ({ ...f, libelle: v }))} placeholder="Ex : PAC Air/Eau — Jean" /></div>
-        <div className="grid grid-2 gap-3 mt-4"><FloatSelect label="Commercial" value={form.commercial_id} onChange={v => setForm((f: any) => ({ ...f, commercial_id: v }))} options={[{ value: '', label: 'Tous les commerciaux' }, ...commerciaux.map(c => ({ value: c.id, label: c.nom_complet || c.email }))]} /><FloatSelect label="Produit" value={form.produit_id} onChange={v => setForm((f: any) => ({ ...f, produit_id: v }))} options={[{ value: '', label: 'Tous les produits' }, ...produits.map(p => ({ value: p.id, label: p.nom }))]} /></div>
-        <div className="grid grid-2 gap-3 mt-4"><FloatInput label="Montant commercial (€)" type="number" value={form.montant_commercial} onChange={v => setForm((f: any) => ({ ...f, montant_commercial: v }))} /><FloatInput label="Montant société (€)" type="number" value={form.montant_societe} onChange={v => setForm((f: any) => ({ ...f, montant_societe: v }))} /></div>
-        <div className="grid grid-2 gap-3 mt-4"><FloatInput label="% commercial (optionnel)" type="number" value={form.pourcentage_commercial} onChange={v => setForm((f: any) => ({ ...f, pourcentage_commercial: v }))} /><FloatSelect label="Mode" value={form.mode} onChange={v => setForm((f: any) => ({ ...f, mode: v }))} options={[{ value: 'fixe', label: 'Montant fixe' }, { value: 'pourcentage', label: 'Pourcentage' }, { value: 'fixe_plus_pourcentage', label: 'Fixe + pourcentage' }]} /></div>
-        <div className="grid grid-2 gap-3 mt-4"><FloatInput label="Priorité" type="number" value={form.priorite} onChange={v => setForm((f: any) => ({ ...f, priorite: v }))} /><FloatSelect label="Base du pourcentage" value={form.base_pourcentage} onChange={v => setForm((f: any) => ({ ...f, base_pourcentage: v }))} options={[{ value: 'montant_ht', label: 'Montant HT' }, { value: 'montant_ttc', label: 'Montant TTC' }]} /></div>
+        <FloatSelect
+          label="Événement"
+          value={form.type}
+          onChange={(v) =>
+            setForm(
+              (f: any) => ({
+                ...f,
+                type: v,
+              }),
+            )
+          }
+          options={Object.entries(
+            TYPES,
+          ).map(
+            ([value, label]) => ({
+              value,
+              label,
+            }),
+          )}
+        />
+
+        <div className="mt-4">
+          <FloatInput
+            label="Libellé"
+            value={
+              form.libelle
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  libelle: v,
+                }),
+              )
+            }
+            placeholder="Ex : PAC Air/Eau — Jean"
+          />
+        </div>
+
+        <div className="grid grid-2 gap-3 mt-4">
+          <FloatSelect
+            label="Commercial"
+            value={
+              form.commercial_id
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  commercial_id:
+                    v,
+                }),
+              )
+            }
+            options={[
+              {
+                value: '',
+                label:
+                  'Tous les commerciaux',
+              },
+              ...commerciaux.map(
+                (c) => ({
+                  value: c.id,
+                  label:
+                    c.nom_complet ||
+                    c.email,
+                }),
+              ),
+            ]}
+          />
+
+          <FloatSelect
+            label="Produit"
+            value={
+              form.produit_id
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  produit_id: v,
+                }),
+              )
+            }
+            options={[
+              {
+                value: '',
+                label:
+                  'Tous les produits',
+              },
+              ...produits.map(
+                (p) => ({
+                  value: p.id,
+                  label: p.nom,
+                }),
+              ),
+            ]}
+          />
+        </div>
+
+        <div className="grid grid-2 gap-3 mt-4">
+          <FloatInput
+            label="Montant commercial (€)"
+            type="number"
+            value={
+              form.montant_commercial
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  montant_commercial:
+                    v,
+                }),
+              )
+            }
+          />
+
+          <FloatInput
+            label="Commission potentielle Reno Soluces (€)"
+            type="number"
+            value={
+              form.montant_societe
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  montant_societe:
+                    v,
+                }),
+              )
+            }
+          />
+        </div>
+
+        <div className="grid grid-2 gap-3 mt-4">
+          <FloatInput
+            label="% commercial (optionnel)"
+            type="number"
+            value={
+              form.pourcentage_commercial
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  pourcentage_commercial:
+                    v,
+                }),
+              )
+            }
+          />
+
+          <FloatSelect
+            label="Mode"
+            value={
+              form.mode
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  mode: v,
+                }),
+              )
+            }
+            options={[
+              {
+                value: 'fixe',
+                label:
+                  'Montant fixe',
+              },
+              {
+                value:
+                  'pourcentage',
+                label:
+                  'Pourcentage',
+              },
+              {
+                value:
+                  'fixe_plus_pourcentage',
+                label:
+                  'Fixe + pourcentage',
+              },
+            ]}
+          />
+        </div>
+
+        <div className="grid grid-2 gap-3 mt-4">
+          <FloatInput
+            label="Priorité"
+            type="number"
+            value={
+              form.priorite
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  priorite: v,
+                }),
+              )
+            }
+          />
+
+          <FloatSelect
+            label="Base du pourcentage"
+            value={
+              form.base_pourcentage
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  base_pourcentage:
+                    v,
+                }),
+              )
+            }
+            options={[
+              {
+                value:
+                  'montant_ht',
+                label:
+                  'Montant HT',
+              },
+              {
+                value:
+                  'montant_ttc',
+                label:
+                  'Montant TTC',
+              },
+            ]}
+          />
+        </div>
       </Modal>
 
       <Modal
-        open={paymentModal}
-        onClose={() => setPaymentModal(false)}
-        title={`Paiement — ${paymentTarget === 'commercial' ? 'Commercial' : 'Société'}`}
-        footer={<><Button variant="ghost" onClick={() => setPaymentModal(false)}>Annuler</Button><Button variant="primary" onClick={savePayment} disabled={paymentSaving || !paymentDate}>{paymentSaving ? 'Enregistrement…' : 'Enregistrer le paiement'}</Button></>}
+        open={
+          paymentModal
+        }
+        onClose={() =>
+          setPaymentModal(
+            false,
+          )
+        }
+        title={`Paiement — ${
+          paymentTarget ===
+          'commercial'
+            ? 'Commercial'
+            : 'Reno Soluces'
+        }`}
+        footer={
+          <>
+            <Button
+              variant="ghost"
+              onClick={() =>
+                setPaymentModal(
+                  false,
+                )
+              }
+            >
+              Annuler
+            </Button>
+
+            <Button
+              variant="primary"
+              onClick={
+                savePayment
+              }
+              disabled={
+                paymentSaving ||
+                !paymentDate
+              }
+            >
+              {paymentSaving
+                ? 'Enregistrement…'
+                : 'Enregistrer le paiement'}
+            </Button>
+          </>
+        }
       >
-        <div style={{ marginBottom: 18 }}>
-          <strong>{paymentCommission?.libelle}</strong>
-          <div className="text-sm text-muted" style={{ marginTop: 5 }}>
-            {paymentTarget === 'commercial'
-              ? `Commission commercial : ${euro(paymentCommission?.montant_commercial || 0)}`
-              : `Part société : ${euro(paymentCommission?.montant_societe || 0)}`}
+        <div
+          style={{
+            marginBottom: 18,
+          }}
+        >
+          <strong>
+            {paymentCommission
+              ?.libelle ||
+              'Commission'}
+          </strong>
+
+          <div
+            className="text-sm text-muted"
+            style={{
+              marginTop: 5,
+            }}
+          >
+            {paymentTarget ===
+            'commercial'
+              ? `Commission commerciale : ${euro(
+                  amount(
+                    paymentCommission?.montant_commercial,
+                  ),
+                )}`
+              : `Commission potentielle Reno Soluces : ${euro(
+                  amount(
+                    paymentCommission?.montant_societe,
+                  ),
+                )}`}
           </div>
         </div>
-        <FloatInput label="Date de paiement" type="date" value={paymentDate} onChange={setPaymentDate} />
+
+        <FloatInput
+          label="Date de paiement"
+          type="date"
+          value={
+            paymentDate
+          }
+          onChange={
+            setPaymentDate
+          }
+        />
       </Modal>
     </div>
   )

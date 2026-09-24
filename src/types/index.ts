@@ -1,6 +1,6 @@
 export type PageKey =
   | 'dashboard' | 'prospects' | 'visites' | 'simulations'
-  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'suivi_chantier' | 'documents' | 'parametres' | 'activite' | 'commissions'
+  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'parametres' | 'activite' | 'commissions'
 
 export type TypeProspect = 'particulier' | 'professionnel'
 
@@ -80,17 +80,20 @@ export interface Visite {
   audit_data: AuditData | null
   type_visite?: 'complete' | 'produit'
   produit_cible?: string | null
+  vt_produit_id?: string | null
   created_at: string
   prospect?: Prospect
 }
 
 export interface Notification {
   id: string
-  type: 'relance_devis' | 'tache_retard' | 'info'
+  type: 'relance_devis' | 'tache_retard' | 'vt_a_qualifier' | 'info'
   titre: string
   message: string
   prospect_id: string | null
   devis_id: string | null
+  visite_id?: string | null
+  recipient_id?: string | null
   lue: boolean
   meta: Record<string, unknown>
   created_at: string

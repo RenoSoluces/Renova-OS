@@ -676,3 +676,28 @@
   line-height:1.45;
 }
 .visite-create-error svg{flex-shrink:0;margin-top:1px}
+
+
+/* Sélection du produit à la création d'une VT */
+.vt-create-product-block{
+  border:1px solid var(--c-border);border-radius:var(--r-md);background:var(--c-bg-alt);padding:var(--sp-4);
+}
+.vt-create-product-head{display:flex;align-items:flex-start;justify-content:space-between;gap:var(--sp-4);margin-bottom:var(--sp-3)}
+.vt-product-picker{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.vt-product-option{
+  appearance:none;width:100%;border:1px solid var(--c-border);background:var(--c-bg-alt);border-radius:12px;
+  padding:12px 13px;display:flex;align-items:center;gap:11px;text-align:left;cursor:pointer;color:var(--c-text);
+  transition:border-color var(--tr-fast),box-shadow var(--tr-fast),background var(--tr-fast),transform var(--tr-fast);
+}
+.vt-product-option:hover{border-color:var(--c-primary-300);background:var(--c-bg-soft);transform:translateY(-1px)}
+.vt-product-option.selected{border-color:var(--c-primary-500);box-shadow:0 0 0 2px color-mix(in srgb,var(--c-primary-500) 14%,transparent);background:var(--c-primary-50)}
+.vt-product-option-icon{width:34px;height:34px;display:flex;align-items:center;justify-content:center;border-radius:9px;background:var(--c-bg-soft);color:var(--c-primary-600);flex-shrink:0}
+.vt-product-option.selected .vt-product-option-icon{background:var(--c-primary-100);color:var(--c-primary-700)}
+.vt-product-option strong{display:block;font-size:13px;line-height:1.25}
+.vt-product-option small{display:block;margin-top:3px;color:var(--c-text-muted);font-size:11px;line-height:1.25}
+.vt-choice-radio{margin-left:auto;width:17px;height:17px;border-radius:50%;border:2px solid var(--c-border);position:relative;flex-shrink:0}
+.vt-product-option.selected .vt-choice-radio{border-color:var(--c-primary-500)}
+.vt-product-option.selected .vt-choice-radio::after{content:'';position:absolute;inset:3px;border-radius:50%;background:var(--c-primary-500)}
+.vt-modern-empty{display:flex;align-items:center;gap:12px;padding:14px;border:1px dashed var(--c-border);border-radius:10px;color:var(--c-text-muted)}
+.vt-modern-empty strong,.vt-modern-empty span{display:block}.vt-modern-empty strong{color:var(--c-text-secondary);font-size:13px}.vt-modern-empty span{font-size:11px;margin-top:2px}
+@media (max-width:700px){.vt-product-picker{grid-template-columns:1fr}}

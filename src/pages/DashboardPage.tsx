@@ -11,6 +11,8 @@ import {
   FileSignature,
   Percent,
   CheckCircle2,
+  Banknote,
+  Clock3,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type {
@@ -33,6 +35,7 @@ import {
 } from '../lib/crm/constants'
 import { useAuth } from '../lib/auth/AuthContext'
 import { TodayTasksWidget } from '../components/crm/TodayTasksWidget'
+import { AdminDashboard } from '../components/dashboard/AdminDashboard'
 
 export function DashboardPage({
   onNavigate,
@@ -118,13 +121,15 @@ export function DashboardPage({
               '*, commercial:profiles(id, nom_complet, couleur)',
             )
             .order('date_generation', { ascending: false })
-        : supabase
-            .from('commissions')
-            .select(
-              '*, commercial:profiles(id, nom_complet, couleur)',
-            )
-            .eq('commercial_id', profile?.id || '')
-            .order('date_generation', { ascending: false }),
+        : profile?.id
+          ? supabase
+              .from('commissions')
+              .select(
+                '*, commercial:profiles(id, nom_complet, couleur)',
+              )
+              .eq('commercial_id', profile.id)
+              .order('date_generation', { ascending: false })
+          : Promise.resolve({ data: [], error: null }),
     ]).then(([p, v, d, s, a, ag, ent, com]) => {
       setProspects(p.data || [])
       setVisites((v.data || []) as any)
@@ -139,6 +144,7 @@ export function DashboardPage({
       setLoading(false)
     })
   }, [isAdmin, profile?.id])
+
 
   const prospectCount = prospects.length
 
@@ -188,19 +194,16 @@ export function DashboardPage({
   /*
    * CA EN COURS
    *
-   * Pour l'admin :
-   * total des montants potentiels de tous les prospects
-   * qui ne sont pas dans un statut terminal.
+   * Toujours calculé depuis les devis réellement créés (brouillons et
+   * devis envoyés), jamais depuis le montant potentiel du Prospect.
    */
   const caEnCours = useMemo(() => {
-    return prospects
-      .filter(p => !isProspectTerminal(p.statut))
-      .reduce(
-        (sum, p) =>
-          sum + (Number(p.montant_potentiel) || 0),
-        0,
-      )
-  }, [prospects])
+    // Le CA en cours doit provenir des devis réellement créés, jamais du
+    // montant_potentiel renseigné dans la fiche Prospect.
+    return devis
+      .filter(d => d.statut === 'brouillon' || d.statut === 'envoye')
+      .reduce((sum, d) => sum + (Number(d.montant_ttc) || 0), 0)
+  }, [devis])
 
   /*
    * COMMISSIONS EN COURS
@@ -316,6 +319,44 @@ export function DashboardPage({
     c => c.statut !== 'annulee' && !c.date_paiement_commercial,
   ).length
 
+  // ── Suivi financier des commissions ─────────────────────────────────────
+  const commissionsCommercialEnAttente = useMemo(() => {
+    return commissions
+      .filter(c => c.statut !== 'annulee' && !c.date_paiement_commercial)
+      .reduce((sum, c) => sum + (Number(c.montant_commercial) || 0), 0)
+  }, [commissions])
+
+  const commissionsCommercialPayees = useMemo(() => {
+    return commissions
+      .filter(c => c.statut !== 'annulee' && !!c.date_paiement_commercial)
+      .reduce((sum, c) => sum + (Number(c.montant_commercial) || 0), 0)
+  }, [commissions])
+
+  const commissionsSocieteEnAttente = useMemo(() => {
+    return commissions
+      .filter(c => c.statut !== 'annulee' && !c.date_paiement_societe)
+      .reduce((sum, c) => sum + (Number(c.montant_societe) || 0), 0)
+  }, [commissions])
+
+  const commissionsSocietePayees = useMemo(() => {
+    return commissions
+      .filter(c => c.statut !== 'annulee' && !!c.date_paiement_societe)
+      .reduce((sum, c) => sum + (Number(c.montant_societe) || 0), 0)
+  }, [commissions])
+
+  const commissionsCommercialTotal = commissionsCommercialEnAttente + commissionsCommercialPayees
+  const commissionsSocieteTotal = commissionsSocieteEnAttente + commissionsSocietePayees
+
+  const recentCommissions = useMemo(() => {
+    return [...commissions]
+      .filter(c => c.statut !== 'annulee')
+      .sort((a, b) =>
+        new Date(b.date_generation).getTime() -
+        new Date(a.date_generation).getTime(),
+      )
+      .slice(0, 6)
+  }, [commissions])
+
   const todayKey = new Date()
     .toISOString()
     .slice(0, 10)
@@ -325,6 +366,11 @@ export function DashboardPage({
     rdv: 'Rendez-vous',
     formation: 'Formation',
   }
+
+  // Tous les hooks doivent être exécutés avant ce retour conditionnel.
+  // Sinon React lève « Rendered fewer hooks than expected » lorsque le rôle
+  // passe du chargement au profil admin.
+  if (isAdmin) return <AdminDashboard onNavigate={onNavigate} />
 
   return (
     <div className="page dashboard-page">
@@ -520,6 +566,130 @@ export function DashboardPage({
           </span>
         </button>
 
+      </section>
+
+      {/* =========================
+          SUIVI FINANCIER
+      ========================= */}
+
+      <section className="dashboard-finance-section" style={{ marginBottom: 20 }}>
+        <div className="card">
+          <div className="card-header">
+            <div>
+              <div className="card-title">
+                Suivi financier des commissions
+              </div>
+              <div className="dashboard-panel-subtitle">
+                {isAdmin
+                  ? 'Vue globale des sommes dues aux commerciaux et à la société.'
+                  : 'Vue de vos commissions et de leur règlement.'}
+              </div>
+            </div>
+            <button
+              className="btn btn-ghost btn-sm"
+              onClick={() => onNavigate('commissions')}
+            >
+              Détail des commissions
+              <ArrowRight size={15} />
+            </button>
+          </div>
+
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: isAdmin ? 'repeat(4, minmax(0, 1fr))' : 'repeat(2, minmax(0, 1fr))',
+            gap: 12,
+          }}>
+            <div className="dashboard-finance-tile" style={{ padding: 16, borderRadius: 14, background: 'var(--c-surface-2, #f8faf8)', border: '1px solid var(--c-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+                <span className="dashboard-kpi-icon amber"><Clock3 size={17} /></span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Commercial — à payer</span>
+              </div>
+              <strong style={{ fontSize: 23 }}>{euro(commissionsCommercialEnAttente)}</strong>
+              <div className="text-sm text-muted" style={{ marginTop: 4 }}>
+                {commissions.filter(c => c.statut !== 'annulee' && !c.date_paiement_commercial).length} commission(s)
+              </div>
+            </div>
+
+            <div className="dashboard-finance-tile" style={{ padding: 16, borderRadius: 14, background: 'var(--c-surface-2, #f8faf8)', border: '1px solid var(--c-border)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+                <span className="dashboard-kpi-icon green"><CheckCircle2 size={17} /></span>
+                <span style={{ fontSize: 13, fontWeight: 700 }}>Commercial — payé</span>
+              </div>
+              <strong style={{ fontSize: 23 }}>{euro(commissionsCommercialPayees)}</strong>
+              <div className="text-sm text-muted" style={{ marginTop: 4 }}>
+                Total réglé
+              </div>
+            </div>
+
+            {isAdmin && (
+              <>
+                <div className="dashboard-finance-tile" style={{ padding: 16, borderRadius: 14, background: 'var(--c-surface-2, #f8faf8)', border: '1px solid var(--c-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+                    <span className="dashboard-kpi-icon amber"><Clock3 size={17} /></span>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>Société — à payer</span>
+                  </div>
+                  <strong style={{ fontSize: 23 }}>{euro(commissionsSocieteEnAttente)}</strong>
+                  <div className="text-sm text-muted" style={{ marginTop: 4 }}>
+                    {commissions.filter(c => c.statut !== 'annulee' && !c.date_paiement_societe).length} commission(s)
+                  </div>
+                </div>
+
+                <div className="dashboard-finance-tile" style={{ padding: 16, borderRadius: 14, background: 'var(--c-surface-2, #f8faf8)', border: '1px solid var(--c-border)' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 9, marginBottom: 10 }}>
+                    <span className="dashboard-kpi-icon green"><Banknote size={17} /></span>
+                    <span style={{ fontSize: 13, fontWeight: 700 }}>Société — payé</span>
+                  </div>
+                  <strong style={{ fontSize: 23 }}>{euro(commissionsSocietePayees)}</strong>
+                  <div className="text-sm text-muted" style={{ marginTop: 4 }}>
+                    Total réglé
+                  </div>
+                </div>
+              </>
+            )}
+          </div>
+
+          {isAdmin && recentCommissions.length > 0 && (
+            <div style={{ marginTop: 18, borderTop: '1px solid var(--c-border)', paddingTop: 14 }}>
+              <div style={{ fontSize: 13, fontWeight: 800, marginBottom: 8 }}>Dernières commissions</div>
+              <div style={{ display: 'grid', gap: 6 }}>
+                {recentCommissions.map(c => (
+                  <button
+                    key={c.id}
+                    className="dashboard-commission-row"
+                    onClick={() => onNavigate('commissions')}
+                    style={{
+                      display: 'grid',
+                      gridTemplateColumns: 'minmax(0, 1fr) auto auto auto',
+                      alignItems: 'center',
+                      gap: 12,
+                      width: '100%',
+                      padding: '9px 10px',
+                      border: 0,
+                      borderRadius: 10,
+                      background: 'transparent',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    <span style={{ minWidth: 0 }}>
+                      <strong style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.libelle}</strong>
+                      <span className="text-sm text-muted">{isAdmin ? (c.commercial?.nom_complet || 'Sans commercial') : 'Ma commission'}</span>
+                    </span>
+                    <span>{euro(c.montant_commercial)}</span>
+                    <span className={`badge ${c.date_paiement_commercial ? 'badge-success' : 'badge-warning'}`}>
+                      {c.date_paiement_commercial ? 'Commercial payé' : 'Commercial à payer'}
+                    </span>
+                    {isAdmin && (
+                      <span className={`badge ${c.date_paiement_societe ? 'badge-success' : 'badge-warning'}`}>
+                        {c.date_paiement_societe ? 'Société payée' : 'Société à payer'}
+                      </span>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
       </section>
 
       {/* =========================

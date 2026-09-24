@@ -8,6 +8,7 @@ export interface Profile {
   nom_complet: string
   couleur: string
   role: string
+  telephone?: string | null
   created_at: string
 }
 

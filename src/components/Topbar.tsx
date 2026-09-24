@@ -1,4 +1,4 @@
-import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check } from 'lucide-react'
+import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -16,6 +16,7 @@ interface TopbarProps {
 const ICONS: Record<string, any> = {
   relance_devis: FileWarning,
   tache_retard: Clock,
+  vt_a_qualifier: ClipboardCheck,
   info: Info,
 }
 
@@ -36,20 +37,22 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
   const [notifs, setNotifs] = useState<Notification[]>([])
 
   function loadNotifs() {
-    supabase.from('notifications').select('*').order('created_at', { ascending: false }).limit(20)
+    supabase.from('notifications').select('*').or(`recipient_id.eq.${profile?.id},recipient_id.is.null`).order('created_at', { ascending: false }).limit(20)
       .then(({ data }) => setNotifs((data || []) as Notification[]))
   }
 
-  useEffect(() => { loadNotifs() }, [refreshKey])
+  useEffect(() => { if (profile?.id) loadNotifs() }, [refreshKey, profile?.id])
 
   const nonLues = notifs.filter(n => !n.lue).length
 
   async function marquerLue(n: Notification) {
+    if (n.type === 'vt_a_qualifier' && n.visite_id) localStorage.setItem('renova_pending_vt_id', n.visite_id)
     if (!n.lue) {
       await supabase.from('notifications').update({ lue: true }).eq('id', n.id)
       setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, lue: true } : x))
     }
-    if (n.devis_id) onNavigate?.('devis')
+    if (n.type === 'vt_a_qualifier' && n.visite_id) onNavigate?.('visites')
+    else if (n.devis_id) onNavigate?.('devis')
     else if (n.prospect_id) onNavigate?.('prospects')
     setNotifOpen(false)
   }

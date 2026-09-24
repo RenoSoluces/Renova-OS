@@ -14,6 +14,8 @@ import { ParametresPage } from './pages/ParametresPage'
 import { ActivitePage } from './pages/ActivitePage'
 import { CommissionsPage } from './pages/CommissionsPage'
 import { SuiviChantierPage } from './pages/SuiviChantierPage'
+import { PartenairesPage } from './pages/PartenairesPage'
+import { PerformancePage } from './pages/PerformancePage'
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
@@ -35,6 +37,8 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   activite: { title: 'Historique & activité', subtitle: 'Flux centralisé des échanges' },
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
   suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
+  partenaires: { title: 'Partenaires', subtitle: 'Réseau des installateurs — accès administrateur' },
+  performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },
 }
 
 export default function App() {
@@ -133,6 +137,8 @@ export default function App() {
           {page === 'activite' && <ActivitePage />}
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
+          {page === 'partenaires' && (profile?.role === 'admin' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
+          {page === 'performance' && (profile?.role === 'admin' || profile?.role === 'manager') ? <PerformancePage /> : null}
         </div>
       </div>
     </div>

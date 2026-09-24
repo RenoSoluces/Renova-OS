@@ -53,6 +53,7 @@ interface DevisPageProps {
 
 export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onInitialProspectHandled }: DevisPageProps = {}) {
   const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [view, setView] = useState<'list' | 'editor'>('list')
   const [rows, setRows] = useState<(Devis & { prospect?: Prospect })[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -524,6 +525,34 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
     }
   }
 
+  async function supprimerDevis() {
+    if (!current || !isAdmin) return
+
+    const message = current.statut === 'signe'
+      ? `Le devis ${current.numero} est signé. Sa suppression retirera également la commission associée et détachera le devis du dossier éventuel. Continuer ?`
+      : `Supprimer définitivement le devis ${current.numero} ? Cette action est irréversible.`
+
+    if (!window.confirm(message)) return
+
+    const { error } = await supabase
+      .from('devis')
+      .delete()
+      .eq('id', current.id)
+
+    if (error) {
+      alert(`Impossible de supprimer le devis : ${error.message}`)
+      return
+    }
+
+    setCurrent(null)
+    setLignes([])
+    setAides([])
+    setDevisParent(null)
+    setAvenants([])
+    setView('list')
+    fetchListe()
+  }
+
   const produitsFiltres = produits.filter(p => p.categorie === filtreCategorie)
 
   if (view === 'list') {
@@ -540,6 +569,12 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
             </Button>
           </div>
         </div>
+
+        <section className="dashboard-kpis page-kpi-strip">
+          <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><FileSignature size={19}/></span><span className="dashboard-kpi-main"><strong>{rows.filter(d => d.statut === 'brouillon').length}</strong><span>Brouillons</span></span><span className="dashboard-kpi-note">À finaliser</span></div>
+          <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Send size={19}/></span><span className="dashboard-kpi-main"><strong>{rows.filter(d => d.statut === 'envoye').length}</strong><span>Envoyés</span></span><span className="dashboard-kpi-note">En attente</span></div>
+          <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><CheckCircle2 size={19}/></span><span className="dashboard-kpi-main"><strong>{rows.filter(d => d.statut === 'signe').length}</strong><span>Signés</span></span><span className="dashboard-kpi-note">Clients engagés</span></div>
+        </section>
 
         <div className="card">
           {loading ? (
@@ -627,6 +662,11 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
           <Button variant="secondary" onClick={telechargerPDF} disabled={lignes.length === 0}>
             <Download size={16} /> PDF
           </Button>
+          {isAdmin && (
+            <Button variant="secondary" onClick={supprimerDevis}>
+              <Trash2 size={16} /> Supprimer
+            </Button>
+          )}
           {estSigne && (
             <Button variant="secondary" onClick={creerAvenant} disabled={creatingAvenant}>
               <FilePlus size={16} /> {creatingAvenant ? 'Création…' : 'Créer un avenant'}

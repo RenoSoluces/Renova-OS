@@ -15,6 +15,7 @@ import { determinerCategorieRevenu, estIleDeFrance } from '../lib/moteurAides'
 import { PipelineBoard } from '../components/crm/PipelineBoard'
 import { Timeline } from '../components/crm/Timeline'
 import { TasksPanel } from '../components/crm/TasksPanel'
+import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { useAuth } from '../lib/auth/AuthContext'
 
@@ -159,6 +160,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   const [tagInput, setTagInput] = useState('')
   const [timelineRefresh, setTimelineRefresh] = useState(0)
   const [commerciaux, setCommerciaux] = useState<{ id: string; nom_complet: string; role: string }[]>([])
+  const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
 
   const extended = (p: Prospect): any => p as any
@@ -177,6 +179,11 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
     setCommerciaux((data || []) as any)
   }
 
+  async function fetchInstallateurs() {
+    const { data } = await supabase.from('installateurs').select('id, nom, actif').eq('actif', true).order('nom')
+    setInstallateurs((data || []) as any)
+  }
+
   async function fetchOpenTasks() {
     const { data } = await supabase.from('tasks').select('*').eq('done', false).order('due_at', { ascending: true, nullsFirst: false })
     const map: Record<string, CrmTask[]> = {}
@@ -188,7 +195,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   }
 
   useEffect(() => {
-    Promise.all([fetchProspects(), fetchOpenTasks(), fetchCommerciaux()]).finally(() => setLoading(false))
+    Promise.all([fetchProspects(), fetchOpenTasks(), fetchCommerciaux(), fetchInstallateurs()]).finally(() => setLoading(false))
   }, [])
 
   async function fetchLinkedCounts(prospectId: string) {
@@ -696,6 +703,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
                 </div>
               )}
 
+              {/* Chat interne Admin ↔ Commercial */}
+              <ProspectChat prospect={selected} />
+
               {/* Timeline + Tâches */}
               <div className="detail-section-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
                 <Timeline prospectId={selected.id} refreshKey={timelineRefresh} auteur={profile?.nom_complet || 'Vous'} />
@@ -764,6 +774,16 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
                     />
                   )}
                 </div>
+                {isAdmin && (
+                  <div className="right-mini-section">
+                    <div className="right-mini-section-label">Partenaire installateur</div>
+                    <select className="pipeline-inline-input" value={(selected as any).installateur_id || ''} onChange={ev => updateProspectField('installateur_id', ev.target.value || null)}>
+                      <option value="">Aucun partenaire</option>
+                      {installateurs.map(i => <option key={i.id} value={i.id}>{i.nom}</option>)}
+                    </select>
+                    <div className="text-xs text-muted" style={{marginTop:6}}>L’Admin peut modifier l’attribution à tout moment.</div>
+                  </div>
+                )}
                 <div className="right-mini-section">
                   <div className="right-mini-section-label">CA potentiel</div>
                   <input
@@ -931,6 +951,14 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
             </Button>
           </div>
         </div>
+
+        {view === 'liste' && (
+          <section className="dashboard-kpis page-kpi-strip">
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.filter(p => !['Installé','Perdu','Refusé'].includes(p.statut)).length}</strong><span>Prospects actifs</span></span><span className="dashboard-kpi-note">À suivre</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Check size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.filter(p => p.statut === 'Installé').length}</strong><span>Clients</span></span><span className="dashboard-kpi-note">Installés</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon purple"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.length}</strong><span>Total prospects</span></span><span className="dashboard-kpi-note">Base CRM</span></div>
+          </section>
+        )}
 
         {view === 'liste' && (
           <div className="pro-list-filters" style={{ flexWrap: 'wrap' }}>
