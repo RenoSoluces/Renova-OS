@@ -57,7 +57,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
   const installedDevisIds=new Set(dossiers.filter(d=>d.statut==='installe'&&d.devis_id).map(d=>d.devis_id as string))
   const toInvoice=commissions.filter(c=>c.statut!=='annulee'&&c.type==='devis_signe'&&!(c as any).facturee_at&&c.reference_type==='devis'&&c.reference_id&&installedDevisIds.has(c.reference_id))
   // Les VT sont incluses ici : elles ont une vraie commission dès leur validation/qualification et ne doivent pas disparaître du cockpit.
-  const commissionsEnCours=commissions.filter(c=>c.statut!=='annulee'&&!(c as any).facturee_at)
+  const commissionsEnCours=commissions.filter(c=>c.statut!=='annulee'&&c.statut!=='payee'&&!(c as any).facturee_at&&!c.date_paiement_commercial&&!c.date_paiement_societe)
   const outstanding=commissions.filter(c=>c.statut!=='annulee'&&(c as any).facturee_at&&!c.date_paiement_societe).reduce((s,c)=>s+Number(c.montant_societe||0),0)
   const activeLeads=prospects.filter(p=>!['Signé','Installé','Perdu','Refusé'].includes(p.statut)),signedByProspect=new Set(signedQuotes.map(d=>d.prospect_id))
   const leaderboard:LeadScore[]=installateurs.map(inst=>{const assigned=prospects.filter(p=>(p as any).installateur_id===inst.id),signed=assigned.filter(p=>signedByProspect.has(p.id)).length,lost=assigned.filter(p=>['Perdu','Refusé'].includes(p.statut)).length,overdue=0,conversion=assigned.length?Math.round(signed/assigned.length*100):0,score=Math.max(0,Math.min(100,conversion*.75+Math.max(0,30-overdue*10))),health=score>=80?'A':score>=65?'B':score>=50?'C':score>=35?'D':score>0?'E':'F';return{installer:inst,leads:assigned.length,signed,lost,overdue,conversion,score,health}}).sort((a,b)=>b.score-a.score)
