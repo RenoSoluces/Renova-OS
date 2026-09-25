@@ -198,10 +198,6 @@ export function VisitesPage({
       })
   }, [])
 
-  const [commissionsParVisite, setCommissionsParVisite] = useState<
-    Record<string, { montant_commercial: number; montant_societe: number }>
-  >({})
-
   const fetchVisites = useCallback(async () => {
     const { data } = await supabase
       .from('visites')
@@ -210,21 +206,6 @@ export function VisitesPage({
 
     setVisites((data as any) || [])
     setLoading(false)
-
-    const { data: commissionsData } = await supabase
-      .from('commissions')
-      .select('reference_id, montant_commercial, montant_societe')
-      .eq('reference_type', 'visites')
-
-    const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
-    for (const c of commissionsData || []) {
-      if (!c.reference_id) continue
-      map[c.reference_id] = {
-        montant_commercial: Number(c.montant_commercial) || 0,
-        montant_societe: Number(c.montant_societe) || 0,
-      }
-    }
-    setCommissionsParVisite(map)
   }, [])
 
   const fetchProspects = useCallback(async () => {
@@ -893,9 +874,20 @@ export function VisitesPage({
       return
     }
 
-    // On vérifie d'abord qu'un barème correspond, AVANT d'enregistrer quoi que
-    // ce soit sur la VT : sinon, en cas d'échec, la VT restait qualifiée avec
-    // un produit sans commission, bloquant toute nouvelle tentative.
+    const { error: updateError } = await supabase
+      .from('visites')
+      .update({ vt_produit_id: qualificationProduitId })
+      .eq('id', qualificationVisite.id)
+
+    if (updateError) {
+      alert(`Impossible de qualifier la VT : ${updateError.message}`)
+      setQualificationSaving(false)
+      return
+    }
+
+    // Les barèmes VT sont des montants fixes pour une visite technique.
+    // On récupère toutes les règles actives puis on applique une hiérarchie :
+    // produit+commercial > produit seul > commercial seul > barème VT générique.
     const { data: baremes, error: baremeError } = await supabase
       .from('commission_bareme')
       .select('*')
@@ -910,45 +902,85 @@ export function VisitesPage({
       return
     }
 
-    const dateRef = qualificationVisite.date_visite || new Date().toISOString().slice(0, 10)
-    const bareme = (baremes || []).find((b: any) => {
-      const debutOK = !b.date_debut || b.date_debut <= dateRef
-      const finOK = !b.date_fin || b.date_fin >= dateRef
-      const commercialOK = !b.commercial_id || b.commercial_id === commercialId
-      const produitOK = !b.produit_id || b.produit_id === qualificationProduitId
-      return debutOK && finOK && commercialOK && produitOK
+    const dateRef = (qualificationVisite.date_visite || new Date().toISOString()).slice(0, 10)
+    const actifs = (baremes || []).filter((b: any) => {
+      const debutOK = !b.date_debut || String(b.date_debut).slice(0, 10) <= dateRef
+      const finOK = !b.date_fin || String(b.date_fin).slice(0, 10) >= dateRef
+      return debutOK && finOK
     })
 
+    const score = (b: any) => {
+      const product = b.produit_id ? b.produit_id === qualificationProduitId : true
+      const commercial = b.commercial_id ? b.commercial_id === commercialId : true
+      if (!product || !commercial) return -1
+      // Une règle spécifique gagne toujours sur une règle générique.
+      return (b.produit_id ? 4 : 0) + (b.commercial_id ? 2 : 0)
+    }
+
+    const candidates = actifs
+      .map((b: any) => ({ b, score: score(b) }))
+      .filter((x: any) => x.score >= 0)
+      .sort((a: any, b: any) =>
+        b.score - a.score || Number(b.b.priorite || 0) - Number(a.b.priorite || 0)
+      )
+
+    const bareme = candidates[0]?.b
+
     if (!bareme) {
-      alert("Aucun barème VT actif ne correspond à ce produit/commercial. La VT n'a pas été qualifiée — créez d'abord la règle dans Commissions > Barème, puis réessayez.")
+      alert(
+        `La VT est qualifiée, mais aucun barème VT actif ne correspond.\n\n` +
+        `Produit sélectionné : ${qualificationProduitId}\n` +
+        `Commercial : ${commercialId}\n` +
+        `Date : ${dateRef}`
+      )
+      setQualificationSaving(false)
+      await fetchVisites()
+      setQualificationVisite(null)
+      return
+    }
+
+    const montantCommercial = Number(bareme.montant_commercial) || 0
+    const montantSociete = Number(bareme.montant_societe) || 0
+
+    // Sécurité : un barème trouvé mais à 0 ne doit pas être présenté comme
+    // une commission calculée. On informe l'admin avec le libellé du barème.
+    if (montantCommercial === 0 && montantSociete === 0) {
+      alert(
+        `Le barème « ${bareme.libelle || 'Visite technique'} » a bien été trouvé, ` +
+        `mais ses montants sont à 0 €. Vérifie ses montants commercial et société dans la matrice de rémunération.`
+      )
       setQualificationSaving(false)
       return
     }
 
-    const { error: updateError } = await supabase
-      .from('visites')
-      .update({ vt_produit_id: qualificationProduitId })
-      .eq('id', qualificationVisite.id)
-
-    if (updateError) {
-      alert(`Impossible de qualifier la VT : ${updateError.message}`)
-      setQualificationSaving(false)
-      return
-    }
-
-    const { error: commissionError } = await supabase
+    const { data: existing } = await supabase
       .from('commissions')
-      .upsert({
-        commercial_id: commercialId,
-        type: 'vt',
-        libelle: bareme.libelle || 'Visite technique',
-        reference_type: 'visites',
-        reference_id: qualificationVisite.id,
-        montant_commercial: Number(bareme.montant_commercial) || 0,
-        montant_societe: Number(bareme.montant_societe) || 0,
-        statut: 'en_attente',
-        date_generation: new Date().toISOString(),
-      }, { onConflict: 'reference_type,reference_id' })
+      .select('id')
+      .eq('reference_type', 'visites')
+      .eq('reference_id', qualificationVisite.id)
+      .maybeSingle()
+
+    const commissionPayload = {
+      commercial_id: commercialId,
+      type: 'vt',
+      libelle: bareme.libelle || 'Visite technique',
+      reference_type: 'visites',
+      reference_id: qualificationVisite.id,
+      montant_commercial: montantCommercial,
+      montant_societe: montantSociete,
+      statut: existing ? undefined : 'en_attente',
+      date_generation: existing ? undefined : new Date().toISOString(),
+    }
+
+    const { error: commissionError } = existing
+      ? await supabase.from('commissions').update({
+          commercial_id: commissionPayload.commercial_id,
+          type: commissionPayload.type,
+          libelle: commissionPayload.libelle,
+          montant_commercial: commissionPayload.montant_commercial,
+          montant_societe: commissionPayload.montant_societe,
+        }).eq('id', existing.id)
+      : await supabase.from('commissions').insert(commissionPayload)
 
     setQualificationSaving(false)
 
@@ -957,6 +989,7 @@ export function VisitesPage({
       return
     }
 
+    alert(`VT qualifiée avec le barème « ${bareme.libelle || 'Visite technique'} » : ${montantCommercial} € commercial / ${montantSociete} € société.`)
     await fetchVisites()
     setQualificationVisite(null)
     setQualificationProduitId('')
@@ -1337,10 +1370,7 @@ export function VisitesPage({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {admin && v.statut === 'terminee' && !(
-                      commissionsParVisite[v.id] &&
-                      (commissionsParVisite[v.id].montant_commercial > 0 || commissionsParVisite[v.id].montant_societe > 0)
-                    ) && <button className="btn btn-sm btn-ghost" title="Qualifier le type de VT et générer la commission" onClick={e => { e.stopPropagation(); setQualificationVisite(v); setQualificationProduitId((v as any).vt_produit_id || '') }}>Qualifier VT</button>}
+                    {admin && v.statut === 'terminee' && <button className="btn btn-sm btn-ghost" title="Qualifier le type de VT et générer la commission" onClick={e => { e.stopPropagation(); setQualificationVisite(v); setQualificationProduitId((v as any).vt_produit_id || '') }}>Qualifier VT</button>}
                     {admin && <button className="btn btn-sm btn-ghost" title="Supprimer cette visite technique" onClick={e => { e.stopPropagation(); deleteVisite(v) }}><Trash2 size={15} /></button>}
                     <div
                       className="progress-bar"
@@ -1541,9 +1571,7 @@ export function VisitesPage({
                 onChange={setQualificationProduitId}
                 options={[
                   { value: '', label: 'Sélectionner le type de VT' },
-                  ...catalogueProduits
-                    .filter((p: any) => p.actif !== false && p.categorie === 'autre')
-                    .map((p: any) => ({ value: p.id, label: p.nom })),
+                  ...catalogueProduits.filter((p: any) => p.actif !== false).map((p: any) => ({ value: p.id, label: p.nom })),
                 ]}
               />
             </div>

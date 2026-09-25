@@ -10,6 +10,7 @@ export interface Profile {
   role: string
   telephone?: string | null
   created_at: string
+  objectif_mensuel?: number | null
 }
 
 interface AuthState {

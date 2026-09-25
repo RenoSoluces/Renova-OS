@@ -13,8 +13,6 @@ type Partner = { id: string; nom: string; telephone?: string | null }
 type InteractionRef = { id: string; prospect_id: string; type: string; created_at: string; contenu?: string | null }
 type ProspectRef = Prospect & { updated_at?: string | null; installateur_id?: string | null }
 
-const DEFAULT_OBJECTIVE = 10000
-
 function startOfMonth() {
   const d = new Date()
   return new Date(d.getFullYear(), d.getMonth(), 1).toISOString()
@@ -42,35 +40,46 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
   const [partners, setPartners] = useState<Partner[]>([])
   const [tasks, setTasks] = useState<CrmTask[]>([])
   const [interactions, setInteractions] = useState<InteractionRef[]>([])
-  const [objective, setObjective] = useState(DEFAULT_OBJECTIVE)
   const [loading, setLoading] = useState(true)
+  const [objectifMensuel, setObjectifMensuel] = useState<number | null>(null)
 
   useEffect(() => {
     if (!profile?.id) return
-    const saved = localStorage.getItem(`renova_objectif_commercial_${profile.id}`)
-    if (saved && Number(saved) > 0) setObjective(Number(saved))
-
     const userId = profile.id
     const userName = profile.nom_complet || null
 
     async function load() {
       setLoading(true)
-      const [p, d, ds, c, pa, t, i] = await Promise.all([
+      const [p, d, ds, c, pa, t, i, profileRow] = await Promise.all([
         supabase.from('prospects').select('*').eq('commercial_id', userId).order('created_at', { ascending: false }),
         supabase.from('devis').select('*').order('created_at', { ascending: false }),
         supabase.from('dossiers').select('*').order('created_at', { ascending: false }),
         supabase.from('commissions').select('*, commercial:profiles(id,nom_complet,couleur)').eq('commercial_id', userId).order('date_generation', { ascending: false }),
+        supabase.from('profiles').select('objectif_mensuel').eq('id', userId).maybeSingle(),
         supabase.from('installateurs').select('id,nom,telephone').eq('actif', true).order('nom'),
         supabase.from('tasks').select('*, prospect:prospects(*)').eq('done', false).order('due_at', { ascending: true, nullsFirst: false }).limit(50),
         supabase.from('interactions').select('id,prospect_id,type,created_at,contenu').order('created_at', { ascending: false }).limit(500),
       ])
-      setProspects((p.data || []) as ProspectRef[])
-      setDevis((d.data || []) as Devis[])
-      setDossiers((ds.data || []) as Dossier[])
-      setCommissions((c.data || []) as Commission[])
-      setPartners((pa.data || []) as Partner[])
-      setTasks((t.data || []) as CrmTask[])
-      setInteractions((i.data || []) as InteractionRef[])
+      const asArray = <T,>(value: unknown): T[] => Array.isArray(value) ? value as T[] : []
+      setProspects(asArray<ProspectRef>(p.data))
+      setDevis(asArray<Devis>(d.data))
+      setDossiers(asArray<Dossier>(ds.data))
+      setCommissions(asArray<Commission>(c.data))
+      setPartners(asArray<Partner>(pa.data))
+      setTasks(asArray<CrmTask>(t.data))
+      setInteractions(asArray<InteractionRef>(i.data))
+      // L'objectif est déjà présent dans le profil chargé par AuthContext.
+      // On privilégie la valeur fraîchement relue en base, avec le profil comme
+      // secours afin de ne jamais afficher « À définir » si la requête ciblée
+      // est bloquée/retourne temporairement aucune ligne.
+      const objectifDepuisBase = profileRow.data?.objectif_mensuel
+      const objectifDepuisProfil = profile.objectif_mensuel
+      const objectif = objectifDepuisBase != null
+        ? Number(objectifDepuisBase)
+        : objectifDepuisProfil != null
+          ? Number(objectifDepuisProfil)
+          : null
+      setObjectifMensuel(Number.isFinite(objectif as number) && (objectif as number) > 0 ? objectif : null)
       setLoading(false)
     }
     load()
@@ -83,11 +92,19 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
   const myInteractions = useMemo(() => interactions.filter(i => prospectIds.has(i.prospect_id)), [interactions, prospectIds])
 
   const monthStart = startOfMonth()
-  const monthCommissions = useMemo(() => commissions.filter(c => c.type === 'devis_signe' && new Date(c.date_generation) >= new Date(monthStart)), [commissions, monthStart])
+  const monthCommissions = useMemo(() => commissions.filter(c => {
+    if (c.statut === 'annulee' || c.statut === 'payee') return false
+    if (c.date_paiement_commercial) return false
+    return new Date(c.date_generation) >= new Date(monthStart)
+  }), [commissions, monthStart])
   const primesMois = monthCommissions.reduce((s, c) => s + Number(c.montant_commercial || 0), 0)
 
+  // L'objectif est défini par l'Admin. Le réalisé ne compte que les commissions
+  // du mois encore dues au commercial : VT, devis signés, commissions manuelles, etc.
+  const objectifDuMois = objectifMensuel && objectifMensuel > 0 ? objectifMensuel : 0
+
   const signedThisMonth = myDevis.filter(d => d.statut === 'signe' && new Date(d.created_at) >= new Date(monthStart))
-  const objectiveProgress = objective > 0 ? Math.min(100, Math.round((primesMois / objective) * 100)) : 0
+  const objectiveProgress = objectifDuMois > 0 ? Math.min(100, Math.round((primesMois / objectifDuMois) * 100)) : 0
 
   const hotPipe = useMemo(() => prospects
     .filter(p => p.installateur_id && !isProspectTerminal(p.statut) && !['Signé', 'Installation'].includes(stageOf(p.statut).value))
@@ -169,11 +186,6 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
     setTasks(prev => [...prev, { id: crypto.randomUUID(), prospect_id: p.id, titre: `Rappeler ${p.prenom} ${p.nom}`, description: '', type: 'appel', priorite: 'haute', assigne: profile?.id || null, due_at: due, done: false, done_at: null, created_at: new Date().toISOString(), prospect: p }])
   }
 
-  function saveObjective(value: number) {
-    const safe = Math.max(0, value || 0)
-    setObjective(safe)
-    if (profile?.id) localStorage.setItem(`renova_objectif_commercial_${profile.id}`, String(safe))
-  }
 
   return (
     <div className="page commercial-dashboard">
@@ -191,13 +203,13 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
 
       <section className="commercial-top-grid">
         <div className="card commercial-goal-card">
-          <div className="commercial-card-head"><div><span className="commercial-eyebrow">OBJECTIF DU MOIS</span><strong>{objective ? euro(objective) : 'À définir'}</strong></div><Target size={22}/></div>
+          <div className="commercial-card-head"><div><span className="commercial-eyebrow">OBJECTIF DU MOIS</span><strong>{objectifDuMois ? euro(objectifDuMois) : 'À définir'}</strong></div><Target size={22}/></div>
           <div className="commercial-goal-content">
             <div className="objectif-ring" style={{ ['--progress' as any]: `${objectiveProgress}%` }}>
               <svg viewBox="0 0 120 120" width="120" height="120"><circle cx="60" cy="60" r="48" fill="none" stroke="currentColor" strokeWidth="10" opacity=".12"/><circle cx="60" cy="60" r="48" fill="none" stroke="currentColor" strokeWidth="10" strokeLinecap="round" strokeDasharray={`${Math.round(301.59 * objectiveProgress / 100)} 301.59`}/></svg>
               <div className="objectif-ring-text"><span className="objectif-ring-value">{objectiveProgress}%</span><span className="objectif-ring-label">atteint</span></div>
             </div>
-            <div className="commercial-goal-copy"><strong>{euro(primesMois)}</strong><span>primes gagnées ce mois</span><small>{objectiveProgress >= 75 ? 'En bonne voie !' : objectiveProgress >= 40 ? 'Continuez comme ça.' : 'Chaque signature compte.'}</small><label>Objectif <input type="number" min="0" step="500" value={objective} onChange={e => saveObjective(Number(e.target.value))}/></label></div>
+            <div className="commercial-goal-copy"><strong>{euro(primesMois)}</strong><span>primes gagnées ce mois</span><small>{objectiveProgress >= 75 ? 'En bonne voie !' : objectiveProgress >= 40 ? 'Continuez comme ça.' : 'Chaque signature compte.'}</small><label>Objectif défini par l’Admin · toutes les commissions non payées comptent</label></div>
           </div>
         </div>
 
