@@ -47,10 +47,11 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
     if (!profile?.id) return
     const userId = profile.id
     const userName = profile.nom_complet || null
+    const currentProfile = profile
 
     async function load() {
       setLoading(true)
-      const [p, d, ds, c, pa, t, i, profileRow] = await Promise.all([
+      const [p, d, ds, c, profileRow, pa, t, i] = await Promise.all([
         supabase.from('prospects').select('*').eq('commercial_id', userId).order('created_at', { ascending: false }),
         supabase.from('devis').select('*').order('created_at', { ascending: false }),
         supabase.from('dossiers').select('*').order('created_at', { ascending: false }),
@@ -73,7 +74,7 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
       // secours afin de ne jamais afficher « À définir » si la requête ciblée
       // est bloquée/retourne temporairement aucune ligne.
       const objectifDepuisBase = profileRow.data?.objectif_mensuel
-      const objectifDepuisProfil = profile.objectif_mensuel
+      const objectifDepuisProfil = currentProfile.objectif_mensuel
       const objectif = objectifDepuisBase != null
         ? Number(objectifDepuisBase)
         : objectifDepuisProfil != null
