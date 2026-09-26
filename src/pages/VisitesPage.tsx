@@ -874,14 +874,25 @@ export function VisitesPage({
       return
     }
 
-    const { error: updateError } = await supabase
+    // Relecture de la VT avant qualification : si elle est déjà qualifiée,
+    // on ferme simplement la fenêtre pour éviter toute seconde qualification.
+    const { data: currentVisite, error: currentVisiteError } = await supabase
       .from('visites')
-      .update({ vt_produit_id: qualificationProduitId })
+      .select('vt_produit_id')
       .eq('id', qualificationVisite.id)
+      .maybeSingle()
 
-    if (updateError) {
-      alert(`Impossible de qualifier la VT : ${updateError.message}`)
+    if (currentVisiteError) {
+      alert(`Impossible de vérifier l'état de la VT : ${currentVisiteError.message}`)
       setQualificationSaving(false)
+      return
+    }
+
+    if (currentVisite?.vt_produit_id) {
+      await fetchVisites()
+      setQualificationSaving(false)
+      setQualificationVisite(null)
+      setQualificationProduitId('')
       return
     }
 
@@ -986,6 +997,34 @@ export function VisitesPage({
 
     if (commissionError) {
       alert(`La VT est qualifiée, mais la commission n'a pas pu être créée : ${commissionError.message}`)
+      return
+    }
+
+    // Marque la VT comme qualifiée uniquement après la création/mise à jour
+    // effective de sa commission. Le filtre sur NULL évite une seconde
+    // qualification si un autre clic est intervenu entre-temps.
+    const { data: qualifiedVisite, error: qualificationError } = await supabase
+      .from('visites')
+      .update({ vt_produit_id: qualificationProduitId })
+      .eq('id', qualificationVisite.id)
+      .is('vt_produit_id', null)
+      .select('id,vt_produit_id')
+      .maybeSingle()
+
+    if (qualificationError) {
+      alert(`La commission a été enregistrée, mais la VT n'a pas pu être marquée comme qualifiée : ${qualificationError.message}`)
+      setQualificationSaving(false)
+      await fetchVisites()
+      return
+    }
+
+    if (!qualifiedVisite) {
+      // Une autre qualification a déjà été enregistrée. On ne laisse pas
+      // l'interface proposer une nouvelle qualification.
+      await fetchVisites()
+      setQualificationSaving(false)
+      setQualificationVisite(null)
+      setQualificationProduitId('')
       return
     }
 
@@ -1370,7 +1409,7 @@ export function VisitesPage({
                   </div>
 
                   <div className="flex items-center gap-3">
-                    {admin && v.statut === 'terminee' && <button className="btn btn-sm btn-ghost" title="Qualifier le type de VT et générer la commission" onClick={e => { e.stopPropagation(); setQualificationVisite(v); setQualificationProduitId((v as any).vt_produit_id || '') }}>Qualifier VT</button>}
+                    {admin && v.statut === 'terminee' && !(v as any).vt_produit_id && <button className="btn btn-sm btn-ghost" title="Qualifier le type de VT et générer la commission" onClick={e => { e.stopPropagation(); setQualificationVisite(v); setQualificationProduitId('') }}>Qualifier VT</button>}
                     {admin && <button className="btn btn-sm btn-ghost" title="Supprimer cette visite technique" onClick={e => { e.stopPropagation(); deleteVisite(v) }}><Trash2 size={15} /></button>}
                     <div
                       className="progress-bar"
