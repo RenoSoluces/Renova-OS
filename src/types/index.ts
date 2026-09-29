@@ -1,6 +1,6 @@
 export type PageKey =
   | 'dashboard' | 'prospects' | 'visites' | 'simulations'
-  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'parametres' | 'activite' | 'commissions'
+  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme'
 
 export type TypeProspect = 'particulier' | 'professionnel'
 

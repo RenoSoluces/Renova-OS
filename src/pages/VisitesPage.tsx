@@ -1001,6 +1001,8 @@ export function VisitesPage({
       return
     }
 
+    await logAuditEvent({ action: existing ? 'commission_vt_maj' : 'commission_vt_creee', entityType: 'commission', entityId: existing?.id || null, description: `Commission VT ${bareme.libelle || 'Visite technique'} — ${montantCommercial} € commercial / ${montantSociete} € société`, meta: { visite_id: qualificationVisite.id, produit_id: qualificationProduitId, commercial_id: commercialId } })
+
     // Marque la VT comme qualifiée uniquement après la création/mise à jour
     // effective de sa commission. Le filtre sur NULL évite une seconde
     // qualification si un autre clic est intervenu entre-temps.

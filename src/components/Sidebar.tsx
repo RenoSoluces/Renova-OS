@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3,
+  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -46,6 +46,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
     items: [
       { key: 'catalogue', label: 'Catalogue produits', icon: Package },
       { key: 'parametres', label: 'Paramètres', icon: Settings },
+      { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
     ],
   },
 ]
@@ -92,7 +93,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance') || profile?.role === 'admin' || profile?.role === 'manager').map(item => {
+            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').map(item => {
               const Icon = item.icon
               return (
                 <button

@@ -20,6 +20,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { FloatSelect } from '../components/ui/FloatInput'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { setProspectStatus } from '../lib/crm/workflow'
 
 const STATUT_BADGE: Record<string, string> = {
   en_cours: 'badge-info',
@@ -441,10 +442,7 @@ export function DossiersPage({
               : null
 
         if (nextProspectStatut) {
-          await supabase
-            .from('prospects')
-            .update({ statut: nextProspectStatut })
-            .eq('id', detail.prospect_id)
+          await setProspectStatus(detail.prospect_id, nextProspectStatut, `statut dossier ${detailStatut}`)
         }
       }
 

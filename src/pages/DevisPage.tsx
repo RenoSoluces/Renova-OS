@@ -3,6 +3,8 @@ import {
   Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { setProspectStatus } from '../lib/crm/workflow'
+import { logAuditEvent } from '../lib/auditLog'
 import type { Devis, DevisLigne, DevisAide, Prospect, Produit, Entreprise } from '../types'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
@@ -510,7 +512,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
         prospect_id: current.prospect_id, type: 'devis', auteur: profile?.nom_complet || 'Vous',
         contenu: `Devis ${current.numero} signé — ${euro(totaux.montantTTC)} TTC`,
       })
-      await supabase.from('prospects').update({ statut: 'Signé', derniere_interaction_at: dateSignature }).eq('id', current.prospect_id)
+      await setProspectStatus(current.prospect_id, 'Signé', `devis ${current.numero} signé`)
     }
 
     // Un devis signé ouvre (ou complète) le dossier de suivi du client : c'est le pivot
@@ -530,7 +532,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
       if (dossier) {
         await supabase.from('devis').update({ dossier_id: dossier.id }).eq('id', current.id)
         // Le devis signé ouvre le cycle travaux : le prospect passe en Installation.
-        await supabase.from('prospects').update({ statut: 'Installation', derniere_interaction_at: dateSignature }).eq('id', current.prospect_id)
+        await setProspectStatus(current.prospect_id, 'Installation', `devis ${current.numero} → installation`)
         // Checklist des pièces administratives usuelles à recueillir pour instruire le dossier
         await supabase.from('documents').insert([
           { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Devis signé', type: 'devis_signe', categorie: 'Contractuel', recu: true },
@@ -541,8 +543,12 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
       }
     }
 
+    if (!error) {
+      await logAuditEvent({ action: 'devis_signe', entityType: 'devis', entityId: current.id, description: `Devis ${current.numero} signé`, meta: { montant_ttc: totaux.montantTTC } })
+    }
+
     if (!error && current.prospect_id && current.dossier_id) {
-      await supabase.from('prospects').update({ statut: 'Installation', derniere_interaction_at: dateSignature }).eq('id', current.prospect_id)
+      await setProspectStatus(current.prospect_id, 'Installation', `devis ${current.numero} → installation`)
     }
 
     setSigning(false)

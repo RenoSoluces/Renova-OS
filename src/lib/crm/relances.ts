@@ -26,7 +26,7 @@ export async function verifierRelances(auteur: string | null) {
 async function verifierDevisSansReponse(auteur: string | null) {
   const { data: devisEnvoyes } = await supabase
     .from('devis')
-    .select('id, numero, prospect_id, statut, created_at, prospect:prospects(nom, prenom)')
+    .select('id, numero, prospect_id, statut, created_at, prospect:prospects(nom, prenom, commercial_id)')
     .eq('statut', 'envoye')
 
   for (const devis of devisEnvoyes || []) {
@@ -42,6 +42,7 @@ async function verifierDevisSansReponse(auteur: string | null) {
     if (existante) continue
 
     const prospect = devis.prospect as any
+    const recipientId = prospect?.commercial_id || null
     const nomClient = prospect ? `${prospect.prenom} ${prospect.nom}` : 'client'
 
     if (devis.prospect_id) {
@@ -62,6 +63,7 @@ async function verifierDevisSansReponse(auteur: string | null) {
       message: `${nomClient} n'a pas répondu depuis ${joursDepuis(devis.created_at)} jours. Une tâche de relance a été créée.`,
       prospect_id: devis.prospect_id,
       devis_id: devis.id,
+      recipient_id: recipientId,
       meta: { devis_id: devis.id, kind: 'relance_devis' },
     })
   }
@@ -70,7 +72,7 @@ async function verifierDevisSansReponse(auteur: string | null) {
 async function verifierTachesEnRetard() {
   const { data: tachesEnRetard } = await supabase
     .from('tasks')
-    .select('id, titre, prospect_id, due_at')
+    .select('id, titre, prospect_id, due_at, prospect:prospects(commercial_id)')
     .eq('done', false)
     .lt('due_at', new Date().toISOString())
 
@@ -83,11 +85,13 @@ async function verifierTachesEnRetard() {
       .maybeSingle()
     if (existante) continue
 
+    const recipientId = (tache.prospect as any)?.commercial_id || null
     await supabase.from('notifications').insert({
       type: 'tache_retard',
       titre: 'Tâche en retard',
       message: tache.titre,
       prospect_id: tache.prospect_id,
+      recipient_id: recipientId,
       meta: { task_id: tache.id, kind: 'tache_retard' },
     })
   }

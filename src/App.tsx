@@ -16,12 +16,24 @@ import { CommissionsPage } from './pages/CommissionsPage'
 import { SuiviChantierPage } from './pages/SuiviChantierPage'
 import { PartenairesPage } from './pages/PartenairesPage'
 import { PerformancePage } from './pages/PerformancePage'
+import { SystemHealthPage } from './pages/SystemHealthPage'
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
 import { useAuth } from './lib/auth/AuthContext'
 import { LoginPage } from './pages/LoginPage'
-import { Loader2 } from 'lucide-react'
+import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
+import React from 'react'
+
+class AppErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message: string }> {
+  state = { hasError: false, message: '' }
+  static getDerivedStateFromError(error: unknown) { return { hasError: true, message: error instanceof Error ? error.message : 'Erreur inattendue' } }
+  componentDidCatch(error: unknown) { console.error('[RENOVA OS] Erreur interface:', error) }
+  render() {
+    if (!this.state.hasError) return this.props.children
+    return <div className="page" style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="card card-pad" style={{maxWidth:560,textAlign:'center'}}><AlertTriangle size={32} style={{color:'var(--c-warning,#e8a317)',marginBottom:12}}/><h2>Une erreur a interrompu cet écran</h2><p className="text-muted">Renova OS a évité une page blanche. Recharge l'écran pour reprendre.</p><p className="text-muted" style={{fontSize:12}}>{this.state.message}</p><button className="btn btn-primary" onClick={() => window.location.reload()}><RefreshCw size={15}/> Recharger</button></div></div>
+  }
+}
 
 const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: 'Tableau de bord', subtitle: 'Vue d\'ensemble de votre activité' },
@@ -39,9 +51,10 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
   partenaires: { title: 'Partenaires', subtitle: 'Réseau des installateurs — accès administrateur' },
   performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },
+  sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
 }
 
-export default function App() {
+function AppContent() {
   const { session, loading: authLoading, profile } = useAuth()
   const [page, setPage] = useState<PageKey>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
@@ -139,8 +152,11 @@ export default function App() {
           {page === 'suivi_chantier' && <SuiviChantierPage />}
           {page === 'partenaires' && (profile?.role === 'admin' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'performance' && (profile?.role === 'admin' || profile?.role === 'manager') ? <PerformancePage /> : null}
+          {page === 'sante_systeme' && <SystemHealthPage />}
         </div>
       </div>
     </div>
   )
 }
+
+export default function App() { return <AppErrorBoundary><AppContent /></AppErrorBoundary> }

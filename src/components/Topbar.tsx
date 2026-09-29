@@ -36,6 +36,9 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<Notification[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [search, setSearch] = useState('')
+  const [searchOpen, setSearchOpen] = useState(false)
+  const [searchResults, setSearchResults] = useState<{type:'prospect'|'devis'|'dossier';id:string;label:string;sub:string}[]>([])
 
   function loadNotifs() {
     supabase.from('notifications').select('*').or(`recipient_id.eq.${profile?.id},recipient_id.is.null`).order('created_at', { ascending: false }).limit(20)
@@ -45,6 +48,27 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
   useEffect(() => {
     if (profile?.id) loadNotifs()
   }, [refreshKey, profile?.id])
+
+  useEffect(() => {
+    const q = search.trim()
+    if (q.length < 2) { setSearchResults([]); return }
+    const timer = window.setTimeout(async () => {
+      const like = `%${q.replace(/[%_]/g, '')}%`
+      const [{ data: prospects }, { data: devis }, { data: dossiers }] = await Promise.all([
+        supabase.from('prospects').select('id, prenom, nom, ville, commercial_id').or(`nom.ilike.${like},prenom.ilike.${like},email.ilike.${like},telephone.ilike.${like}`).limit(6),
+        supabase.from('devis').select('id, numero, statut, prospect:prospects(prenom,nom)').ilike('numero', like).limit(5),
+        supabase.from('dossiers').select('id, reference, statut, prospect:prospects(prenom,nom)').ilike('reference', like).limit(5),
+      ])
+      const next = [
+        ...(prospects || []).map((p:any) => ({type:'prospect' as const,id:p.id,label:`${p.prenom || ''} ${p.nom || ''}`.trim(),sub:p.ville || 'Prospect'})),
+        ...(devis || []).map((d:any) => ({type:'devis' as const,id:d.id,label:d.numero,sub:`Devis · ${d.prospect ? `${d.prospect.prenom || ''} ${d.prospect.nom || ''}`.trim() : '—'}`})),
+        ...(dossiers || []).map((d:any) => ({type:'dossier' as const,id:d.id,label:d.reference,sub:`Dossier · ${d.prospect ? `${d.prospect.prenom || ''} ${d.prospect.nom || ''}`.trim() : '—'}`})),
+      ]
+      setSearchResults(next)
+      setSearchOpen(true)
+    }, 220)
+    return () => window.clearTimeout(timer)
+  }, [search])
 
   useEffect(() => {
     const onBeforeInstallPrompt = (event: Event) => {
@@ -106,7 +130,19 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
       )}
       <div className="topbar-search">
         <Search />
-        <input placeholder="Rechercher un prospect, dossier..." />
+        <input placeholder="Rechercher un prospect, dossier..." value={search} onChange={e => setSearch(e.target.value)} onFocus={() => search.trim().length >= 2 && setSearchOpen(true)} />
+        {searchOpen && search.trim().length >= 2 && (
+          <>
+            <div className="topbar-search-backdrop" onClick={() => setSearchOpen(false)} />
+            <div className="topbar-search-results">
+              {searchResults.length === 0 ? <div className="topbar-search-empty">Aucun résultat</div> : searchResults.map(r => (
+                <button key={`${r.type}-${r.id}`} onClick={() => { setSearchOpen(false); setSearch(''); onNavigate?.(r.type === 'prospect' ? 'prospects' : r.type === 'devis' ? 'devis' : 'dossiers') }}>
+                  <strong>{r.label || 'Sans nom'}</strong><span>{r.sub}</span>
+                </button>
+              ))}
+            </div>
+          </>
+        )}
       </div>
       <button className="topbar-icon-btn" title="Aide">
         <HelpCircle size={20} />
