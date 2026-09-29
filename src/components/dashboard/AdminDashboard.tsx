@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, ArrowUpRight, Ban, BellRing, Bot, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, FileCheck2, FileOutput, Gauge, RefreshCw, Send, ShieldCheck, Sparkles, Target, TrendingUp, Users, Trophy } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import { supabase } from '../../lib/supabase'
+import { logAuditEvent } from '../../lib/auditLog'
 import { euro, timeAgo } from '../../lib/crm/constants'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
@@ -16,6 +17,7 @@ interface AlertItem { id:string; kind:'sleep'|'litige'|'payment'; title:string; 
 export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
   const [prospects,setProspects]=useState<Prospect[]>([]),[devis,setDevis]=useState<Devis[]>([]),[dossiers,setDossiers]=useState<Dossier[]>([]),[commissions,setCommissions]=useState<Commission[]>([])
   const [installateurs,setInstallateurs]=useState<Installer[]>([]),[baremes,setBaremes]=useState<Bareme[]>([]),[lines,setLines]=useState<any[]>([]),[interactions,setInteractions]=useState<any[]>([]),[profiles,setProfiles]=useState<any[]>([])
+  const [health,setHealth]=useState({unqualifiedVT:0,zeroCommissions:0,installedWithoutCommission:0})
   const [loading,setLoading]=useState(true),[dispatcherOpen,setDispatcherOpen]=useState(false),[dispatching,setDispatching]=useState(false),[invoiceOpen,setInvoiceOpen]=useState<Commission|null>(null),[tickerRefresh,setTickerRefresh]=useState(0),[dispatcherSelections,setDispatcherSelections]=useState<Record<string,string>>({})
   async function load(){
     setLoading(true)
@@ -30,14 +32,21 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
         supabase.from('devis_lignes').select('id,devis_id,produit_id,montant_ht,ordre'),
         supabase.from('interactions').select('*, prospect:prospects(prenom,nom)').order('created_at',{ascending:false}).limit(15),
         supabase.from('profiles').select('id,nom_complet,role,objectif_mensuel').in('role',['commercial','manager','admin']).order('nom_complet'),
+        supabase.from('visites').select('id,statut,vt_produit_id').eq('statut','terminee').is('vt_produit_id',null),
       ]
-      const [p,d,ds,c,i,b,l,ints,prof] = await Promise.allSettled(queries)
+      const [p,d,ds,c,i,b,l,ints,prof,unqualified] = await Promise.allSettled(queries)
       const dataOf = (r:any) => r.status === 'fulfilled' ? (r.value?.data || []) : []
       const errorOf = (r:any) => r.status === 'fulfilled' ? r.value?.error : r.reason
-      const errors = [p,d,ds,c,i,b,l,ints,prof].map(errorOf).filter(Boolean)
+      const errors = [p,d,ds,c,i,b,l,ints,prof,unqualified].map(errorOf).filter(Boolean)
       if (errors.length) console.warn('Certaines données du dashboard admin sont indisponibles:', errors)
       setProspects(dataOf(p) as Prospect[]); setDevis(dataOf(d) as Devis[]); setDossiers(dataOf(ds) as Dossier[]); setCommissions(dataOf(c) as Commission[])
       setInstallateurs(dataOf(i) as Installer[]); setBaremes(dataOf(b) as Bareme[]); setLines(dataOf(l)); setInteractions(dataOf(ints)); setProfiles(dataOf(prof))
+      const unqualifiedVTs = dataOf(unqualified) as any[]
+      const zeroCommissions = dataOf(c).filter((x:any) => x.statut !== 'annulee' && Number(x.montant_commercial || 0) === 0 && Number(x.montant_societe || 0) === 0)
+      const installed = dataOf(ds).filter((x:any) => x.statut === 'installe' && x.devis_id)
+      const commissionRefs = new Set(dataOf(c).filter((x:any) => x.reference_type === 'devis' && x.reference_id).map((x:any) => x.reference_id))
+      const installedWithoutCommission = installed.filter((x:any) => !commissionRefs.has(x.devis_id)).length
+      setHealth({ unqualifiedVT: unqualifiedVTs.length, zeroCommissions: zeroCommissions.length, installedWithoutCommission })
     } catch (error) { console.error('Erreur chargement dashboard admin:', error) } finally { setLoading(false) }
   }
   useEffect(()=>{load(); const timer=window.setInterval(()=>load(),30000); return ()=>window.clearInterval(timer)},[])
@@ -68,6 +77,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
     const safe=Math.max(0,Number.isFinite(value)?value:0)
     const {error}=await supabase.from('profiles').update({objectif_mensuel:safe}).eq('id',profileId)
     if(error){alert(error.message);return}
+    await logAuditEvent({ action:'objectif_modifie', entityType:'objectif', entityId:profileId, description:`Objectif mensuel défini à ${safe} €`, meta:{objectif_mensuel:safe} })
     setProfiles(prev=>prev.map(p=>p.id===profileId?{...p,objectif_mensuel:safe}:p))
   }
 
@@ -80,7 +90,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
     else { setDispatcherSelections(m=>({...m,[prospectId]:''})); await load() }
     setDispatching(false)
   }
-  function generateInvoice(c:Commission){const doc=new jsPDF(),now=new Date(),num=`FAC-COM-${now.getFullYear()}-${c.id.slice(0,6).toUpperCase()}`;doc.setFontSize(22);doc.text('RENOVA OS',20,25);doc.setFontSize(12);doc.text('FACTURE DE COMMISSION',20,35);doc.setFontSize(10);doc.text(`N° ${num}`,20,45);doc.text(`Date : ${now.toLocaleDateString('fr-FR')}`,20,52);doc.text(c.libelle||'Commission',20,75);doc.text(`Montant de la commission : ${euro(c.montant_societe)}`,20,90);doc.text('Règlement : selon conditions contractuelles.',20,110);doc.save(`${num}.pdf`);supabase.from('commissions').update({facturee_at:now.toISOString(),facture_numero:num}).eq('id',c.id).then(()=>{setInvoiceOpen(null);load()})}
+  function generateInvoice(c:Commission){const doc=new jsPDF(),now=new Date(),num=`FAC-COM-${now.getFullYear()}-${c.id.slice(0,6).toUpperCase()}`;doc.setFontSize(22);doc.text('RENOVA OS',20,25);doc.setFontSize(12);doc.text('FACTURE DE COMMISSION',20,35);doc.setFontSize(10);doc.text(`N° ${num}`,20,45);doc.text(`Date : ${now.toLocaleDateString('fr-FR')}`,20,52);doc.text(c.libelle||'Commission',20,75);doc.text(`Montant de la commission : ${euro(c.montant_societe)}`,20,90);doc.text('Règlement : selon conditions contractuelles.',20,110);doc.save(`${num}.pdf`);supabase.from('commissions').update({facturee_at:now.toISOString(),facture_numero:num}).eq('id',c.id).then(async ({error})=>{if(error){alert(`La facture n'a pas pu être enregistrée : ${error.message}`);return} await logAuditEvent({action:'commission_facturee',entityType:'facture',entityId:c.id,description:`Facture de commission ${num} générée`,meta:{facture_numero:num,montant_societe:c.montant_societe}});setInvoiceOpen(null);load()})}
   if(loading)return <div className="admin-dashboard-loading"><RefreshCw className="spin" size={22}/> Chargement du cockpit administrateur…</div>
   return <div className="admin-dashboard">
     <div className="admin-dashboard-hero"><div><div className="admin-dashboard-kicker"><Sparkles size={13}/> ADMIN CONTROL CENTER</div><h1>Le cockpit de votre activité</h1><p>Cash, partenaires, relances et signatures — tout ce qui mérite une action est visible ici.</p></div><div className="admin-hero-actions"><Button variant="ghost" onClick={()=>load()}><RefreshCw size={15}/> Actualiser</Button><Button variant="primary" onClick={()=>setDispatcherOpen(true)}><Bot size={15}/> Dispatcher un lead</Button></div></div>
@@ -91,6 +101,14 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
     </section>
     <div className="admin-dashboard-columns"><section className="admin-panel action-wall"><div className="admin-panel-head"><div><div className="admin-panel-kicker"><BellRing size={14}/> ACTION ADMIN</div><h2>Mur des relances & blocages</h2></div><span className="admin-count-badge">{alerts.length}</span></div>{alerts.length===0?<div className="admin-empty"><ShieldCheck size={22}/><div><strong>Aucune anomalie critique</strong><span>Les leads chauds sont suivis.</span></div></div>:alerts.map(a=><div className="admin-alert" key={a.id}><span className={`admin-alert-icon ${a.kind}`}><AlertTriangle size={17}/></span><div className="admin-alert-copy"><strong>{a.title}</strong><span>{a.detail}</span></div><button className="admin-alert-btn" onClick={()=>a.prospectId&&onNavigate('prospects')}>{a.action}<ChevronRight size={14}/></button></div>)}{activeLeads.filter(p=>!(p as any).installateur_id).slice(0,2).map(p=><div className="admin-alert" key={`unassigned-${p.id}`}><span className="admin-alert-icon sleep"><Target size={17}/></span><div className="admin-alert-copy"><strong>Lead non attribué — {p.prenom} {p.nom}</strong><span>{p.code_postal||'Adresse inconnue'} · prêt à être dispatché.</span></div><button className="admin-alert-btn" onClick={()=>setDispatcherOpen(true)}>Dispatcher<ChevronRight size={14}/></button></div>)}</section>
       <section className="admin-panel leaderboard-panel"><div className="admin-panel-head"><div><div className="admin-panel-kicker"><Gauge size={14}/> DATAVIZ PARTENAIRES</div><h2>Leaderboard des installateurs</h2></div><span className="admin-live"><i/> LIVE</span></div><div className="leaderboard-list">{leaderboard.length===0?<div className="admin-empty"><Users size={22}/><div><strong>Aucun installateur actif</strong><span>Ajoutez vos partenaires.</span></div></div>:leaderboard.slice(0,6).map((x,idx)=><div className="leader-row" key={x.installer.id}><div className="leader-rank">{idx+1}</div><div className="leader-name"><strong>{x.installer.nom}</strong><span>{x.leads} leads · {x.signed} signés · {x.lost} perdus</span></div><div className="leader-bar"><div style={{width:`${x.conversion}%`}}/></div><strong className="leader-pct">{x.conversion}%</strong><span className={`health health-${x.health}`}>{x.health}</span></div>)}</div>{leaderboard[0]&&<div className="black-hole"><div><span className="black-hole-title"><Ban size={14}/> BLACK HOLE</span><strong>{leaderboard.reduce((s,x)=>s+x.lost,0)} leads perdus</strong></div><span>Surveillez les partenaires qui laissent dormir leur portefeuille.</span></div>}<button className="admin-link-btn" onClick={()=>onNavigate('partenaires')}>Gérer les partenaires <ArrowUpRight size={14}/></button></section></div>
+    <section className="admin-panel leaderboard-panel">
+      <div className="admin-panel-head"><div><div className="admin-panel-kicker"><ShieldCheck size={14}/> SANTÉ DU SYSTÈME</div><h2>Contrôles métier</h2></div><span className={`admin-live ${health.unqualifiedVT||health.zeroCommissions||health.installedWithoutCommission?'admin-health-warning':''}`}><i/> {health.unqualifiedVT||health.zeroCommissions||health.installedWithoutCommission?'À vérifier':'OK'}</span></div>
+      <div className="admin-mini-stat-grid">
+        <div><span>VT terminées sans qualification</span><strong>{health.unqualifiedVT}</strong><small>{health.unqualifiedVT?'À traiter dans Visites':'Aucune VT bloquée'}</small></div>
+        <div><span>Commissions à 0 €</span><strong>{health.zeroCommissions}</strong><small>{health.zeroCommissions?'Vérifier le barème':'Aucune anomalie détectée'}</small></div>
+        <div><span>Dossiers installés sans commission</span><strong>{health.installedWithoutCommission}</strong><small>{health.installedWithoutCommission?'Contrôler le suivi financier':'Tout est cohérent'}</small></div>
+      </div>
+    </section>
     <section className="admin-panel leaderboard-panel">
       <div className="admin-panel-head"><div><div className="admin-panel-kicker"><Target size={14}/> OBJECTIFS COMMERCIAUX</div><h2>Objectif mensuel</h2></div><span className="admin-live"><i/> ADMIN</span></div>
       <div className="admin-mini-stat-grid">

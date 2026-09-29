@@ -146,6 +146,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   const [sourceFilter, setSourceFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
   const [commercialFilter, setCommercialFilter] = useState('')
+  const [potCommunOnly, setPotCommunOnly] = useState(false)
   const [selected, setSelected] = useState<Prospect | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
@@ -160,12 +161,14 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   const [tagInput, setTagInput] = useState('')
   const [timelineRefresh, setTimelineRefresh] = useState(0)
   const [commerciaux, setCommerciaux] = useState<{ id: string; nom_complet: string; role: string }[]>([])
+  const [anciensCommerciaux, setAnciensCommerciaux] = useState<{ id: string; nom_complet: string }[]>([])
   const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
 
   const extended = (p: Prospect): any => p as any
 
   async function fetchProspects() {
+    await actualiserPotCommun()
     const { data, error } = await supabase
       .from('prospects')
       .select('*')
@@ -177,6 +180,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   async function fetchCommerciaux() {
     const { data } = await supabase.from('profiles').select('id, nom_complet, role').order('nom_complet')
     setCommerciaux((data || []) as any)
+    const { data: anciens } = await supabase.from('commerciaux_historique').select('id, nom_complet').order('nom_complet')
+    setAnciensCommerciaux((anciens || []) as any)
+  }
+
+  async function actualiserPotCommun() {
+    await supabase.rpc('actualiser_pot_commun')
   }
 
   async function fetchInstallateurs() {
@@ -271,14 +280,15 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
       const matchesSource = !sourceFilter || p.source === sourceFilter
       const matchesTag = !tagFilter || (p.tags || []).includes(tagFilter)
       const matchesCommercial = !commercialFilter || p.commercial_id === commercialFilter
-      return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial
+      const matchesPool = !potCommunOnly || !!(p as any).pot_commun
+      return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPool
     })
-  }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter])
+  }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly])
 
-  const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter].filter(Boolean).length
+  const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly ? 'pot' : ''].filter(Boolean).length
 
   function reinitialiserFiltres() {
-    setStatutFilter(''); setTemperatureFilter(''); setSourceFilter(''); setTagFilter(''); setCommercialFilter('')
+    setStatutFilter(''); setTemperatureFilter(''); setSourceFilter(''); setTagFilter(''); setCommercialFilter(''); setPotCommunOnly(false)
   }
 
   function openWizard() {
@@ -485,6 +495,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
           </div>
 
           <h1 className="prospect-detail-name">{e.civilite} {selected.prenom} {selected.nom}</h1>
+          {(selected as any).pot_commun && <div style={{ margin: '8px 0 12px' }}><span className="prospect-cee-tag" style={{ background: '#fff3cd', color: '#8a5a00' }}>🟠 POT COMMUN · sans action depuis 90 jours</span></div>}
           <p className="prospect-detail-addr">
             <MapPin size={14} style={{ verticalAlign: 'middle', marginRight: 4 }} />
             {e.adresse_rue || selected.adresse || '—'}
@@ -758,6 +769,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
                         const nom = commerciaux.find(c => c.id === id)?.nom_complet || null
                         updateProspectField('commercial_id', id)
                         updateProspectField('commercial', nom)
+                        if (id) updateProspectField('commercial_historique_id', null)
                       }}
                     >
                       <option value="">Non attribué (pool commun)</option>
@@ -774,6 +786,29 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
                     />
                   )}
                 </div>
+                {isAdmin && (selected as any).pot_commun_ancien_commercial && (
+                  <div className="right-mini-section">
+                    <div className="right-mini-section-label">Ancien commercial</div>
+                    <div className="text-sm">{(selected as any).pot_commun_ancien_commercial}</div>
+                    <div className="text-xs text-muted" style={{marginTop:6}}>Le prospect est actuellement dans le pot commun.</div>
+                  </div>
+                )}
+                {isAdmin && (
+                  <div className="right-mini-section">
+                    <div className="right-mini-section-label">Ancien commercial</div>
+                    <select className="pipeline-inline-input" value={(selected as any).commercial_historique_id || ''} onChange={async ev => {
+                      const id = ev.target.value || null
+                      await updateProspectField('commercial_historique_id', id)
+                      if (id) {
+                        await updateProspectField('commercial_id', null)
+                        await updateProspectField('commercial', anciensCommerciaux.find(c => c.id === id)?.nom_complet || null)
+                      }
+                    }}>
+                      <option value="">Aucun ancien commercial</option>
+                      {anciensCommerciaux.map(c => <option key={c.id} value={c.id}>{c.nom_complet}</option>)}
+                    </select>
+                  </div>
+                )}
                 {isAdmin && (
                   <div className="right-mini-section">
                     <div className="right-mini-section-label">Partenaire installateur</div>
@@ -1018,6 +1053,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
                 {commerciaux.map(c => <option key={c.id} value={c.id}>{c.nom_complet || c.role}</option>)}
               </select>
             )}
+            <button className={`btn btn-sm ${potCommunOnly ? 'btn-primary' : 'btn-outline'}`} onClick={() => setPotCommunOnly(v => !v)}>🟠 Pot commun</button>
             {filtresActifsCount > 0 && (
               <button className="btn btn-ghost btn-sm" onClick={reinitialiserFiltres}>
                 Réinitialiser ({filtresActifsCount})

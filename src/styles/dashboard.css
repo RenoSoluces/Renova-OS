@@ -806,3 +806,4 @@
 @media (max-width: 1100px) { .commercial-top-grid { grid-template-columns:1fr 1fr; } .commercial-pipe-card { grid-column:1/-1; } }
 @media (max-width: 820px) { .commercial-hero { align-items:flex-start; flex-direction:column; } .commercial-main-grid, .commercial-stats-grid, .commercial-top-grid { grid-template-columns:1fr; } .commercial-pipe-card { grid-column:auto; } .commercial-money-meta { align-items:flex-start; flex-direction:column; } }
 @media (max-width: 520px) { .commercial-goal-content { gap:10px; } .commercial-goal-card .objectif-ring { transform:scale(.88); transform-origin:left center; margin-right:-12px; } .commercial-todo-row { align-items:flex-start; } .commercial-todo-actions { flex-direction:column; } }
+.admin-health-warning{color:#b36b00!important}.admin-health-warning i{background:#e7a52d!important;box-shadow:0 0 0 5px #fff3dc!important}

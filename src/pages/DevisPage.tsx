@@ -9,7 +9,7 @@ import { Button } from '../components/ui/Button'
 import { FloatSelect, FloatInput, FloatTextarea } from '../components/ui/FloatInput'
 import { SignaturePad } from '../components/shared/SignaturePad'
 import {
-  calculMontantLigneHT, calculTotauxDevis, calculResteACharge,
+  calculMontantLigneHT, calculTotauxDevis, calculResteACharge, type RemiseType,
   CATEGORIE_VERS_GESTE_MPR, CATEGORIE_VERS_GESTE_CEE,
 } from '../lib/devis/calculDevis'
 import { calculAideMPR, determinerProfilMPR, ProfilMPR, LABEL_PROFIL } from '../lib/aides/baremeMaPrimeRenov'
@@ -76,6 +76,8 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
   const [devisParent, setDevisParent] = useState<Devis | null>(null)
   const [avenants, setAvenants] = useState<Devis[]>([])
   const [creatingAvenant, setCreatingAvenant] = useState(false)
+  const [remiseType, setRemiseType] = useState<RemiseType>('montant')
+  const [remiseValeur, setRemiseValeur] = useState(0)
 
   function fetchListe() {
     setLoading(true)
@@ -133,6 +135,10 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
       type_operation: 'mono_geste',
       date_validite: dateValidite,
       conditions_paiement: entreprise?.devis_conditions_paiement_defaut || '',
+      remise_type: 'montant',
+      remise_valeur: 0,
+      montant_ht_avant_remise: 0,
+      remise_montant_ht: 0,
     }).select('*, prospect:prospects(*)').single()
     if (error || !data) return
     setShowNewModal(false)
@@ -143,6 +149,8 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
 
   async function ouvrirDevis(devis: Devis & { prospect?: Prospect }) {
     setCurrent(devis)
+    setRemiseType((devis.remise_type || 'montant') as RemiseType)
+    setRemiseValeur(Number(devis.remise_valeur || 0))
     setNomSignataire(devis.signature_nom_signataire || (devis.prospect ? `${devis.prospect.civilite || ''} ${devis.prospect.prenom} ${devis.prospect.nom}`.trim() : ''))
     setSignatureData(devis.signature_image_data || null)
     setDevisParent(null)
@@ -181,6 +189,10 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
       date_validite: dateValidite,
       conditions_paiement: current.conditions_paiement || entreprise?.devis_conditions_paiement_defaut || '',
       notes: `Avenant n°${numeroAvenant} au devis ${current.numero} (signé le ${current.signature_date ? new Date(current.signature_date).toLocaleDateString('fr-FR') : '—'}).`,
+      remise_type: current.remise_type || 'montant',
+      remise_valeur: current.remise_valeur || 0,
+      montant_ht_avant_remise: current.montant_ht_avant_remise || current.montant_ht || 0,
+      remise_montant_ht: current.remise_montant_ht || 0,
     }).select('*, prospect:prospects(*)').single()
 
     if (!error && nouveau) {
@@ -368,7 +380,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
     }])
   }
 
-  const totaux = useMemo(() => calculTotauxDevis(lignes), [lignes])
+  const totaux = useMemo(() => calculTotauxDevis(lignes, remiseValeur, remiseType), [lignes, remiseValeur, remiseType])
   const totalAides = useMemo(() => aides.reduce((s, a) => s + (a.montant || 0), 0), [aides])
   const resteACharge = useMemo(() => calculResteACharge(totaux.montantTTC, aides), [totaux, aides])
 
@@ -378,6 +390,10 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
 
     await supabase.from('devis').update({
       montant_ht: totaux.montantHT,
+      montant_ht_avant_remise: totaux.montantHTAvantRemise,
+      remise_type: remiseType,
+      remise_valeur: remiseValeur,
+      remise_montant_ht: totaux.remiseHT,
       montant_tva: totaux.montantTVA,
       montant_ttc: totaux.montantTTC,
       montant_aides: totalAides,
@@ -413,6 +429,18 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
       })))
     }
 
+    setCurrent(c => c ? {
+      ...c,
+      montant_ht: totaux.montantHT,
+      montant_ht_avant_remise: totaux.montantHTAvantRemise,
+      remise_type: remiseType,
+      remise_valeur: remiseValeur,
+      remise_montant_ht: totaux.remiseHT,
+      montant_tva: totaux.montantTVA,
+      montant_ttc: totaux.montantTTC,
+      montant_aides: totalAides,
+      reste_a_charge: resteACharge,
+    } : c)
     setSaving(false)
     fetchListe()
   }
@@ -428,7 +456,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
   function telechargerPDF() {
     if (!current) return
     telechargerDevisPDF(
-      { ...current, montant_ht: totaux.montantHT, montant_tva: totaux.montantTVA, montant_ttc: totaux.montantTTC, montant_aides: totalAides, reste_a_charge: resteACharge },
+      { ...current, montant_ht: totaux.montantHT, montant_ht_avant_remise: totaux.montantHTAvantRemise, remise_type: remiseType, remise_valeur: remiseValeur, remise_montant_ht: totaux.remiseHT, montant_tva: totaux.montantTVA, montant_ttc: totaux.montantTTC, montant_aides: totalAides, reste_a_charge: resteACharge },
       lignes,
       aides,
       current.prospect || null,
@@ -450,6 +478,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
     // valeur probante : toute modification ultérieure du devis serait détectable.
     const contenuAHacher = JSON.stringify({
       devisId: current.id, numero: current.numero,
+      montantHTAvantRemise: totaux.montantHTAvantRemise, remiseType, remiseValeur, remiseHT: totaux.remiseHT,
       montantTTC: totaux.montantTTC, resteACharge, nomSignataire: nomSignataire.trim(), dateSignature,
     })
     let hash = ''
@@ -814,6 +843,27 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
           </div>
 
           <div className="card card-pad">
+            <div className="section-label">Remise commerciale</div>
+            <div className="text-sm text-muted" style={{ marginBottom: 10 }}>Accordée au client dans le cadre de la négociation commerciale.</div>
+            <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
+              <label className="field" style={{ minWidth: 150, flex: '0 0 150px' }}>
+                <span>Type de remise</span>
+                <select value={remiseType} onChange={e => setRemiseType(e.target.value as RemiseType)} disabled={estSigne}>
+                  <option value="montant">Montant (€ HT)</option>
+                  <option value="pourcentage">Pourcentage (%)</option>
+                </select>
+              </label>
+              <label className="field" style={{ minWidth: 150, flex: '0 0 150px' }}>
+                <span>{remiseType === 'montant' ? 'Remise' : 'Remise (%)'}</span>
+                <input type="number" min={0} max={remiseType === 'pourcentage' ? 100 : undefined} step="0.01" value={remiseValeur || ''} onChange={e => setRemiseValeur(Math.max(0, parseFloat(e.target.value) || 0))} disabled={estSigne} placeholder="0" />
+              </label>
+              {totaux.remiseHT > 0 && (
+                <div className="text-sm" style={{ paddingBottom: 9 }}>Soit <strong>-{euro(totaux.remiseHT)} HT</strong></div>
+              )}
+            </div>
+          </div>
+
+          <div className="card card-pad">
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <div className="section-label" style={{ marginBottom: 0 }}>Aides mobilisables</div>
               <div style={{ display: 'flex', gap: 6 }}>
@@ -851,7 +901,9 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
 
           <div className="card card-pad">
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">Total HT</span><span>{euro(totaux.montantHT)}</span></div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">Total HT avant remise</span><span>{euro(totaux.montantHTAvantRemise)}</span></div>
+              {totaux.remiseHT > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success-600, #16a34a)' }}><span>Remise commerciale</span><span>-{euro(totaux.remiseHT)}</span></div>}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">Total HT après remise</span><span>{euro(totaux.montantHT)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">TVA</span><span>{euro(totaux.montantTVA)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}><span>Total TTC</span><span>{euro(totaux.montantTTC)}</span></div>
               <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success-600, #16a34a)' }}><span>Aides mobilisées</span><span>-{euro(totalAides)}</span></div>
@@ -906,7 +958,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
         <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           <div className="card card-pad" style={{ background: 'var(--c-bg-alt)' }}>
             <div className="font-semibold">{current?.numero}</div>
-            <div className="text-sm text-muted">Montant TTC : {euro(totaux.montantTTC)} · Reste à charge : {euro(resteACharge)}</div>
+            <div className="text-sm text-muted">Montant TTC : {euro(totaux.montantTTC)} · Reste à charge : {euro(resteACharge)}{totaux.remiseHT > 0 ? ` · Remise : -${euro(totaux.remiseHT)}` : ''}</div>
           </div>
 
           <label className="field">

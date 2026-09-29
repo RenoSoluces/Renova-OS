@@ -29,6 +29,10 @@ export interface Prospect {
   zone_ile_de_france: boolean
   commercial: string | null
   commercial_id: string | null
+  commercial_historique_id?: string | null
+  pot_commun?: boolean
+  pot_commun_at?: string | null
+  pot_commun_ancien_commercial?: string | null
   tags: string[]
   montant_potentiel: number | null
   temperature: 'chaud' | 'tiede' | 'froid' | null
@@ -440,6 +444,10 @@ export interface Devis {
   date_validite: string | null
   conditions_paiement: string
   montant_ht: number
+  montant_ht_avant_remise?: number
+  remise_type?: 'montant' | 'pourcentage'
+  remise_valeur?: number
+  remise_montant_ht?: number
   montant_tva: number
   montant_ttc: number
   montant_aides: number

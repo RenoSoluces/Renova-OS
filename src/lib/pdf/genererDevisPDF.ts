@@ -215,6 +215,14 @@ export function genererDevisPDF(
     y += bold ? 7 : 5.5;
   };
 
+  const remiseHT = Number(devis.remise_montant_ht || 0);
+  if (remiseHT > 0) {
+    ligneTotal("Total HT avant remise", euro(devis.montant_ht_avant_remise || (devis.montant_ht + remiseHT)));
+    const libelleRemise = devis.remise_type === "pourcentage"
+      ? `Remise commerciale (${Number(devis.remise_valeur || 0).toLocaleString("fr-FR")} %)`
+      : "Remise commerciale";
+    ligneTotal(libelleRemise, `- ${euro(remiseHT)}`, false, [40, 130, 80]);
+  }
   ligneTotal("Total HT", euro(devis.montant_ht));
   ligneTotal("TVA", euro(devis.montant_tva));
   ligneTotal("Total TTC", euro(devis.montant_ttc), true);

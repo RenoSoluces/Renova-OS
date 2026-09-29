@@ -5,30 +5,48 @@ export interface LigneCalculable {
 }
 
 export interface TotauxDevis {
+  montantHTAvantRemise: number;
   montantHT: number;
   montantTVA: number;
   montantTTC: number;
+  remiseHT: number;
 }
+
+export type RemiseType = 'montant' | 'pourcentage';
 
 export function calculMontantLigneHT(ligne: LigneCalculable): number {
   return Math.round(ligne.quantite * ligne.prix_unitaire_ht * 100) / 100;
 }
 
-export function calculTotauxDevis(lignes: LigneCalculable[]): TotauxDevis {
-
-  let montantHT = 0;
-  let montantTVA = 0;
+export function calculTotauxDevis(
+  lignes: LigneCalculable[],
+  remiseValeur = 0,
+  remiseType: RemiseType = 'montant'
+): TotauxDevis {
+  let montantHTAvantRemise = 0;
+  const tvaParLigne: number[] = [];
 
   for (const ligne of lignes) {
     const ht = calculMontantLigneHT(ligne);
-    montantHT += ht;
-    montantTVA += ht * (ligne.tva_taux / 100);
+    montantHTAvantRemise += ht;
+    tvaParLigne.push(ht * (ligne.tva_taux / 100));
   }
 
+  montantHTAvantRemise = Math.round(montantHTAvantRemise * 100) / 100;
+  const remiseHT = remiseType === 'pourcentage'
+    ? montantHTAvantRemise * Math.min(Math.max(remiseValeur, 0), 100) / 100
+    : Math.min(Math.max(remiseValeur, 0), montantHTAvantRemise);
+  const remiseArrondie = Math.round(remiseHT * 100) / 100;
+  const tauxRemise = montantHTAvantRemise > 0 ? remiseArrondie / montantHTAvantRemise : 0;
+  const montantHT = Math.max(0, Math.round((montantHTAvantRemise - remiseArrondie) * 100) / 100);
+  const montantTVA = Math.round(tvaParLigne.reduce((sum, tva) => sum + tva * (1 - tauxRemise), 0) * 100) / 100;
+
   return {
-    montantHT: Math.round(montantHT * 100) / 100,
-    montantTVA: Math.round(montantTVA * 100) / 100,
+    montantHTAvantRemise,
+    montantHT,
+    montantTVA,
     montantTTC: Math.round((montantHT + montantTVA) * 100) / 100,
+    remiseHT: remiseArrondie,
   };
 
 }

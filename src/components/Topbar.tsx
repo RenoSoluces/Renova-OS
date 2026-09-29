@@ -1,4 +1,4 @@
-import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck } from 'lucide-react'
+import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -35,13 +35,32 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
   const [menuOpen, setMenuOpen] = useState(false)
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<Notification[]>([])
+  const [installPrompt, setInstallPrompt] = useState<any>(null)
 
   function loadNotifs() {
     supabase.from('notifications').select('*').or(`recipient_id.eq.${profile?.id},recipient_id.is.null`).order('created_at', { ascending: false }).limit(20)
       .then(({ data }) => setNotifs((data || []) as Notification[]))
   }
 
-  useEffect(() => { if (profile?.id) loadNotifs() }, [refreshKey, profile?.id])
+  useEffect(() => {
+    if (profile?.id) loadNotifs()
+  }, [refreshKey, profile?.id])
+
+  useEffect(() => {
+    const onBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault()
+      setInstallPrompt(event)
+    }
+    window.addEventListener('beforeinstallprompt', onBeforeInstallPrompt)
+    return () => window.removeEventListener('beforeinstallprompt', onBeforeInstallPrompt)
+  }, [])
+
+  async function installerApplication() {
+    if (!installPrompt) return
+    installPrompt.prompt()
+    await installPrompt.userChoice
+    setInstallPrompt(null)
+  }
 
   const nonLues = notifs.filter(n => !n.lue).length
 
@@ -80,6 +99,11 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
       </div>
       <div className="topbar-spacer" />
       {actions}
+      {installPrompt && (
+        <button className="btn btn-sm btn-secondary" onClick={installerApplication} title="Installer Renova OS comme application">
+          <Download size={15} /> Installer l'application
+        </button>
+      )}
       <div className="topbar-search">
         <Search />
         <input placeholder="Rechercher un prospect, dossier..." />

@@ -77,6 +77,7 @@ import {
 import { ImportRapportVT } from '../components/visites/ImportRapportVT'
 import type { ImportVTResult } from '../lib/pdf/import/importVT'
 import type { DispositifAide } from '../types'
+import { logAuditEvent } from '../lib/auditLog'
 
 /** Mappe une catégorie du Catalogue produits vers le parcours VT correspondant.
  * Le produit reste la source de vérité : la VT est créée avec l'id exact du produit
@@ -1028,11 +1029,19 @@ export function VisitesPage({
       return
     }
 
+    await logAuditEvent({
+      action: 'vt_qualifiee',
+      entityType: 'visite',
+      entityId: qualificationVisite.id,
+      actorId: profile?.id,
+      description: `VT qualifiée avec le barème « ${bareme.libelle || 'Visite technique'} »`,
+      meta: { commercial_id: commercialId, produit_id: qualificationProduitId, montant_commercial: montantCommercial, montant_societe: montantSociete },
+    })
     alert(`VT qualifiée avec le barème « ${bareme.libelle || 'Visite technique'} » : ${montantCommercial} € commercial / ${montantSociete} € société.`)
     await fetchVisites()
     setQualificationVisite(null)
     setQualificationProduitId('')
-  }, [admin, qualificationVisite, qualificationProduitId, fetchVisites])
+  }, [admin, qualificationVisite, qualificationProduitId, fetchVisites, profile?.id])
 
   const deleteVisite = useCallback(async (visite: Visite) => {
     if (!admin) return

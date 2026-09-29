@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { User, Building2, Plug, Bell, Save, ScrollText, RefreshCw, Plus, Image as ImageIcon, Sun } from 'lucide-react'
+import { User, Building2, Plug, Bell, Save, ScrollText, RefreshCw, Plus, Image as ImageIcon, Sun, Users, Trash2 } from 'lucide-react'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
@@ -13,6 +13,7 @@ const TABS = [
   { key: 'dispositifs', label: 'Dispositifs d\'aides', icon: <ScrollText size={16} /> },
   { key: 'integrations', label: 'Intégrations', icon: <Plug size={16} /> },
   { key: 'notifications', label: 'Notifications', icon: <Bell size={16} /> },
+  { key: 'commerciaux', label: 'Commerciaux historiques', icon: <Users size={16} /> },
 ]
 
 const ENTREPRISE_VIDE: Partial<Entreprise> = {
@@ -54,6 +55,40 @@ export function ParametresPage() {
   const [entrepriseSaved, setEntrepriseSaved] = useState(false)
   const [integrations, setIntegrations] = useState({ mpr: '', apiAdresse: '' })
   const [notif, setNotif] = useState({ email: true, push: false, sms: false })
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
+  const [anciensCommerciaux, setAnciensCommerciaux] = useState<any[]>([])
+  const [ancienCommercialForm, setAncienCommercialForm] = useState({ nom_complet: '', email: '', telephone: '', notes: '' })
+  const [savingAncienCommercial, setSavingAncienCommercial] = useState(false)
+
+  async function fetchAnciensCommerciaux() {
+    const { data } = await supabase.from('commerciaux_historique').select('*').order('nom_complet')
+    setAnciensCommerciaux(data || [])
+  }
+
+  useEffect(() => {
+    if (tab === 'commerciaux' && isAdmin) fetchAnciensCommerciaux()
+  }, [tab, isAdmin])
+
+  async function ajouterAncienCommercial() {
+    if (!ancienCommercialForm.nom_complet.trim()) return
+    setSavingAncienCommercial(true)
+    const { error } = await supabase.from('commerciaux_historique').insert({
+      nom_complet: ancienCommercialForm.nom_complet.trim(),
+      email: ancienCommercialForm.email.trim() || null,
+      telephone: ancienCommercialForm.telephone.trim() || null,
+      notes: ancienCommercialForm.notes.trim() || null,
+    })
+    setSavingAncienCommercial(false)
+    if (error) { alert(error.message); return }
+    setAncienCommercialForm({ nom_complet: '', email: '', telephone: '', notes: '' })
+    fetchAnciensCommerciaux()
+  }
+
+  async function supprimerAncienCommercial(id: string) {
+    if (!confirm('Supprimer cet ancien commercial ? Les prospects qui lui sont attribués conserveront leur historique, mais ne seront plus liés à cette fiche.')) return
+    await supabase.from('commerciaux_historique').delete().eq('id', id)
+    fetchAnciensCommerciaux()
+  }
 
   useEffect(() => {
     if (!profile) return
@@ -180,7 +215,7 @@ export function ParametresPage() {
       </div>
 
       <div className="tabs mb-4">
-        {TABS.map(t => (
+        {TABS.filter(t => t.key !== 'commerciaux' || isAdmin).map(t => (
           <button
             key={t.key}
             className={`tab ${tab === t.key ? 'active' : ''}`}
@@ -411,6 +446,34 @@ export function ParametresPage() {
                   </table>
                 </div>
               )}
+            </div>
+          )}
+
+          {tab === 'commerciaux' && isAdmin && (
+            <div className="flex flex-col gap-5">
+              <div>
+                <h2 style={{ margin: 0 }}>Anciens commerciaux</h2>
+                <p className="text-muted" style={{ marginTop: 6 }}>Ajoutez les commerciaux qui ne sont plus connectés à Renova OS. Vous pourrez ensuite attribuer leurs anciens prospects à leur historique sans créer de compte de connexion.</p>
+              </div>
+              <div className="grid grid-2 gap-3">
+                <FloatInput label="Nom complet *" value={ancienCommercialForm.nom_complet} onChange={v => setAncienCommercialForm(f => ({ ...f, nom_complet: v }))} />
+                <FloatInput label="Email" type="email" value={ancienCommercialForm.email} onChange={v => setAncienCommercialForm(f => ({ ...f, email: v }))} />
+                <FloatInput label="Téléphone" value={ancienCommercialForm.telephone} onChange={v => setAncienCommercialForm(f => ({ ...f, telephone: v }))} />
+                <FloatInput label="Note" value={ancienCommercialForm.notes} onChange={v => setAncienCommercialForm(f => ({ ...f, notes: v }))} />
+              </div>
+              <Button variant="primary" onClick={ajouterAncienCommercial} disabled={savingAncienCommercial || !ancienCommercialForm.nom_complet.trim()}>
+                <Plus size={17} /> {savingAncienCommercial ? 'Ajout…' : 'Ajouter l’ancien commercial'}
+              </Button>
+              <div className="card" style={{ marginTop: 4 }}>
+                <div className="card-body">
+                  {anciensCommerciaux.length === 0 ? <div className="text-muted">Aucun ancien commercial enregistré.</div> : anciensCommerciaux.map(c => (
+                    <div key={c.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 0', borderBottom: '1px solid var(--border)' }}>
+                      <div><strong>{c.nom_complet}</strong><div className="text-xs text-muted">{c.email || 'Sans email'}{c.telephone ? ` · ${c.telephone}` : ''}</div></div>
+                      <button className="btn btn-ghost btn-sm" onClick={() => supprimerAncienCommercial(c.id)} title="Supprimer"><Trash2 size={15} /></button>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 
