@@ -373,6 +373,9 @@ export interface Commission {
 export interface Document {
   id: string
   dossier_id: string | null
+  prospect_id?: string | null
+  partenaire_id?: string | null
+  categorie?: string | null
   nom: string
   type: string
   taille: number | string | null

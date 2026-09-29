@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronLeft, ChevronRight, Check, Phone, Mail, MapPin,
   Pencil, Trash2, Zap, Home, Wrench, User, Users, Wallet, ArrowRight,
   AlertTriangle, FileText, Calendar, LayoutGrid, List as ListIcon,
-  Flame, Snowflake, Minus, Tag, X as XIcon,
+  Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Prospect, CrmTask } from '../types'
@@ -18,6 +18,7 @@ import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { useAuth } from '../lib/auth/AuthContext'
+import { uploadDocument } from '../lib/storage/uploadDocument'
 
 interface Props {
   onProspectClick?: (p: Prospect) => void
@@ -160,6 +161,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   const [linkedCounts, setLinkedCounts] = useState<{ visites: number; simulations: number; devis: number; dossiers: number } | null>(null)
   const [tagInput, setTagInput] = useState('')
   const [timelineRefresh, setTimelineRefresh] = useState(0)
+  const [prospectDocuments, setProspectDocuments] = useState<any[]>([])
+  const [uploadingPartnerQuote, setUploadingPartnerQuote] = useState(false)
+  const [partnerQuotePartnerId, setPartnerQuotePartnerId] = useState('')
+  const [partnerQuoteInput, setPartnerQuoteInput] = useState<HTMLInputElement | null>(null)
   const [commerciaux, setCommerciaux] = useState<{ id: string; nom_complet: string; role: string }[]>([])
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<{ id: string; nom_complet: string }[]>([])
   const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
@@ -169,10 +174,14 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
 
   async function fetchProspects() {
     await actualiserPotCommun()
-    const { data, error } = await supabase
+    let query = supabase
       .from('prospects')
       .select('*')
       .order('created_at', { ascending: false })
+    if (!isAdmin && profile?.id) {
+      query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true`)
+    }
+    const { data, error } = await query
     if (error) { setProspects([]); return }
     setProspects((data || []) as Prospect[])
   }
@@ -204,8 +213,36 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   }
 
   useEffect(() => {
+    if (!profile) return
     Promise.all([fetchProspects(), fetchOpenTasks(), fetchCommerciaux(), fetchInstallateurs()]).finally(() => setLoading(false))
-  }, [])
+  }, [profile?.id, profile?.role])
+
+  async function fetchProspectDocuments(prospectId: string) {
+    const { data } = await supabase
+      .from('documents')
+      .select('id, nom, type, taille, url, categorie, partenaire_id, created_at')
+      .eq('prospect_id', prospectId)
+      .order('created_at', { ascending: false })
+    setProspectDocuments(data || [])
+  }
+
+  async function ajouterDevisPartenaire(files: FileList | null) {
+    if (!files || files.length === 0 || !selected) return
+    setUploadingPartnerQuote(true)
+    for (const file of Array.from(files)) {
+      const partnerId = (selected as any).installateur_id || null
+      const { error } = await uploadDocument(file, {
+        prospectId: selected.id,
+        type: 'devis_partenaire',
+        categorie: 'Devis partenaire',
+        partenaireId: partnerQuotePartnerId || partnerId,
+      })
+      if (error) window.alert(`Impossible d'ajouter \"${file.name}\" : ${error}`)
+    }
+    await fetchProspectDocuments(selected.id)
+    setUploadingPartnerQuote(false)
+    if (partnerQuoteInput) partnerQuoteInput.value = ''
+  }
 
   async function fetchLinkedCounts(prospectId: string) {
     setLinkedCounts(null)
@@ -221,7 +258,13 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   }
 
   useEffect(() => {
-    if (selected) fetchLinkedCounts(selected.id)
+    if (selected) {
+      fetchLinkedCounts(selected.id)
+      fetchProspectDocuments(selected.id)
+      setPartnerQuotePartnerId((selected as any).installateur_id || '')
+    } else {
+      setProspectDocuments([])
+    }
   }, [selected?.id])
 
   async function updateStage(prospectId: string, newStatut: string) {
@@ -713,6 +756,62 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
                   </div>
                 </div>
               )}
+
+              {/* Documents du prospect / devis partenaires */}
+              <div className="detail-section-card">
+                <div className="detail-section-top">
+                  <div>
+                    <div className="detail-etape-row">
+                      <span className="detail-etape-label">Documents</span>
+                    </div>
+                    <div className="detail-section-heading">Devis & documents partenaires</div>
+                    <div className="detail-section-subdesc">Conservez les devis reçus des installateurs directement dans la fiche du prospect.</div>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                    <select
+                      className="pipeline-inline-input"
+                      value={partnerQuotePartnerId || (selected as any).installateur_id || ''}
+                      onChange={ev => setPartnerQuotePartnerId(ev.target.value)}
+                      style={{ minWidth: 190 }}
+                    >
+                      <option value="">Partenaire non renseigné</option>
+                      {installateurs.map(i => <option key={i.id} value={i.id}>{i.nom}</option>)}
+                    </select>
+                    <input
+                      ref={el => setPartnerQuoteInput(el)}
+                      type="file"
+                      accept=".pdf,.doc,.docx,.jpg,.jpeg,.png,.xls,.xlsx"
+                      hidden
+                      onChange={ev => ajouterDevisPartenaire(ev.target.files)}
+                    />
+                    <button className="btn btn-primary btn-sm" onClick={() => partnerQuoteInput?.click()} disabled={uploadingPartnerQuote}>
+                      <UploadCloud size={15} /> {uploadingPartnerQuote ? 'Envoi…' : 'Ajouter un devis partenaire'}
+                    </button>
+                  </div>
+                </div>
+                <div className="detail-info-card">
+                  {prospectDocuments.length === 0 ? (
+                    <div className="detail-info-inner text-sm text-muted">Aucun document partenaire enregistré.</div>
+                  ) : (
+                    <div className="detail-info-inner">
+                      {prospectDocuments.map(doc => {
+                        const partenaire = installateurs.find(i => i.id === doc.partenaire_id)?.nom
+                        return (
+                          <div className="detail-info-row" key={doc.id}>
+                            <span className="detail-info-key" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                              <FileText size={15} /> {doc.nom}
+                            </span>
+                            <span className="detail-info-val" style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                              <span className="text-xs text-muted">{partenaire || 'Partenaire non renseigné'} · {new Date(doc.created_at).toLocaleDateString('fr-FR')}</span>
+                              {doc.url && <a href={doc.url} target="_blank" rel="noreferrer" className="btn btn-ghost btn-sm" title="Ouvrir"><Download size={14} /></a>}
+                            </span>
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
+              </div>
 
               {/* Chat interne Admin ↔ Commercial */}
               <ProspectChat prospect={selected} />

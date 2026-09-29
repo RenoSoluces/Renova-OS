@@ -3,10 +3,10 @@ import type { Document } from '../../types'
 
 export async function uploadDocument(
   file: File,
-  opts: { dossierId?: string | null; type?: string; nouvelleVersionDe?: Document } = {}
+  opts: { dossierId?: string | null; prospectId?: string | null; type?: string; categorie?: string; partenaireId?: string | null; nouvelleVersionDe?: Document } = {}
 ) {
   const ext = file.name.split('.').pop() || 'bin'
-  const path = `${opts.dossierId || 'divers'}/${crypto.randomUUID()}.${ext}`
+  const path = `${opts.dossierId || opts.prospectId || 'divers'}/${crypto.randomUUID()}.${ext}`
 
   const { error: uploadError } = await supabase.storage.from('documents').upload(path, file, {
     cacheControl: '3600',
@@ -21,6 +21,9 @@ export async function uploadDocument(
     .from('documents')
     .insert({
       dossier_id: versionPrecedente?.dossier_id ?? opts.dossierId ?? null,
+      prospect_id: opts.prospectId ?? null,
+      categorie: opts.categorie || 'Général',
+      partenaire_id: opts.partenaireId ?? null,
       nom: file.name,
       type: opts.type || (ext.toLowerCase()),
       taille: file.size,
