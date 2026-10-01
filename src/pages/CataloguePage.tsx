@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Plus, Package, Pencil, Trash2, X, Copy, Search } from 'lucide-react'
+import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText } from 'lucide-react'
+import { jsPDF } from 'jspdf'
+import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Produit } from '../types'
 import { Modal } from '../components/ui/Modal'
@@ -65,6 +67,8 @@ function emptyForm(): FormState {
 }
 
 export function CataloguePage() {
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [rows, setRows] = useState<Produit[]>([])
   const [loading, setLoading] = useState(true)
   const [filtreCategorie, setFiltreCategorie] = useState<string>('toutes')
@@ -239,6 +243,37 @@ export function CataloguePage() {
       .map(([label, produits]) => ({ label, produits }))
   })()
 
+  async function generateFicheTechnique(p: Produit) {
+    const doc = new jsPDF()
+    const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n)
+    try {
+      const logo = await fetch('/pwa-512.png').then(r => r.blob()).then(blob => new Promise<string>((resolve, reject) => {
+        const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsDataURL(blob)
+      }))
+      doc.addImage(logo, 'PNG', 18, 14, 22, 22)
+    } catch {}
+    doc.setFontSize(20); doc.text('RENOVA OS', 46, 27)
+    doc.setFontSize(10); doc.text('FICHE TECHNIQUE PRODUIT', 46, 34)
+    doc.setDrawColor(210); doc.line(18, 43, 192, 43)
+    doc.setFontSize(17); doc.text(p.nom || 'Produit', 18, 56)
+    doc.setFontSize(10)
+    let y = 66
+    const meta = [['Marque', p.marque], ['Référence', p.reference], ['Catégorie', CATEGORIE_LABEL[p.categorie] || p.categorie], ['Unité', UNITES.find(u => u.value === p.unite)?.label || p.unite]]
+    for (const [label, value] of meta) { if (value) { doc.setFont('helvetica','bold'); doc.text(`${label} :`, 18, y); doc.setFont('helvetica','normal'); doc.text(String(value), 55, y); y += 7 } }
+    y += 3; doc.setFont('helvetica','bold'); doc.text('Description', 18, y); y += 7; doc.setFont('helvetica','normal')
+    const desc = doc.splitTextToSize(p.description || 'Aucune description renseignée.', 174); doc.text(desc, 18, y); y += desc.length * 5 + 8
+    if (p.caracteristiques && Object.keys(p.caracteristiques).length) {
+      doc.setFont('helvetica','bold'); doc.text('Caractéristiques techniques', 18, y); y += 7; doc.setFont('helvetica','normal')
+      for (const [k,v] of Object.entries(p.caracteristiques)) { const lines=doc.splitTextToSize(`${k} : ${String(v)}`,174); doc.text(lines,18,y); y+=lines.length*5+2; if(y>270){doc.addPage();y=22} }
+    }
+    y += 5; doc.setFont('helvetica','bold'); doc.text('Éligibilité aux aides',18,y); y+=7; doc.setFont('helvetica','normal')
+    doc.text(`MaPrimeRénov' : ${p.eligible_mpr ? 'Oui' : 'Non'}`,18,y); y+=6
+    doc.text(`CEE : ${p.eligible_cee ? `Oui${p.fiche_cee ? ` — ${p.fiche_cee}` : ''}` : 'Non'}`,18,y)
+    if (isAdmin) { y+=10; doc.setFont('helvetica','bold'); doc.text(`Tarif interne HT : ${euro(Number(p.prix_unitaire_ht)||0)}`,18,y) }
+    doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text(`Fiche générée le ${new Date().toLocaleDateString('fr-FR')} — Document technique RENOVA OS`,18,286)
+    doc.save(`fiche-technique-${(p.nom||'produit').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()}.pdf`)
+  }
+
   return (
     <div className="page">
       <div className="page-header">
@@ -246,11 +281,11 @@ export function CataloguePage() {
           <h1 className="page-title">Catalogue produits</h1>
           <p className="page-subtitle">Les produits et prestations que vous proposez, utilisés pour construire vos devis</p>
         </div>
-        <div className="page-actions">
+        {isAdmin && <div className="page-actions">
           <Button variant="primary" onClick={openCreate}>
             <Plus size={18} /> Ajouter un produit
           </Button>
-        </div>
+        </div>}
       </div>
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center', justifyContent: 'space-between' }}>
@@ -331,7 +366,7 @@ export function CataloguePage() {
                   <tr>
                     <th>Produit</th>
                     {groupement === 'fournisseur' && <th>Catégorie</th>}
-                    <th>Prix HT</th>
+                    {isAdmin && <th>Prix HT</th>}
                     <th>TVA</th>
                     <th>Aides</th>
                     <th>Statut</th>
@@ -349,7 +384,7 @@ export function CataloguePage() {
                         )}
                       </td>
                       {groupement === 'fournisseur' && <td>{CATEGORIE_LABEL[p.categorie] || p.categorie}</td>}
-                      <td>{euro(p.prix_unitaire_ht)} / {UNITES.find(u => u.value === p.unite)?.label || p.unite}</td>
+                      {isAdmin && <td>{euro(p.prix_unitaire_ht)} / {UNITES.find(u => u.value === p.unite)?.label || p.unite}</td>}
                       <td>{p.tva_taux}%</td>
                       <td>
                         <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -365,9 +400,12 @@ export function CataloguePage() {
                       </td>
                       <td>
                         <div style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn-icon" onClick={() => openDuplicate(p)} title="Dupliquer (nouvelle variante de cette gamme)"><Copy size={16} /></button>
-                          <button className="btn-icon" onClick={() => openEdit(p)} title="Modifier"><Pencil size={16} /></button>
-                          <button className="btn-icon" onClick={() => remove(p)} title="Supprimer"><Trash2 size={16} /></button>
+                          <button className="btn-icon" onClick={() => generateFicheTechnique(p)} title="Télécharger la fiche technique"><FileText size={16} /></button>
+                          {isAdmin && <>
+                            <button className="btn-icon" onClick={() => openDuplicate(p)} title="Dupliquer (nouvelle variante de cette gamme)"><Copy size={16} /></button>
+                            <button className="btn-icon" onClick={() => openEdit(p)} title="Modifier"><Pencil size={16} /></button>
+                            <button className="btn-icon" onClick={() => remove(p)} title="Supprimer"><Trash2 size={16} /></button>
+                          </>}
                         </div>
                       </td>
                     </tr>

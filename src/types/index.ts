@@ -328,6 +328,26 @@ export interface PlanningEvent {
   created_at?: string
 }
 
+
+export interface DossierFacturation {
+  id: string
+  dossier_id: string
+  libelle: string
+  montant_ht: number
+  taux_tva: number
+  declencheur: string
+  statut: 'a_facturer' | 'facturee' | 'payee' | 'annulee'
+  facturee_at?: string | null
+  facture_numero?: string | null
+  date_paiement?: string | null
+  date_echeance?: string | null
+  conditions_paiement?: string | null
+  categorie_operation?: string | null
+  ordre: number
+  notes?: string | null
+  created_at: string
+}
+
 // ── Commissions ──────────────────────────────────────────────────────────────
 export type CommissionType = 'vt' | 'devis_signe' | 'manuel'
 export type CommissionStatut = 'en_attente' | 'validee' | 'payee' | 'annulee'
@@ -389,7 +409,10 @@ export interface Document {
 export interface Entreprise {
   id: string
   raison_sociale: string
+  forme_juridique?: string
+  capital_social?: string
   siret: string
+  numero_tva?: string
   numero_rge: string
   qualifications_rge: { domaine: string; certificat: string; validite: string }[]
   adresse: string
@@ -398,6 +421,12 @@ export interface Entreprise {
   telephone: string
   email: string
   logo_url: string
+  iban?: string
+  bic?: string
+  banque?: string
+  conditions_paiement_defaut?: string
+  taux_penalite_retard?: string
+  escompte_defaut?: string
   taux_cee_eur_par_mwh_cumac: number
   conditions_generales_devis: string
   devis_duree_validite_jours: number

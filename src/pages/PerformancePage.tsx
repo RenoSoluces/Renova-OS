@@ -7,7 +7,8 @@ interface Partner { id: string; nom: string; actif: boolean }
 interface Commercial { id: string; nom_complet: string; role: string }
 interface Dossier { id: string; prospect_id: string; devis_id?: string | null; installateur_id: string | null; montant_total: number | null; statut: string }
 interface DevisRef { id: string; prospect_id: string | null; montant_ttc: number | null }
-interface ProspectRef { id: string; commercial_id: string | null }
+interface ProspectRef { id: string; commercial_id: string | null; installateur_id?: string | null }
+interface VTRef { id: string; prospect_id: string | null; type: string; commission_montant_societe?: number | null }
 
 export function PerformancePage() {
   const [partners, setPartners] = useState<Partner[]>([])
@@ -16,8 +17,11 @@ export function PerformancePage() {
   const [prospects, setProspects] = useState<ProspectRef[]>([])
   const [devis, setDevis] = useState<DevisRef[]>([])
   const [commissions, setCommissions] = useState<any[]>([])
+  const [vts, setVts] = useState<VTRef[]>([])
   const [tab, setTab] = useState<'partenaires' | 'commerciaux'>('partenaires')
   const [loading, setLoading] = useState(true)
+  const [facturations, setFacturations] = useState<any[]>([])
+  const [vtCommissions, setVtCommissions] = useState<any[]>([])
 
   useEffect(() => {
     Promise.all([
@@ -27,13 +31,19 @@ export function PerformancePage() {
       supabase.from('prospects').select('id,commercial_id,installateur_id'),
       supabase.from('devis').select('id,prospect_id,montant_ttc'),
       supabase.from('commissions').select('id,commercial_id,montant_commercial,montant_societe,statut,date_paiement_commercial,date_paiement_societe').neq('statut','annulee'),
-    ]).then(([p, c, d, pr, dv, co]) => {
+      supabase.from('planning_events').select('id,prospect_id,type,commission_montant_societe').eq('type','visite'),
+      supabase.from('dossier_facturation').select('id,dossier_id,statut'),
+      supabase.from('commissions').select('id,reference_type,reference_id,statut,date_paiement_societe').in('reference_type',['visites','planning_events']).neq('statut','annulee'),
+    ]).then(([p, c, d, pr, dv, co, vt, df, vtCom]) => {
       setPartners((p.data || []) as Partner[])
       setCommercials((c.data || []).filter((x: Commercial) => x.role === 'commercial') as Commercial[])
       setDossiers((d.data || []) as Dossier[])
       setProspects((pr.data || []) as ProspectRef[])
       setDevis((dv.data || []) as DevisRef[])
       setCommissions(co.data || [])
+      setVts((vt.data || []) as VTRef[])
+      setFacturations(df.data || [])
+      setVtCommissions(vtCom.data || [])
       setLoading(false)
     })
   }, [])
@@ -42,13 +52,19 @@ export function PerformancePage() {
   const prospectPartner = useMemo(() => new Map(prospects.map(p => [p.id, (p as any).installateur_id || null])), [prospects])
   const devisAmount = useMemo(() => new Map(devis.map(d => [d.id, Number(d.montant_ttc) || 0])), [devis])
   const dossierCa = (d: Dossier) => Number(d.montant_total) || (d.devis_id ? (devisAmount.get(d.devis_id) || 0) : 0)
+  const vtByPartner = useMemo(() => { const m=new Map<string,{count:number;ca:number}>(); for(const v of vts){ const partner=prospectPartner.get(v.prospect_id||''); if(!partner) continue; const row=m.get(partner)||{count:0,ca:0}; row.count+=1; row.ca+=Number(v.commission_montant_societe||0); m.set(partner,row) } return m },[vts,prospectPartner])
 
   const partnerRows = useMemo(() => partners.map(p => {
     const ds = dossiers.filter(d => (prospectPartner.get(d.prospect_id) || d.installateur_id) === p.id)
     const ca = ds.reduce((sum, d) => sum + dossierCa(d), 0)
     const installed = ds.filter(d => d.statut === 'installe').reduce((sum, d) => sum + dossierCa(d), 0)
-    return { ...p, dossiers: ds.length, installed, ca }
-  }).sort((a, b) => b.ca - a.ca), [partners, dossiers, prospectPartner, devisAmount])
+    const paidDossierIds = new Set(facturations.filter(f => f.statut === 'payee').map(f => f.dossier_id))
+    const validDossiers = ds.filter(d => paidDossierIds.has(d.id)).length
+    const vt=vtByPartner.get(p.id)||{count:0,ca:0}
+    const paidVtIds = new Set(vtCommissions.filter((c:any) => c.statut === 'payee' || c.date_paiement_societe).map((c:any)=>c.reference_id))
+    const paidVtCount = vts.filter(v => (prospectPartner.get(v.prospect_id||'')===p.id) && paidVtIds.has(v.id)).length
+    return { ...p, dossiers: ds.length, dossiersValides: validDossiers + paidVtCount, installed, ca: ca + vt.ca, vtCount: vt.count, vtValides: paidVtCount, vtCa: vt.ca }
+  }).sort((a, b) => b.dossiersValides - a.dossiersValides || b.ca - a.ca), [partners, dossiers, prospectPartner, devisAmount, vtByPartner, facturations, vtCommissions, vts])
 
   const commercialRows = useMemo(() => commercials.map(c => {
     const ds = dossiers.filter(d => prospectCommercial.get(d.prospect_id) === c.id)
@@ -68,7 +84,7 @@ export function PerformancePage() {
     ? partnerRows.reduce((s, x) => s + x.installed, 0)
     : commercialRows.reduce((s, x) => s + x.installed, 0)
   const totalDossiers = tab === 'partenaires'
-    ? partnerRows.reduce((s, x) => s + x.dossiers, 0)
+    ? partnerRows.reduce((s, x) => s + x.dossiersValides, 0)
     : commercialRows.reduce((s, x) => s + x.dossiers, 0)
 
   return <div className="page">
@@ -82,8 +98,8 @@ export function PerformancePage() {
     </div>
 
     {tab === 'partenaires' ? <section className="dashboard-kpis page-kpi-strip">
-      <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Euro size={19}/></span><span className="dashboard-kpi-main"><strong>{euro(totalCa)}</strong><span>CA des dossiers</span></span></div>
-      <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><HardHat size={19}/></span><span className="dashboard-kpi-main"><strong>{totalDossiers}</strong><span>Dossiers générés</span></span></div>
+      <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Euro size={19}/></span><span className="dashboard-kpi-main"><strong>{euro(totalCa)}</strong><span>CA total dossiers + VT</span></span></div>
+      <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><HardHat size={19}/></span><span className="dashboard-kpi-main"><strong>{totalDossiers}</strong><span>Dossiers validés (payés) + VT payées</span></span></div>
       <div className="dashboard-kpi"><span className="dashboard-kpi-icon purple"><TrendingUp size={19}/></span><span className="dashboard-kpi-main"><strong>{euro(totalInstalled)}</strong><span>CA installé</span></span></div>
     </section> : <section className="dashboard-kpis page-kpi-strip">
       <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><HardHat size={19}/></span><span className="dashboard-kpi-main"><strong>{totalDossiers}</strong><span>Nombre de dossiers</span></span></div>
@@ -96,8 +112,8 @@ export function PerformancePage() {
       <div className="card-pad">
         {loading ? <div className="text-muted">Chargement…</div> : tab === 'partenaires' ? (
           <div className="performance-table">
-            <div className="performance-row performance-head"><span>Partenaire</span><span>Dossiers</span><span>CA dossiers</span><span>CA installé</span></div>
-            {partnerRows.map(x => <div className="performance-row" key={x.id}><strong><Building2 size={15}/> {x.nom}</strong><span>{x.dossiers}</span><strong>{euro(x.ca)}</strong><span>{euro(x.installed)}</span></div>)}
+            <div className="performance-row performance-head"><span>Partenaire</span><span>Dossiers validés</span><span>VT payées</span><span>CA total</span><span>CA installé</span></div>
+            {partnerRows.map(x => <div className="performance-row" key={x.id}><strong><Building2 size={15}/> {x.nom}</strong><span>{x.dossiersValides}</span><span>{x.vtValides} / {x.vtCount}</span><strong>{euro(x.ca)}</strong><span>{euro(x.installed)}</span></div>)}
             {partnerRows.length === 0 && <div className="empty-state">Aucun partenaire.</div>}
           </div>
         ) : (

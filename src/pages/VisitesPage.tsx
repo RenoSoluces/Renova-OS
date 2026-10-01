@@ -2659,17 +2659,10 @@ export function VisitesPage({
                       </div>
                     )}
 
-                    <div className="text-xs text-muted mt-4">
-                      Coût retenu :{' '}
-                      {simulationPV.coutParKwcUtilise.toLocaleString(
-                        'fr-FR',
-                      )}{' '}
-                      €/kWc
-                      {prixCataloguePV
-                        ? ' (produit catalogue)'
-                        : ' (tarif par défaut — configurez le catalogue ou les Paramètres pour un chiffrage plus précis)'}
-                      .
-                    </div>
+                    {admin && <div className="text-xs text-muted mt-4">
+                      Coût retenu : {simulationPV.coutParKwcUtilise.toLocaleString('fr-FR')} €/kWc
+                      {prixCataloguePV ? ' (produit catalogue)' : ' (tarif par défaut)'}.
+                    </div>}
 
                     <button
                       className="btn btn-primary mt-4"

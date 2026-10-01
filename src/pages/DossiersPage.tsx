@@ -12,14 +12,19 @@ import {
   Loader2,
   Trash2,
   Euro,
+  PlusCircle,
+  Receipt,
+  CalendarCheck2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
-import type { Dossier, Prospect, Devis, Document as DocumentPiece } from '../types'
+import type { Dossier, Prospect, Devis, Document as DocumentPiece, DossierFacturation } from '../types'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
-import { FloatSelect } from '../components/ui/FloatInput'
+import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { jsPDF } from 'jspdf'
+import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
 
 const STATUT_BADGE: Record<string, string> = {
@@ -77,10 +82,15 @@ export function DossiersPage({
   const [detail, setDetail] = useState<DossierAvecRelations | null>(null)
   const [pieces, setPieces] = useState<DocumentPiece[]>([])
   const [detailStatut, setDetailStatut] = useState('')
+  const [detailDateInstallation, setDetailDateInstallation] = useState('')
   const [savingStatut, setSavingStatut] = useState(false)
   const [detailMessage, setDetailMessage] = useState('')
 
   const [deletingDossier, setDeletingDossier] = useState(false)
+  const [facturation, setFacturation] = useState<DossierFacturation[]>([])
+  const [factureForm, setFactureForm] = useState({ libelle: 'Prestation partenaire', montant_ht: '', taux_tva: '20', declencheur: 'installation' })
+  const [factureSaving, setFactureSaving] = useState(false)
+  const [editingFacturationId, setEditingFacturationId] = useState<string | null>(null)
 
   const [uploadingPieceId, setUploadingPieceId] = useState<string | null>(null)
   const [uploadError, setUploadError] = useState('')
@@ -254,16 +264,191 @@ export function DossiersPage({
   async function ouvrirDetail(d: DossierAvecRelations) {
     setDetail(d)
     setDetailStatut(d.statut || 'creation')
+    setDetailDateInstallation(d.date_installation || '')
     setUploadError('')
     setDetailMessage('')
 
-    const { data } = await supabase
-      .from('documents')
-      .select('*')
-      .eq('dossier_id', d.id)
-      .order('created_at')
+    const [{ data }, { data: factures }] = await Promise.all([
+      supabase.from('documents').select('*').eq('dossier_id', d.id).order('created_at'),
+      supabase.from('dossier_facturation').select('*').eq('dossier_id', d.id).order('ordre').order('created_at'),
+    ])
 
     setPieces((data || []) as DocumentPiece[])
+    setFacturation((factures || []) as DossierFacturation[])
+    const commission = d.devis_id ? commissionsParDevis[d.devis_id] : undefined
+    if (commission && Number(commission.montant_societe) > 0 && (factures || []).length === 0) {
+      setFactureForm({
+        libelle: 'Prestation partenaire',
+        montant_ht: String(Number(commission.montant_societe)),
+        taux_tva: '20',
+        declencheur: 'installation',
+      })
+    } else {
+      setFactureForm({ libelle: 'Prestation partenaire', montant_ht: '', taux_tva: '20', declencheur: 'installation' })
+    }
+  }
+
+  async function ajouterEcheanceFacturation() {
+    if (!detail) return
+    const montant = Number(factureForm.montant_ht)
+    const tva = Number(factureForm.taux_tva)
+    if (!factureForm.libelle.trim() || !Number.isFinite(montant) || montant <= 0) {
+      setDetailMessage('Indiquez un libellé et un montant HT supérieur à 0 €.')
+      return
+    }
+    setFactureSaving(true)
+    const { data, error } = await supabase.from('dossier_facturation').insert({
+      dossier_id: detail.id,
+      libelle: factureForm.libelle.trim(),
+      montant_ht: montant,
+      taux_tva: Number.isFinite(tva) ? Math.max(0, tva) : 20,
+      declencheur: factureForm.declencheur,
+      ordre: facturation.length,
+    }).select('*').single()
+    setFactureSaving(false)
+    if (error) { setDetailMessage(`Erreur facturation : ${error.message}`); return }
+    if (data) setFacturation(prev => [...prev, data as DossierFacturation])
+    setFactureForm({ libelle: 'Prestation partenaire', montant_ht: '', taux_tva: String(tva || 20), declencheur: 'installation' })
+  }
+
+  async function enregistrerModificationEcheance() {
+    if (!editingFacturationId) return
+    const montant = Number(factureForm.montant_ht)
+    const tva = Number(factureForm.taux_tva)
+    if (!factureForm.libelle.trim() || !Number.isFinite(montant) || montant <= 0) {
+      setDetailMessage('Indiquez un libellé et un montant HT supérieur à 0 €.')
+      return
+    }
+    setFactureSaving(true)
+    const { data, error } = await supabase.from('dossier_facturation').update({
+      libelle: factureForm.libelle.trim(),
+      montant_ht: montant,
+      taux_tva: Number.isFinite(tva) ? Math.max(0, tva) : 20,
+      declencheur: factureForm.declencheur,
+    }).eq('id', editingFacturationId).select('*').single()
+    setFactureSaving(false)
+    if (error) { setDetailMessage(`Erreur modification facture : ${error.message}`); return }
+    if (data) setFacturation(prev => prev.map(x => x.id === editingFacturationId ? data as DossierFacturation : x))
+    setEditingFacturationId(null)
+  }
+
+  async function supprimerEcheanceFacturation(id: string) {
+    if (!confirm('Supprimer cette échéance de facturation ?')) return
+    const { error } = await supabase.from('dossier_facturation').delete().eq('id', id).eq('statut', 'a_facturer')
+    if (error) { setDetailMessage(`Erreur suppression : ${error.message}`); return }
+    setFacturation(prev => prev.filter(x => x.id !== id))
+  }
+
+  async function genererFactureEcheance(ligne: DossierFacturation) {
+    if (!detail || ligne.statut !== 'a_facturer') return
+    setFactureSaving(true)
+    try {
+      const [{ data: numero }, { data: entreprise }] = await Promise.all([
+        supabase.rpc('next_facture_number'),
+        supabase.from('entreprises').select('*').limit(1).maybeSingle(),
+      ])
+      if (!numero) throw new Error('Impossible de générer un numéro de facture.')
+      const now = new Date()
+      const numeroFacture = String(numero)
+      const prospect = detail.prospect as any
+      const partnerId = detail.installateur_id || prospect?.installateur_id || null
+      const { data: partenaire } = partnerId
+        ? await supabase.from('installateurs').select('*').eq('id', partnerId).maybeSingle()
+        : { data: null as any }
+
+      const ht = Number(ligne.montant_ht) || 0
+      const taux = Number(ligne.taux_tva) || 0
+      const tva = ht * taux / 100
+      const ttc = ht + tva
+      const doc = new jsPDF()
+      const euroPdf = (n:number) => `${n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €`
+
+      try {
+        if (entreprise?.logo_url) {
+          const blob = await fetch(entreprise.logo_url).then(r=>r.blob())
+          const dataUrl = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=reject;r.readAsDataURL(blob)})
+          doc.addImage(dataUrl, 'PNG', 18, 14, 28, 18)
+        }
+      } catch {}
+
+      doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.text(entreprise?.raison_sociale || 'RENOVA OS', 52, 25)
+      doc.setFont('helvetica','normal'); doc.setFontSize(9)
+      let ey=32
+      for (const line of [
+        entreprise?.forme_juridique,
+        entreprise?.adresse,
+        [entreprise?.code_postal,entreprise?.ville].filter(Boolean).join(' '),
+        entreprise?.telephone,
+        entreprise?.email,
+        entreprise?.siret ? `SIRET : ${entreprise.siret}` : '',
+        entreprise?.numero_tva ? `TVA intracommunautaire : ${entreprise.numero_tva}` : '',
+      ].filter(Boolean)) { doc.text(String(line),52,ey); ey+=5 }
+
+      doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.text('FACTURE', 145, 24)
+      doc.setFont('helvetica','normal'); doc.setFontSize(9)
+      doc.text(`N° ${numeroFacture}`,145,32)
+      doc.text(`Date d’émission : ${now.toLocaleDateString('fr-FR')}`,145,38)
+      doc.text(`Date de prestation : ${(detail.date_installation || now.toISOString().slice(0,10))}`,145,44)
+
+      doc.setDrawColor(210); doc.line(18,68,192,68)
+      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('CLIENT / PARTENAIRE',18,78)
+      doc.setFont('helvetica','normal'); doc.setFontSize(9)
+      let py=86
+      for (const line of [
+        partenaire?.nom || 'Partenaire non renseigné',
+        partenaire?.contact,
+        partenaire?.adresse,
+        [partenaire?.code_postal,partenaire?.ville].filter(Boolean).join(' '),
+        partenaire?.siret ? `SIREN : ${String(partenaire.siret).replace(/\s/g,'').slice(0,9)}` : '',
+        partenaire?.numero_tva ? `TVA intracommunautaire : ${partenaire.numero_tva}` : '',
+        partenaire?.email,
+      ].filter(Boolean)) { doc.text(String(line),18,py); py+=5 }
+
+      doc.setFont('helvetica','bold'); doc.text('DÉTAIL DE LA PRESTATION',18,128)
+      doc.setFont('helvetica','normal')
+      doc.text('Désignation',18,137); doc.text('Qté',112,137); doc.text('PU HT',135,137); doc.text('TVA',165,137); doc.text('Total HT',182,137)
+      doc.line(18,140,192,140)
+      doc.text(ligne.libelle || 'Prestation partenaire',18,149)
+      doc.text('1',114,149); doc.text(euroPdf(ht),133,149); doc.text(`${taux}%`,164,149); doc.text(euroPdf(ht),178,149)
+
+      doc.line(18,158,192,158)
+      doc.setFont('helvetica','bold'); doc.text('Total HT',130,168); doc.text(euroPdf(ht),178,168)
+      doc.text('TVA',130,176); doc.text(euroPdf(tva),178,176)
+      doc.setFontSize(12); doc.text('TOTAL TTC',130,186); doc.text(euroPdf(ttc),178,186)
+
+      doc.setFont('helvetica','normal'); doc.setFontSize(8)
+      let fy=200
+      const due = ligne.date_echeance ? new Date(ligne.date_echeance).toLocaleDateString('fr-FR') : 'selon conditions contractuelles'
+      for (const line of [
+        `Échéance de paiement : ${due}`,
+        `Conditions : ${ligne.conditions_paiement || entreprise?.conditions_paiement_defaut || 'Selon conditions contractuelles.'}`,
+        `Escompte pour paiement anticipé : ${entreprise?.escompte_defaut || 'Néant'}`,
+        `Pénalités de retard : ${entreprise?.taux_penalite_retard || '3 fois le taux d’intérêt légal'}`,
+        'Indemnité forfaitaire pour frais de recouvrement : 40 €.',
+        `Nature de l’opération : ${ligne.categorie_operation || 'prestation de services'}.`,
+      ]) { const lines=doc.splitTextToSize(line,174); doc.text(lines,18,fy); fy+=Math.max(5,lines.length*4.5) }
+
+      if (entreprise?.iban || entreprise?.bic) {
+        doc.setFont('helvetica','bold'); doc.text('COORDONNÉES BANCAIRES',18,252)
+        doc.setFont('helvetica','normal')
+        doc.text(`Banque : ${entreprise?.banque || '—'}`,18,260)
+        doc.text(`IBAN : ${entreprise?.iban || '—'}`,18,266)
+        doc.text(`BIC : ${entreprise?.bic || '—'}`,18,272)
+      }
+      doc.setFontSize(7); doc.text('Document généré par RENOVA OS — à conserver comme pièce comptable.',18,286)
+      doc.save(`${numeroFacture}.pdf`)
+
+      const { error } = await supabase.from('dossier_facturation').update({
+        statut:'facturee', facturee_at:now.toISOString(), facture_numero:numeroFacture,
+        date_echeance: ligne.date_echeance || null,
+        conditions_paiement: ligne.conditions_paiement || entreprise?.conditions_paiement_defaut || '',
+      }).eq('id',ligne.id)
+      if (error) throw new Error(`PDF généré, mais enregistrement impossible : ${error.message}`)
+      await logAuditEvent({ action:'dossier_facture', entityType:'facture', entityId:ligne.id, description:`Facture ${numeroFacture} générée`, meta:{facture_numero:numeroFacture,montant_ht:ht,montant_ttc:ttc} })
+      setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,statut:'facturee',facturee_at:now.toISOString(),facture_numero:numeroFacture}:x))
+    } catch (e:any) {
+      setDetailMessage(e?.message || 'Impossible de générer la facture.')
+    } finally { setFactureSaving(false) }
   }
 
   async function supprimerDossier() {
@@ -414,9 +599,18 @@ export function DossiersPage({
 
     setSavingStatut(true)
 
+    const dossierUpdate: Record<string, any> = {
+      statut: detailStatut,
+      date_installation: detailDateInstallation || null,
+    }
+    if (detailStatut === 'installe' && !detailDateInstallation) {
+      setDetailMessage('Indiquez la date réelle d’installation avant de passer le dossier en « Installé ».')
+      setSavingStatut(false)
+      return
+    }
     const { data, error } = await supabase
       .from('dossiers')
-      .update({ statut: detailStatut })
+      .update(dossierUpdate)
       .eq('id', detail.id)
       .select('*, prospect:prospects(*)')
       .single()
@@ -945,38 +1139,47 @@ export function DossiersPage({
               )}
             </div>
 
-            {/* STATUT */}
-            {/* STATUT */}
-
-            <div
-              style={{
-                display: 'flex',
-                gap: 8,
-                alignItems: 'flex-end',
-              }}
-            >
-              <div style={{ flex: 1 }}>
-                <FloatSelect
-                  label="Statut du dossier"
-                  value={detailStatut}
-                  onChange={setDetailStatut}
-                  options={STATUTS_DOSSIER}
-                />
-              </div>
-
+            {/* STATUT + DATE D'INSTALLATION */}
+            <div style={{ display:'grid', gridTemplateColumns:'minmax(220px,1fr) minmax(180px,260px) auto', gap:8, alignItems:'end' }}>
+              <FloatSelect label="Statut du dossier" value={detailStatut} onChange={setDetailStatut} options={STATUTS_DOSSIER} />
+              <FloatInput label="Date d'installation" type="date" value={detailDateInstallation} onChange={setDetailDateInstallation} disabled={!isAdmin} />
               <Button
                 variant="secondary"
                 onClick={enregistrerStatut}
-                disabled={
-                  savingStatut ||
-                  detailStatut === detail.statut
-                }
+                disabled={savingStatut || (!isAdmin && (detailStatut !== detail.statut || detailDateInstallation !== (detail.date_installation || '')))}
               >
-                {savingStatut
-                  ? 'Enregistrement…'
-                  : 'Mettre à jour'}
+                {savingStatut ? 'Enregistrement…' : 'Enregistrer'}
               </Button>
             </div>
+            {!isAdmin && <div className="text-xs text-muted">Seul l’administrateur peut modifier le statut et la date d’installation.</div>}
+            {detail.date_installation && (
+              <div className="text-sm text-muted" style={{ display:'flex', alignItems:'center', gap:6 }}>
+                <CalendarCheck2 size={15} /> Installation réalisée le <strong>{new Date(detail.date_installation).toLocaleDateString('fr-FR')}</strong>
+              </div>
+            )}
+
+            {/* FACTURATION PARTENAIRE */}
+            {isAdmin && <div className="recap-card" style={{ padding: 16, border: '1px solid var(--c-border, #e5e7eb)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <Receipt size={17} />
+                <div><div className="font-semibold" style={{ fontSize: 15 }}>Facturation partenaire</div><div className="text-sm text-muted">Découpez la commission société en plusieurs échéances et facturez-les directement depuis le dossier.</div></div>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'minmax(160px,1.5fr) minmax(100px,1fr) 90px minmax(150px,1fr) auto', gap:8, alignItems:'end' }}>
+                <FloatInput label="Libellé" value={factureForm.libelle} onChange={v=>setFactureForm(f=>({...f,libelle:v}))} />
+                <FloatInput label="Montant HT" value={factureForm.montant_ht} onChange={v=>setFactureForm(f=>({...f,montant_ht:v}))} />
+                <FloatInput label="TVA %" value={factureForm.taux_tva} onChange={v=>setFactureForm(f=>({...f,taux_tva:v}))} />
+                <FloatSelect label="Échéance" value={factureForm.declencheur} onChange={v=>setFactureForm(f=>({...f,declencheur:v}))} options={[{value:'installation',label:"À l'installation"},{value:'mpr',label:'Au paiement MaPrimeRénov’'},{value:'autre',label:'Autre échéance'}]} />
+                <Button variant="secondary" onClick={editingFacturationId ? enregistrerModificationEcheance : ajouterEcheanceFacturation} disabled={factureSaving}><PlusCircle size={14}/> {editingFacturationId ? 'Enregistrer' : 'Ajouter'}</Button>{editingFacturationId && <Button variant="ghost" onClick={()=>setEditingFacturationId(null)}>Annuler</Button>}
+              </div>
+              {facturation.length===0 ? <div className="text-sm text-muted" style={{marginTop:12}}>Aucune échéance. La commission société du dossier est de <strong>{detail.devis_id && commissionsParDevis[detail.devis_id] ? euro(commissionsParDevis[detail.devis_id].montant_societe) : '—'}</strong>.</div> : <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:8}}>
+                {facturation.map(ligne=>{const ht=Number(ligne.montant_ht)||0;const ttc=ht*(1+(Number(ligne.taux_tva)||0)/100);return <div key={ligne.id} style={{display:'grid',gridTemplateColumns:'minmax(180px,1fr) 110px 120px minmax(130px,1fr) auto',gap:8,alignItems:'center',padding:'10px 0',borderTop:'1px solid #edf1ef'}}>
+                  <div><strong>{ligne.libelle}</strong><div className="text-sm text-muted">{ligne.declencheur==='installation'?'À l’installation':ligne.declencheur==='mpr'?'Au paiement MaPrimeRénov’':'Autre échéance'}</div></div>
+                  <strong>{euro(ht)} HT</strong><span>{euro(ttc)} TTC</span><span className={`badge ${ligne.statut==='payee'?'badge-success':ligne.statut==='facturee'?'badge-info':'badge-warning'}`}>{ligne.statut==='a_facturer'?'À facturer':ligne.statut==='facturee'?'Facturée':'Payée'}{ligne.facture_numero?` · ${ligne.facture_numero}`:''}</span>
+                  <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>{ligne.statut==='a_facturer'&&<><Button size="sm" variant="ghost" onClick={()=>{setEditingFacturationId(ligne.id);setFactureForm({libelle:ligne.libelle,montant_ht:String(ligne.montant_ht),taux_tva:String(ligne.taux_tva),declencheur:ligne.declencheur})}}>Éditer</Button><Button size="sm" variant="secondary" onClick={()=>genererFactureEcheance(ligne)}><Receipt size={13}/> Facturer</Button><Button size="sm" variant="ghost" onClick={()=>supprimerEcheanceFacturation(ligne.id)}>Supprimer</Button></>}</div>
+                </div>})}
+                <div style={{display:'flex',justifyContent:'space-between',paddingTop:8,fontWeight:700}}><span>Total échéances</span><span>{euro(facturation.reduce((s,x)=>s+Number(x.montant_ht||0),0))} HT</span></div>
+              </div>}
+            </div>}
 
             {/* ÉTAT DOSSIER */}
 

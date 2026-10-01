@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Plus, FileText, FileImage, FileSpreadsheet, Upload, Trash2, ExternalLink, Loader2, Folder, History, Eye, UploadCloud } from 'lucide-react'
+import { Plus, FileText, FileImage, FileSpreadsheet, Upload, Trash2, ExternalLink, Loader2, Folder, History, Eye, UploadCloud, Download } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Document, Dossier, Prospect } from '../types'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { useAuth } from '../lib/auth/AuthContext'
 import { FloatSelect } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 
@@ -42,6 +43,8 @@ function formatSize(t: string | number | null | undefined) {
 type DocRow = Document & { dossier?: (Dossier & { prospect?: Prospect }) | null }
 
 export function DocumentsPage() {
+  const { profile } = useAuth()
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [docs, setDocs] = useState<DocRow[]>([])
   const [dossiers, setDossiers] = useState<(Dossier & { prospect?: Prospect })[]>([])
   const [loading, setLoading] = useState(true)
@@ -153,6 +156,20 @@ export function DocumentsPage() {
       if (next.has(id)) next.delete(id); else next.add(id)
       return next
     })
+  }
+
+  async function downloadDocument(doc: Document) {
+    if (!doc.url) return
+    try {
+      const response = await fetch(doc.url)
+      if (!response.ok) throw new Error('Téléchargement impossible')
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a'); a.href = url; a.download = doc.nom || 'document'; document.body.appendChild(a); a.click(); a.remove()
+      URL.revokeObjectURL(url)
+    } catch {
+      window.open(doc.url, '_blank', 'noopener,noreferrer')
+    }
   }
 
   return (
@@ -310,7 +327,7 @@ export function DocumentsPage() {
                         <div key={v.id} className="flex items-center gap-2 text-xs" style={{ justifyContent: 'space-between' }}>
                           <span className="text-muted">v{v.version} — {new Date(v.created_at).toLocaleDateString('fr-FR')}</span>
                           <div className="flex items-center gap-2">
-                            {v.url && <a href={v.url} target="_blank" rel="noreferrer" title="Ouvrir cette version"><ExternalLink size={13} /></a>}
+                            {v.url && <a href={v.url} target="_blank" rel="noreferrer" title="Ouvrir cette version"><ExternalLink size={13} /></a>}                            {isAdmin && v.url && <button onClick={() => downloadDocument(v)} title="Télécharger cette version" style={{border:0,background:'none',cursor:'pointer'}}><Download size={13} /></button>}
                             <button onClick={() => removeDoc(v)} title="Supprimer cette version"><Trash2 size={13} /></button>
                           </div>
                         </div>
@@ -335,6 +352,11 @@ export function DocumentsPage() {
                       <a href={d.url} target="_blank" rel="noreferrer" className="btn-icon-sm" title="Ouvrir">
                         <ExternalLink size={15} />
                       </a>
+                    )}
+                    {isAdmin && d.url && (
+                      <button className="btn-icon-sm" title="Télécharger le document" onClick={() => downloadDocument(d)}>
+                        <Download size={15} />
+                      </button>
                     )}
                     <button className="btn-icon-sm" title="Supprimer" onClick={() => removeDoc(d)}>
                       <Trash2 size={15} />

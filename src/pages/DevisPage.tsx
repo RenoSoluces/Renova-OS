@@ -53,7 +53,8 @@ interface DevisPageProps {
   onInitialProspectHandled?: () => void
 }
 
-export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onInitialProspectHandled }: DevisPageProps = {}) {
+export function DevisPage({
+  openDevisId, onOpenedDevis, initialProspectId, onInitialProspectHandled }: DevisPageProps = {}) {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [view, setView] = useState<'list' | 'editor'>('list')
@@ -790,7 +791,7 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
             {produitsFiltres.map(prod => (
               <div key={prod.id} className="recap-card" style={{ padding: 10 }}>
                 <div className="font-semibold text-sm">{prod.nom}</div>
-                <div className="text-sm text-muted">{euro(prod.prix_unitaire_ht)} / {prod.unite}</div>
+                <div className="text-sm text-muted">{isAdmin ? `${euro(prod.prix_unitaire_ht)} / ${prod.unite}` : prod.unite}</div>
                 <button className="btn btn-sm btn-secondary mt-2" onClick={() => ajouterProduit(prod)} disabled={estSigne}>
                   <Plus size={14} /> Ajouter
                 </button>
@@ -831,14 +832,14 @@ export function DevisPage({ openDevisId, onOpenedDevis, initialProspectId, onIni
                           disabled={estSigne}
                         />
                       </label>
-                      <label className="text-sm text-muted">PU HT
+                      {isAdmin && <label className="text-sm text-muted">PU HT
                         <input
                           type="number" min={0} step="0.01" value={l.prix_unitaire_ht}
                           onChange={e => updateLigne(l.id, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })}
                           style={{ width: 90, marginLeft: 6, height: 32 }}
                           disabled={estSigne}
                         />
-                      </label>
+                      </label>}
                       <span className="text-sm text-muted">TVA {l.tva_taux}%</span>
                       <span className="font-semibold" style={{ marginLeft: 'auto' }}>{euro(l.montant_ht)} HT</span>
                     </div>

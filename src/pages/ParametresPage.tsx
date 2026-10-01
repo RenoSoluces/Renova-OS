@@ -17,8 +17,8 @@ const TABS = [
 ]
 
 const ENTREPRISE_VIDE: Partial<Entreprise> = {
-  raison_sociale: '', siret: '', numero_rge: '', adresse: '', code_postal: '', ville: '',
-  telephone: '', email: '', logo_url: '', conditions_generales_devis: '',
+  raison_sociale: '', forme_juridique: '', capital_social: '', siret: '', numero_tva: '', numero_rge: '', adresse: '', code_postal: '', ville: '',
+  telephone: '', email: '', logo_url: '', iban: '', bic: '', banque: '', conditions_paiement_defaut: 'Paiement à 30 jours date de facture', taux_penalite_retard: '3 fois le taux d’intérêt légal', escompte_defaut: 'Néant', conditions_generales_devis: '',
   taux_cee_eur_par_mwh_cumac: 6,
   devis_duree_validite_jours: 30,
   devis_conditions_paiement_defaut: 'Acompte de 30% à la signature du devis, solde à la réception des travaux.',
@@ -267,7 +267,10 @@ export function ParametresPage() {
 
                 <div className="grid grid-2 gap-3">
                   <FloatInput label="Raison sociale" value={entreprise.raison_sociale || ''} onChange={v => setEntreprise({ ...entreprise, raison_sociale: v })} />
+                  <FloatInput label="Forme juridique" value={(entreprise as any).forme_juridique || ''} onChange={v => setEntreprise({ ...entreprise, forme_juridique: v } as any)} />
+                  <FloatInput label="Capital social" value={(entreprise as any).capital_social || ''} onChange={v => setEntreprise({ ...entreprise, capital_social: v } as any)} />
                   <FloatInput label="SIRET" value={entreprise.siret || ''} onChange={v => setEntreprise({ ...entreprise, siret: v })} />
+                  <FloatInput label="TVA intracommunautaire" value={(entreprise as any).numero_tva || ''} onChange={v => setEntreprise({ ...entreprise, numero_tva: v } as any)} />
                   <FloatInput label="Numéro RGE" value={entreprise.numero_rge || ''} onChange={v => setEntreprise({ ...entreprise, numero_rge: v })} />
                   <FloatInput label="Taux CEE (€/MWh cumac)" type="number" value={String(entreprise.taux_cee_eur_par_mwh_cumac ?? '')} onChange={v => setEntreprise({ ...entreprise, taux_cee_eur_par_mwh_cumac: parseFloat(v) || 0 })} />
                   <FloatInput label="Adresse" value={entreprise.adresse || ''} onChange={v => setEntreprise({ ...entreprise, adresse: v })} />
@@ -275,6 +278,18 @@ export function ParametresPage() {
                   <FloatInput label="Ville" value={entreprise.ville || ''} onChange={v => setEntreprise({ ...entreprise, ville: v })} />
                   <FloatInput label="Téléphone" value={entreprise.telephone || ''} onChange={v => setEntreprise({ ...entreprise, telephone: v })} />
                   <FloatInput label="Email" type="email" value={entreprise.email || ''} onChange={v => setEntreprise({ ...entreprise, email: v })} />
+                </div>
+
+                <div className="mt-4">
+                  <div className="field-label" style={{ marginBottom: 6 }}>Coordonnées de facturation</div>
+                  <div className="grid grid-2 gap-3">
+                    <FloatInput label="Banque" value={(entreprise as any).banque || ''} onChange={v => setEntreprise({ ...entreprise, banque: v } as any)} />
+                    <FloatInput label="IBAN" value={(entreprise as any).iban || ''} onChange={v => setEntreprise({ ...entreprise, iban: v } as any)} />
+                    <FloatInput label="BIC" value={(entreprise as any).bic || ''} onChange={v => setEntreprise({ ...entreprise, bic: v } as any)} />
+                    <FloatInput label="Conditions de paiement facture" value={(entreprise as any).conditions_paiement_defaut || ''} onChange={v => setEntreprise({ ...entreprise, conditions_paiement_defaut: v } as any)} />
+                    <FloatInput label="Pénalités de retard" value={(entreprise as any).taux_penalite_retard || ''} onChange={v => setEntreprise({ ...entreprise, taux_penalite_retard: v } as any)} />
+                    <FloatInput label="Escompte paiement anticipé" value={(entreprise as any).escompte_defaut || ''} onChange={v => setEntreprise({ ...entreprise, escompte_defaut: v } as any)} />
+                  </div>
                 </div>
 
                 <div>
