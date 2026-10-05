@@ -30,6 +30,7 @@ export interface Prospect {
   commercial: string | null
   commercial_id: string | null
   commercial_historique_id?: string | null
+  installateur_id?: string | null
   pot_commun?: boolean
   pot_commun_at?: string | null
   pot_commun_ancien_commercial?: string | null
@@ -369,6 +370,7 @@ export interface CommissionBareme {
   date_fin?: string | null
   created_at: string
   updated_at?: string
+  public_cible?: 'particulier' | 'professionnel' | 'tous'
 }
 
 export interface Commission {
@@ -386,8 +388,21 @@ export interface Commission {
   date_paiement_commercial?: string | null
   date_paiement_societe?: string | null
   notes: string | null
+  echeances?: CommissionEcheance[]
   created_at: string
   commercial?: { id: string; nom_complet: string; couleur?: string } | null
+}
+
+export interface CommissionEcheance {
+  id: string
+  commission_id: string
+  beneficiaire: 'commercial' | 'societe'
+  libelle: string
+  montant: number
+  date_prevue: string | null
+  date_paiement: string | null
+  ordre: number
+  created_at: string
 }
 
 export interface Document {
@@ -441,6 +456,30 @@ export interface Entreprise {
   created_at: string
 }
 
+export interface Installateur {
+  id: string
+  nom: string
+  contact?: string
+  telephone?: string
+  email?: string
+  adresse?: string
+  code_postal?: string
+  ville?: string
+  zone_intervention?: string
+  specialites?: string[]
+  numero_rge?: string
+  siret?: string
+  numero_tva?: string
+  actif: boolean
+  devis_autorise?: boolean
+  devis_nom_affichage?: string
+  devis_raison_sociale?: string
+  devis_forme_juridique?: string
+  devis_logo_url?: string
+  devis_cgv?: string
+  created_at?: string
+}
+
 export interface Produit {
   id: string
   entreprise_id: string
@@ -460,11 +499,26 @@ export interface Produit {
   eligible_cee: boolean
   fiche_cee: string
   actif: boolean
+  public_cible: 'particulier' | 'professionnel' | 'tous'
   created_at: string
 }
 
 export interface Devis {
   id: string
+  emetteur_type?: 'renova_soluces' | 'partenaire'
+  emetteur_installateur_id?: string | null
+  emetteur_nom_affichage?: string | null
+  emetteur_raison_sociale?: string | null
+  emetteur_forme_juridique?: string | null
+  emetteur_siret?: string | null
+  emetteur_numero_tva?: string | null
+  emetteur_adresse?: string | null
+  emetteur_code_postal?: string | null
+  emetteur_ville?: string | null
+  emetteur_telephone?: string | null
+  emetteur_email?: string | null
+  emetteur_logo_url?: string | null
+  emetteur_cgv?: string | null
   entreprise_id: string
   prospect_id: string
   visite_id: string | null

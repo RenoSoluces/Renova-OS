@@ -46,6 +46,7 @@ const EMPTY = {
   date_debut: '',
   date_fin: '',
   actif: true,
+  public_cible: 'particulier',
 }
 
 type PaymentTarget = 'commercial' | 'societe'
@@ -77,6 +78,18 @@ function amount(value: unknown) {
   return Number.isFinite(n) ? n : 0
 }
 
+function echeancePaidAmount(c: CommissionWithCommercial, target: PaymentTarget) {
+  return (c.echeances || []).filter(e => e.beneficiaire === target && !!e.date_paiement).reduce((sum, e) => sum + amount(e.montant), 0)
+}
+function echeanceTotalAmount(c: CommissionWithCommercial, target: PaymentTarget) {
+  const total = target === 'societe' ? amount(c.montant_societe) : amount(c.montant_commercial)
+  const schedules = (c.echeances || []).filter(e => e.beneficiaire === target)
+  return schedules.length ? schedules.reduce((sum, e) => sum + amount(e.montant), 0) : total
+}
+function echeanceRemainingAmount(c: CommissionWithCommercial, target: PaymentTarget) {
+  return Math.max(0, echeanceTotalAmount(c, target) - echeancePaidAmount(c, target))
+}
+
 export function CommissionsPage() {
   const { profile } = useAuth()
   const admin =
@@ -87,6 +100,7 @@ export function CommissionsPage() {
   const [rules, setRules] = useState<CommissionBareme[]>([])
   const [commerciaux, setCommerciaux] = useState<any[]>([])
   const [produits, setProduits] = useState<any[]>([])
+  const [baremePublic, setBaremePublic] = useState<'particulier' | 'professionnel'>('particulier')
 
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>(EMPTY)
@@ -101,6 +115,12 @@ export function CommissionsPage() {
     useState<CommissionWithCommercial | null>(null)
   const [paymentDate, setPaymentDate] = useState(todayInput())
   const [paymentSaving, setPaymentSaving] = useState(false)
+  const [echeanceModal, setEcheanceModal] = useState(false)
+  const [echeanceCommission, setEcheanceCommission] = useState<CommissionWithCommercial | null>(null)
+  const [echeanceTarget, setEcheanceTarget] = useState<PaymentTarget>('societe')
+  const [echeances, setEcheances] = useState<any[]>([])
+  const [echeanceSaving, setEcheanceSaving] = useState(false)
+  const [echeanceForm, setEcheanceForm] = useState({ libelle: '', montant: '', date_prevue: '' })
 
   const [search, setSearch] = useState('')
   const [commercialFilter, setCommercialFilter] =
@@ -134,30 +154,19 @@ export function CommissionsPage() {
 
     const produitsQuery = supabase
       .from('catalogue_produits')
-      .select('id,nom,categorie')
+      .select('id,nom,categorie,public_cible')
       .eq('actif', true)
       .order('nom')
 
     const commerciauxQuery = supabase
       .from('profiles')
       .select('id,nom_complet,role')
-      .in('role', [
-        'commercial',
-        'manager',
-        'admin',
-      ])
+      .in('role', ['commercial','manager','admin'])
       .order('nom_complet')
+    const echeancesQuery = supabase.from('commission_echeances').select('*').order('ordre').order('created_at')
 
-    const [
-      commissionResult,
-      baremeResult,
-      produitsResult,
-      commerciauxResult,
-    ] = await Promise.all([
-      commissionQuery,
-      baremeQuery,
-      produitsQuery,
-      commerciauxQuery,
+    const [commissionResult, baremeResult, produitsResult, commerciauxResult, echeancesResult] = await Promise.all([
+      commissionQuery, baremeQuery, produitsQuery, commerciauxQuery, echeancesQuery,
     ])
 
     if (commissionResult.error) {
@@ -174,8 +183,14 @@ export function CommissionsPage() {
       )
     }
 
-    const baseRows =
-      (commissionResult.data || []) as CommissionWithCommercial[]
+    const echeancesByCommission = new Map<string, any[]>()
+    for (const e of (echeancesResult.data || []) as any[]) {
+      const list = echeancesByCommission.get(e.commission_id) || []
+      list.push(e); echeancesByCommission.set(e.commission_id, list)
+    }
+    const baseRows = ((commissionResult.data || []) as CommissionWithCommercial[]).map(row => ({
+      ...row, echeances: echeancesByCommission.get(row.id) || [],
+    }))
 
     /*
      * Important :
@@ -238,19 +253,8 @@ export function CommissionsPage() {
         return false
       }
 
-      if (
-        paymentFilter === 'a_payer' &&
-        !!r.date_paiement_commercial
-      ) {
-        return false
-      }
-
-      if (
-        paymentFilter === 'payees' &&
-        !r.date_paiement_commercial
-      ) {
-        return false
-      }
+      if (paymentFilter === 'a_payer' && echeanceRemainingAmount(r, 'commercial') <= 0) return false
+      if (paymentFilter === 'payees' && echeancePaidAmount(r, 'commercial') <= 0) return false
 
       if (query) {
         const haystack = [
@@ -298,70 +302,20 @@ export function CommissionsPage() {
     [filteredRows],
   )
 
-  const commercialEnAttente = useMemo(
-    () =>
-      filteredRows
-        .filter(
-          (r) =>
-            r.statut !== 'annulee' &&
-            !r.date_paiement_commercial,
-        )
-        .reduce(
-          (sum, r) =>
-            sum + amount(r.montant_commercial),
-          0,
-        ),
-    [filteredRows],
-  )
+  const commercialEnAttente = useMemo(() => filteredRows.filter(r => r.statut !== 'annulee').reduce((sum, r) => sum + echeanceRemainingAmount(r, 'commercial'), 0), [filteredRows])
 
-  const commercialPaye = useMemo(
-    () =>
-      filteredRows
-        .filter(
-          (r) =>
-            !!r.date_paiement_commercial,
-        )
-        .reduce(
-          (sum, r) =>
-            sum + amount(r.montant_commercial),
-          0,
-        ),
-    [filteredRows],
-  )
+
+  const commercialPaye = useMemo(() => filteredRows.filter(r => r.statut !== 'annulee').reduce((sum, r) => sum + echeancePaidAmount(r, 'commercial'), 0), [filteredRows])
+
 
   /*
    * COMMISSION POTENTIELLE RENO SOLUCES
    */
-  const renovaEnAttente = useMemo(
-    () =>
-      filteredRows
-        .filter(
-          (r) =>
-            r.statut !== 'annulee' &&
-            !r.date_paiement_societe,
-        )
-        .reduce(
-          (sum, r) =>
-            sum + amount(r.montant_societe),
-          0,
-        ),
-    [filteredRows],
-  )
+  const renovaEnAttente = useMemo(() => filteredRows.filter(r => r.statut !== 'annulee').reduce((sum, r) => sum + echeanceRemainingAmount(r, 'societe'), 0), [filteredRows])
 
-  const renovaPaye = useMemo(
-    () =>
-      filteredRows
-        .filter(
-          (r) =>
-            !!r.date_paiement_societe,
-        )
-        .reduce(
-          (sum, r) =>
-            sum + amount(r.montant_societe),
-          0,
-        ),
-    [filteredRows],
-  )
+
+  const renovaPaye = useMemo(() => filteredRows.filter(r => r.statut !== 'annulee').reduce((sum, r) => sum + echeancePaidAmount(r, 'societe'), 0), [filteredRows])
+
 
   const renovaTotal = useMemo(
     () =>
@@ -390,7 +344,7 @@ export function CommissionsPage() {
    */
   function openNew() {
     setEditing(null)
-    setForm({ ...EMPTY })
+    setForm({ ...EMPTY, public_cible: baremePublic })
     setModal(true)
   }
 
@@ -430,6 +384,7 @@ export function CommissionsPage() {
       date_fin:
         r.date_fin || '',
       actif: r.actif,
+      public_cible: r.public_cible || 'tous',
     })
 
     setModal(true)
@@ -472,6 +427,7 @@ export function CommissionsPage() {
       date_fin:
         form.date_fin || null,
       actif: form.actif,
+      public_cible: form.public_cible || baremePublic,
     }
 
     const q = editing
@@ -565,6 +521,45 @@ export function CommissionsPage() {
     )
 
     setPaymentModal(true)
+  }
+
+  async function openEcheances(c: CommissionWithCommercial, target: PaymentTarget) {
+    setEcheanceCommission(c)
+    setEcheanceTarget(target)
+    setEcheanceForm({ libelle: target === 'societe' ? 'Paiement Reno Soluces' : 'Paiement commercial', montant: '', date_prevue: '' })
+    const { data, error } = await supabase.from('commission_echeances').select('*').eq('commission_id', c.id).eq('beneficiaire', target).order('ordre').order('created_at')
+    if (error) { alert(`Impossible de charger les échéances : ${error.message}`); return }
+    setEcheances(data || [])
+    setEcheanceModal(true)
+  }
+  async function addEcheance() {
+    if (!echeanceCommission) return
+    const montant = Number(echeanceForm.montant)
+    if (!Number.isFinite(montant) || montant <= 0) { alert('Indique un montant supérieur à 0 €.'); return }
+    setEcheanceSaving(true)
+    const { data, error } = await supabase.from('commission_echeances').insert({
+      commission_id: echeanceCommission.id, beneficiaire: echeanceTarget,
+      libelle: echeanceForm.libelle.trim() || (echeanceTarget === 'societe' ? 'Paiement Reno Soluces' : 'Paiement commercial'),
+      montant, date_prevue: echeanceForm.date_prevue || null, ordre: echeances.length,
+    }).select('*').single()
+    setEcheanceSaving(false)
+    if (error) { alert(`Erreur ajout échéance : ${error.message}`); return }
+    if (data) setEcheances(prev => [...prev, data])
+    setEcheanceForm({ libelle: echeanceTarget === 'societe' ? 'Paiement Reno Soluces' : 'Paiement commercial', montant: '', date_prevue: '' })
+    load()
+  }
+  async function toggleEcheancePaid(e: any) {
+    const nextDate = e.date_paiement ? null : new Date().toISOString()
+    const { data, error } = await supabase.from('commission_echeances').update({ date_paiement: nextDate }).eq('id', e.id).select('*').single()
+    if (error) { alert(`Erreur paiement : ${error.message}`); return }
+    if (data) setEcheances(prev => prev.map(x => x.id === e.id ? data : x))
+    load()
+  }
+  async function deleteEcheance(e: any) {
+    if (!confirm(`Supprimer l'échéance « ${e.libelle} » ?`)) return
+    const { error } = await supabase.from('commission_echeances').delete().eq('id', e.id)
+    if (error) { alert(`Erreur suppression : ${error.message}`); return }
+    setEcheances(prev => prev.filter(x => x.id !== e.id)); load()
   }
 
   async function savePayment() {
@@ -687,6 +682,12 @@ export function CommissionsPage() {
 
     load()
   }
+
+  const displayedRules = rules.filter((r: any) => (r.public_cible || 'tous') === baremePublic || (r.public_cible || 'tous') === 'tous')
+
+  const echeanceTotal = echeances.reduce((sum, e) => sum + amount(e.montant), 0)
+  const echeancePaid = echeances.filter(e => !!e.date_paiement).reduce((sum, e) => sum + amount(e.montant), 0)
+  const echeanceExpected = echeanceCommission ? (echeanceTarget === 'societe' ? amount(echeanceCommission.montant_societe) : amount(echeanceCommission.montant_commercial)) : 0
 
   return (
     <div className="page">
@@ -1239,13 +1240,8 @@ export function CommissionsPage() {
 
                       {admin && (
                         <div>
-                          <strong>
-                            {euro(
-                              amount(
-                                c.montant_societe,
-                              ),
-                            )}
-                          </strong>
+                          <strong>{euro(amount(c.montant_societe))}</strong>
+                          {(c.echeances || []).some(e => e.beneficiaire === 'societe') && <div className="text-sm text-muted">{euro(echeancePaidAmount(c, 'societe'))} payé · {euro(echeanceRemainingAmount(c, 'societe'))} restant</div>}
 
                           <div className="text-sm text-muted">
                             {c.date_paiement_societe
@@ -1258,13 +1254,8 @@ export function CommissionsPage() {
                       )}
 
                       <div>
-                        <strong>
-                          {euro(
-                            amount(
-                              c.montant_commercial,
-                            ),
-                          )}
-                        </strong>
+                        <strong>{euro(amount(c.montant_commercial))}</strong>
+                        {(c.echeances || []).some(e => e.beneficiaire === 'commercial') && <div className="text-sm text-muted">{euro(echeancePaidAmount(c, 'commercial'))} payé · {euro(echeanceRemainingAmount(c, 'commercial'))} restant</div>}
                       </div>
 
                       <div>
@@ -1378,6 +1369,8 @@ export function CommissionsPage() {
                                 </Button>
                               )}
 
+                              <Button variant="ghost" size="sm" onClick={() => openEcheances(c, 'commercial')}>Échéancier commercial</Button>
+
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -1393,6 +1386,8 @@ export function CommissionsPage() {
                                   : 'Payer'}{' '}
                                 commercial
                               </Button>
+
+                              <Button variant="ghost" size="sm" onClick={() => openEcheances(c, 'societe')}>Échéancier Reno Soluces</Button>
 
                               <Button
                                 variant="ghost"
@@ -1554,7 +1549,12 @@ export function CommissionsPage() {
 
       {admin &&
         tab === 'bareme' && (
-          <div className="card">
+          <>
+            <div className="view-toggle" style={{ marginBottom: 16 }}>
+              <button className={`view-toggle-btn ${baremePublic === 'particulier' ? 'active' : ''}`} onClick={() => setBaremePublic('particulier')}>Particuliers</button>
+              <button className={`view-toggle-btn ${baremePublic === 'professionnel' ? 'active' : ''}`} onClick={() => setBaremePublic('professionnel')}>Professionnels</button>
+            </div>
+            <div className="card">
             <div className="card-pad">
               <div
                 style={{
@@ -1575,7 +1575,7 @@ export function CommissionsPage() {
                 <b>Priorité</b>
               </div>
 
-              {rules.length ===
+              {displayedRules.length ===
               0 ? (
                 <div className="empty-state">
                   <Settings2
@@ -1593,7 +1593,7 @@ export function CommissionsPage() {
                   </p>
                 </div>
               ) : (
-                rules.map(
+                displayedRules.map(
                   (r: any) => (
                     <div
                       key={r.id}
@@ -1709,6 +1709,7 @@ export function CommissionsPage() {
               )}
             </div>
           </div>
+           </>
         )}
 
       <Modal
@@ -1781,6 +1782,22 @@ export function CommissionsPage() {
             }
             placeholder="Ex : PAC Air/Eau — Jean"
           />
+        </div>
+
+        <div className="grid grid-2 gap-3 mt-4">
+          <FloatSelect
+            label="Public cible"
+            value={form.public_cible}
+            onChange={(v) => setForm((f: any) => ({ ...f, public_cible: v }))}
+            options={[
+              { value: 'particulier', label: 'Particulier' },
+              { value: 'professionnel', label: 'Professionnel' },
+              { value: 'tous', label: 'Tous publics' },
+            ]}
+          />
+          <div className="text-sm text-muted" style={{ display: 'flex', alignItems: 'center' }}>
+            Les règles sont séparées par public comme le catalogue produits.
+          </div>
         </div>
 
         <div className="grid grid-2 gap-3 mt-4">
@@ -2069,6 +2086,18 @@ export function CommissionsPage() {
             setPaymentDate
           }
         />
+      </Modal>
+      <Modal open={echeanceModal} onClose={() => setEcheanceModal(false)} title={`Échéancier — ${echeanceTarget === 'societe' ? 'Reno Soluces' : 'commercial'}`}>
+        <div className="card-pad">
+          <div className="text-sm text-muted" style={{marginBottom:14}}>Total prévu : <strong>{euro(echeanceExpected)}</strong> · Échéances : <strong>{euro(echeanceTotal)}</strong> · Payé : <strong>{euro(echeancePaid)}</strong> · Reste : <strong>{euro(Math.max(0,echeanceExpected-echeancePaid))}</strong></div>
+          <div style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr auto',gap:8,alignItems:'end'}}>
+            <FloatInput label="Libellé" value={echeanceForm.libelle} onChange={v=>setEcheanceForm(f=>({...f,libelle:v}))}/>
+            <FloatInput label="Montant" value={echeanceForm.montant} onChange={v=>setEcheanceForm(f=>({...f,montant:v}))}/>
+            <FloatInput label="Date prévue" type="date" value={echeanceForm.date_prevue} onChange={v=>setEcheanceForm(f=>({...f,date_prevue:v}))}/>
+            <Button variant="primary" onClick={addEcheance} disabled={echeanceSaving}><Plus size={15}/> Ajouter</Button>
+          </div>
+          <div style={{marginTop:16}}>{echeances.length===0 ? <div className="text-sm text-muted">Aucune échéance définie.</div> : echeances.map(e=><div key={e.id} style={{display:'grid',gridTemplateColumns:'1.5fr 110px 130px 120px auto',gap:10,alignItems:'center',padding:'10px 0',borderTop:'1px solid #edf1ef'}}><div><strong>{e.libelle}</strong>{e.date_prevue&&<div className="text-sm text-muted">Prévue le {formatDate(e.date_prevue)}</div>}</div><strong>{euro(amount(e.montant))}</strong><span className={`badge ${e.date_paiement?'badge-success':'badge-warning'}`}>{e.date_paiement?`Payé le ${formatDate(e.date_paiement)}`:'À payer'}</span><Button size="sm" variant={e.date_paiement?'ghost':'secondary'} onClick={()=>toggleEcheancePaid(e)}>{e.date_paiement?'Annuler paiement':'Marquer payé'}</Button><Button size="sm" variant="ghost" onClick={()=>deleteEcheance(e)}>Supprimer</Button></div>)}</div>
+        </div>
       </Modal>
     </div>
   )

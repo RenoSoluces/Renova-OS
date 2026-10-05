@@ -18,6 +18,9 @@ const CATEGORIES = [
   { value: 'ballon_thermodynamique', label: 'Ballon thermodynamique' },
   { value: 'vmc', label: 'VMC' },
   { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
+  { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
+  { value: 'professionnel_cee', label: 'Professionnels — CEE' },
+  { value: 'professionnel_hors_cee', label: 'Professionnels — hors CEE' },
   { value: 'autre', label: 'Autre prestation' },
 ]
 
@@ -38,6 +41,7 @@ type CaracLigne = { cle: string; valeur: string }
 
 interface FormState {
   categorie: string
+  public_cible: 'particulier' | 'professionnel' | 'tous'
   nom: string
   marque: string
   reference: string
@@ -57,7 +61,7 @@ interface FormState {
 
 function emptyForm(): FormState {
   return {
-    categorie: 'combles', nom: '', marque: '', reference: '', description: '',
+    categorie: 'combles', public_cible: 'particulier', nom: '', marque: '', reference: '', description: '',
     caracteristiques: [{ cle: '', valeur: '' }],
     prix_unitaire_ht: '', unite: 'unite', tva_taux: 5.5,
     eligible_mpr: false, eligible_cee: false, fiche_cee: '', actif: true,
@@ -71,6 +75,7 @@ export function CataloguePage() {
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [rows, setRows] = useState<Produit[]>([])
   const [loading, setLoading] = useState(true)
+  const [filtrePublic, setFiltrePublic] = useState<'particulier' | 'professionnel' | 'tous'>('particulier')
   const [filtreCategorie, setFiltreCategorie] = useState<string>('toutes')
   const [recherche, setRecherche] = useState('')
   const [groupement, setGroupement] = useState<'categorie' | 'fournisseur'>('categorie')
@@ -105,7 +110,7 @@ export function CataloguePage() {
     setEditing(p)
     const carac = Object.entries(p.caracteristiques || {}).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
     setForm({
-      categorie: p.categorie, nom: p.nom, marque: p.marque, reference: p.reference,
+      categorie: p.categorie, public_cible: p.public_cible || 'particulier', nom: p.nom, marque: p.marque, reference: p.reference,
       description: p.description,
       caracteristiques: carac.length ? carac : [{ cle: '', valeur: '' }],
       prix_unitaire_ht: String(p.prix_unitaire_ht),
@@ -124,7 +129,7 @@ export function CataloguePage() {
     setEditing(null)
     const carac = Object.entries(p.caracteristiques || {}).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
     setForm({
-      categorie: p.categorie, nom: `${p.nom} (copie)`, marque: p.marque, reference: '',
+      categorie: p.categorie, public_cible: p.public_cible || 'particulier', nom: `${p.nom} (copie)`, marque: p.marque, reference: '',
       description: p.description,
       caracteristiques: carac.length ? carac : [{ cle: '', valeur: '' }],
       prix_unitaire_ht: String(p.prix_unitaire_ht),
@@ -167,6 +172,7 @@ export function CataloguePage() {
 
     const payload = {
       categorie: form.categorie,
+      public_cible: form.public_cible,
       nom: form.nom,
       marque: form.marque,
       reference: form.reference,
@@ -211,7 +217,9 @@ export function CataloguePage() {
   const euro = (n: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n)
 
-  const filtered = (filtreCategorie === 'toutes' ? rows : rows.filter(r => r.categorie === filtreCategorie))
+  const filtered = rows
+    .filter(r => filtrePublic === 'tous' ? true : (r.public_cible || 'particulier') === filtrePublic || (r.public_cible || 'particulier') === 'tous')
+    .filter(r => filtreCategorie === 'toutes' ? true : r.categorie === filtreCategorie)
     .filter(r => {
       if (!recherche.trim()) return true
       const q = recherche.trim().toLowerCase()
@@ -290,14 +298,24 @@ export function CataloguePage() {
 
       <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center', justifyContent: 'space-between' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button className={`btn btn-sm ${filtrePublic === 'particulier' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic('particulier'); setFiltreCategorie('toutes') }}>
+            Particuliers
+          </button>
+          <button className={`btn btn-sm ${filtrePublic === 'professionnel' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic('professionnel'); setFiltreCategorie('toutes') }}>
+            Professionnels
+          </button>
+          <button className={`btn btn-sm ${filtrePublic === 'tous' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic('tous'); setFiltreCategorie('toutes') }}>
+            Tous
+          </button>
+          <span style={{ width: 1, background: 'var(--c-border)', margin: '0 4px' }} />
           <button
             className={`btn btn-sm ${filtreCategorie === 'toutes' ? 'btn-primary' : 'btn-secondary'}`}
             onClick={() => setFiltreCategorie('toutes')}
           >
-            Toutes ({rows.length})
+            Toutes ({rows.filter(r => filtrePublic === 'tous' ? true : (r.public_cible || 'particulier') === filtrePublic || (r.public_cible || 'particulier') === 'tous').length})
           </button>
           {CATEGORIES.map(c => {
-            const count = rows.filter(r => r.categorie === c.value).length
+            const count = rows.filter(r => (filtrePublic === 'tous' ? true : (r.public_cible || 'particulier') === filtrePublic || (r.public_cible || 'particulier') === 'tous') && r.categorie === c.value).length
             if (count === 0) return null
             return (
               <button
@@ -378,6 +396,7 @@ export function CataloguePage() {
                     <tr key={p.id} style={{ opacity: p.actif ? 1 : 0.5 }}>
                       <td>
                         <div className="font-semibold">{p.nom}</div>
+                        <div className="text-xs" style={{ marginTop: 3 }}><span className="badge badge-neutral">{p.public_cible === 'professionnel' ? 'PRO' : p.public_cible === 'tous' ? 'TOUS' : 'PARTICULIER'}</span></div>
                         <div className="text-sm text-muted">{[p.marque, p.reference].filter(Boolean).join(' · ') || '—'}</div>
                         {p.zones_prix && p.zones_prix.length > 0 && (
                           <div className="text-xs text-muted mt-1">{p.zones_prix.length} zone{p.zones_prix.length > 1 ? 's' : ''} tarifaire{p.zones_prix.length > 1 ? 's' : ''}</div>
@@ -441,6 +460,20 @@ export function CataloguePage() {
               <span>Nom du produit *</span>
               <input value={form.nom} onChange={e => setForm(f => ({ ...f, nom: e.target.value }))} placeholder="ex: PAC Daikin Altherma 3" />
             </label>
+          </div>
+
+          <div className="grid grid-2">
+            <label className="field">
+              <span>Public cible</span>
+              <select value={form.public_cible} onChange={e => setForm(f => ({ ...f, public_cible: e.target.value as FormState['public_cible'] }))}>
+                <option value="particulier">Particulier</option>
+                <option value="professionnel">Professionnel</option>
+                <option value="tous">Tous publics</option>
+              </select>
+            </label>
+            <div className="text-sm text-muted" style={{ display: 'flex', alignItems: 'center' }}>
+              Le catalogue est séparé entre particuliers et professionnels.
+            </div>
           </div>
 
           <div className="grid grid-2">

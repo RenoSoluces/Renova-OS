@@ -22,7 +22,8 @@ export function genererDevisPDF(
   lignes: DevisLigne[],
   aides: DevisAide[],
   prospect: Prospect | null,
-  entreprise: Entreprise | null
+  entreprise: Entreprise | null,
+  logoDataUrl?: string | null
 ): jsPDF {
 
   const doc = new jsPDF({ unit: "mm", format: "a4" });
@@ -34,10 +35,11 @@ export function genererDevisPDF(
   // Logo entreprise (facultatif), en haut à gauche
   // ---------------------------------------------------------------
   let decalageLogo = 0;
-  if (entreprise?.logo_url && entreprise.logo_url.startsWith("data:image")) {
+  const logo = logoDataUrl || entreprise?.logo_url || '';
+  if (logo && logo.startsWith("data:image")) {
     try {
-      const format = entreprise.logo_url.includes("image/png") ? "PNG" : "JPEG";
-      doc.addImage(entreprise.logo_url, format, marge, y - 6, 26, 26, undefined, "FAST");
+      const format = logo.includes("image/png") ? "PNG" : "JPEG";
+      doc.addImage(logo, format, marge, y - 6, 26, 26, undefined, "FAST");
       decalageLogo = 32;
     } catch {
       // logo illisible : on continue sans bloquer la génération du PDF
@@ -49,19 +51,23 @@ export function genererDevisPDF(
   // ---------------------------------------------------------------
   doc.setFont("helvetica", "bold");
   doc.setFontSize(15);
-  doc.text(entreprise?.raison_sociale || "Mon entreprise", marge + decalageLogo, y);
+  const nomAffichage = devis.emetteur_nom_affichage || entreprise?.raison_sociale || "Mon entreprise";
+  doc.text(nomAffichage, marge + decalageLogo, y);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(9);
   doc.setTextColor(90);
   y += 6;
   const infosEntreprise = [
-    entreprise?.adresse,
-    [entreprise?.code_postal, entreprise?.ville].filter(Boolean).join(" "),
-    entreprise?.siret ? `SIRET : ${entreprise.siret}` : null,
+    devis.emetteur_raison_sociale || entreprise?.raison_sociale,
+    devis.emetteur_forme_juridique || entreprise?.forme_juridique,
+    devis.emetteur_adresse || entreprise?.adresse,
+    [devis.emetteur_code_postal || entreprise?.code_postal, devis.emetteur_ville || entreprise?.ville].filter(Boolean).join(" "),
+    (devis.emetteur_siret || entreprise?.siret) ? `SIRET : ${devis.emetteur_siret || entreprise?.siret}` : null,
+    (devis.emetteur_numero_tva || entreprise?.numero_tva) ? `TVA : ${devis.emetteur_numero_tva || entreprise?.numero_tva}` : null,
     entreprise?.numero_rge ? `RGE n° ${entreprise.numero_rge}` : null,
-    entreprise?.telephone,
-    entreprise?.email,
+    devis.emetteur_telephone || entreprise?.telephone,
+    devis.emetteur_email || entreprise?.email,
   ].filter(Boolean) as string[];
   for (const ligne of infosEntreprise) {
     doc.text(ligne, marge + decalageLogo, y);
@@ -254,7 +260,8 @@ export function genererDevisPDF(
     doc.text(conditionsPaiement, marge, y);
     y += conditionsPaiement.length * 3.2 + 6;
   }
-  if (entreprise?.conditions_generales_devis) {
+  const conditionsGenerales = devis.emetteur_cgv || entreprise?.conditions_generales_devis || '';
+  if (conditionsGenerales) {
     if (y > 260) { doc.addPage(); y = 20; }
     doc.setFont("helvetica", "bold");
     doc.setFontSize(8);
@@ -264,7 +271,7 @@ export function genererDevisPDF(
     doc.setFont("helvetica", "normal");
     doc.setFontSize(7.5);
     doc.setTextColor(100);
-    const conditions = doc.splitTextToSize(entreprise.conditions_generales_devis, pageWidth - 2 * marge);
+    const conditions = doc.splitTextToSize(conditionsGenerales, pageWidth - 2 * marge);
     doc.text(conditions, marge, y);
     y += conditions.length * 3.2 + 6;
   }
@@ -324,13 +331,29 @@ export function genererDevisPDF(
   return doc;
 }
 
-export function telechargerDevisPDF(
+export async function telechargerDevisPDF(
   devis: Devis,
   lignes: DevisLigne[],
   aides: DevisAide[],
   prospect: Prospect | null,
   entreprise: Entreprise | null
 ) {
-  const doc = genererDevisPDF(devis, lignes, aides, prospect, entreprise);
+  let logoDataUrl: string | null = null;
+  const logoUrl = devis.emetteur_logo_url || '';
+  if (logoUrl && !logoUrl.startsWith('data:image')) {
+    try {
+      const response = await fetch(logoUrl);
+      const blob = await response.blob();
+      logoDataUrl = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result));
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+      });
+    } catch {
+      // Le devis reste générable même si le logo partenaire n'est pas accessible.
+    }
+  }
+  const doc = genererDevisPDF(devis, lignes, aides, prospect, entreprise, logoDataUrl);
   doc.save(`${devis.numero}.pdf`);
 }

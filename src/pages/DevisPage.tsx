@@ -5,7 +5,7 @@ import {
 import { supabase } from '../lib/supabase'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { logAuditEvent } from '../lib/auditLog'
-import type { Devis, DevisLigne, DevisAide, Prospect, Produit, Entreprise } from '../types'
+import type { Devis, DevisLigne, DevisAide, Prospect, Produit, Entreprise, Installateur } from '../types'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { FloatSelect, FloatInput, FloatTextarea } from '../components/ui/FloatInput'
@@ -36,6 +36,9 @@ const CATEGORIES = [
   { value: 'pac_geothermie', label: 'PAC géothermique' },
   { value: 'ballon_thermodynamique', label: 'Ballon thermodynamique' },
   { value: 'vmc', label: 'VMC' },
+  { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
+  { value: 'professionnel_cee', label: 'Professionnels — CEE' },
+  { value: 'professionnel_hors_cee', label: 'Professionnels — hors CEE' },
   { value: 'autre', label: 'Autre prestation' },
 ]
 
@@ -63,6 +66,10 @@ export function DevisPage({
   const [loading, setLoading] = useState(true)
   const [showNewModal, setShowNewModal] = useState(false)
   const [newProspectId, setNewProspectId] = useState('')
+  const [filtrePublic, setFiltrePublic] = useState<'particulier' | 'professionnel' | 'tous'>('particulier')
+  const [partenairesDevis, setPartenairesDevis] = useState<Installateur[]>([])
+  const [quoteIssuerId, setQuoteIssuerId] = useState<string>('renova_soluces')
+  const [creationError, setCreationError] = useState('')
 
   const [current, setCurrent] = useState<(Devis & { prospect?: Prospect }) | null>(null)
   const [lignes, setLignes] = useState<DevisLigne[]>([])
@@ -96,6 +103,8 @@ export function DevisPage({
     fetchListe()
     supabase.from('prospects').select('*').order('nom').then(({ data }) => setProspects((data || []) as Prospect[]))
     supabase.from('catalogue_produits').select('*').eq('actif', true).then(({ data }) => setProduits((data || []) as Produit[]))
+    supabase.from('installateurs').select('*').eq('devis_autorise', true).eq('actif', true).order('nom')
+      .then(({ data }) => setPartenairesDevis((data || []) as Installateur[]))
     supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => {
       if (data) {
         setEntreprise(data as Entreprise)
@@ -125,11 +134,78 @@ export function DevisPage({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialProspectId])
 
+  useEffect(() => {
+    const prospect = prospects.find(p => p.id === newProspectId)
+    const partenaire = prospect?.installateur_id
+      ? partenairesDevis.find(x => x.id === prospect.installateur_id && x.devis_autorise)
+      : null
+    setQuoteIssuerId(partenaire ? partenaire.id : 'renova_soluces')
+  }, [newProspectId, prospects, partenairesDevis])
+
   async function creerDevis() {
-    if (!newProspectId) return
-    const { data: entreprise } = await supabase.from('entreprises').select('id, devis_duree_validite_jours, devis_conditions_paiement_defaut').limit(1).maybeSingle()
+    setCreationError('')
+    if (!newProspectId) {
+      setCreationError('Sélectionnez un prospect.')
+      return
+    }
+
+    const { data: entreprise, error: entrepriseError } = await supabase
+      .from('entreprises')
+      .select('id, raison_sociale, forme_juridique, siret, numero_tva, adresse, code_postal, ville, telephone, email, logo_url, devis_duree_validite_jours, devis_conditions_paiement_defaut, conditions_generales_devis')
+      .limit(1)
+      .maybeSingle()
+
+    if (entrepriseError) {
+      setCreationError(`Impossible de charger les informations de l'entreprise : ${entrepriseError.message}`)
+      return
+    }
+
+    const partenaire = quoteIssuerId !== 'renova_soluces'
+      ? partenairesDevis.find(x => x.id === quoteIssuerId)
+      : null
+
+    if (quoteIssuerId !== 'renova_soluces' && !partenaire) {
+      setCreationError('Le partenaire sélectionné n’est plus autorisé à émettre des devis.')
+      return
+    }
+
     const dureeValidite = entreprise?.devis_duree_validite_jours ?? 30
     const dateValidite = new Date(Date.now() + dureeValidite * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+
+    const issuer = partenaire
+      ? {
+          emetteur_type: 'partenaire',
+          emetteur_installateur_id: partenaire.id,
+          emetteur_nom_affichage: partenaire.devis_nom_affichage || partenaire.nom,
+          emetteur_raison_sociale: partenaire.devis_raison_sociale || partenaire.nom,
+          emetteur_forme_juridique: partenaire.devis_forme_juridique || '',
+          emetteur_siret: partenaire.siret || '',
+          emetteur_numero_tva: partenaire.numero_tva || '',
+          emetteur_adresse: partenaire.adresse || '',
+          emetteur_code_postal: partenaire.code_postal || '',
+          emetteur_ville: partenaire.ville || '',
+          emetteur_telephone: partenaire.telephone || '',
+          emetteur_email: partenaire.email || '',
+          emetteur_logo_url: partenaire.devis_logo_url || '',
+          emetteur_cgv: partenaire.devis_cgv || '',
+        }
+      : {
+          emetteur_type: 'renova_soluces',
+          emetteur_installateur_id: null,
+          emetteur_nom_affichage: entreprise?.raison_sociale || 'Reno Soluces',
+          emetteur_raison_sociale: entreprise?.raison_sociale || 'Reno Soluces',
+          emetteur_forme_juridique: entreprise?.forme_juridique || '',
+          emetteur_siret: entreprise?.siret || '',
+          emetteur_numero_tva: entreprise?.numero_tva || '',
+          emetteur_adresse: entreprise?.adresse || '',
+          emetteur_code_postal: entreprise?.code_postal || '',
+          emetteur_ville: entreprise?.ville || '',
+          emetteur_telephone: entreprise?.telephone || '',
+          emetteur_email: entreprise?.email || '',
+          emetteur_logo_url: entreprise?.logo_url || '',
+          emetteur_cgv: entreprise?.conditions_generales_devis || '',
+        }
+
     const { data, error } = await supabase.from('devis').insert({
       entreprise_id: entreprise?.id || null,
       prospect_id: newProspectId,
@@ -142,11 +218,23 @@ export function DevisPage({
       remise_valeur: 0,
       montant_ht_avant_remise: 0,
       remise_montant_ht: 0,
-    }).select('*, prospect:prospects(*)').single()
-    if (error || !data) return
+      ...issuer,
+    }).select('*').single()
+
+    if (error || !data) {
+      const message = error?.message || 'Le devis n’a pas pu être créé.'
+      setCreationError(message)
+      alert(`Impossible de créer le devis : ${message}`)
+      return
+    }
+
+    const { data: prospectData } = await supabase.from('prospects').select('*').eq('id', newProspectId).maybeSingle()
+    const devisComplet = { ...data, prospect: prospectData || prospects.find(p => p.id === newProspectId) || undefined }
+
     setShowNewModal(false)
     setNewProspectId('')
-    ouvrirDevis(data as any)
+    setQuoteIssuerId('renova_soluces')
+    ouvrirDevis(devisComplet as any)
     fetchListe()
   }
 
@@ -589,7 +677,10 @@ export function DevisPage({
     fetchListe()
   }
 
-  const produitsFiltres = produits.filter(p => p.categorie === filtreCategorie)
+  const produitsFiltres = produits.filter(p =>
+    p.categorie === filtreCategorie &&
+    (filtrePublic === 'tous' || p.public_cible === filtrePublic || p.public_cible === 'tous')
+  )
 
   if (view === 'list') {
     return (
@@ -600,7 +691,7 @@ export function DevisPage({
             <p className="page-subtitle">Devis clients avec calcul automatique des aides mobilisables</p>
           </div>
           <div className="page-actions">
-            <Button variant="primary" onClick={() => setShowNewModal(true)}>
+            <Button variant="primary" onClick={() => { setCreationError(''); setQuoteIssuerId('renova_soluces'); setShowNewModal(true) }}>
               <Plus size={18} /> Nouveau devis
             </Button>
           </div>
@@ -620,7 +711,7 @@ export function DevisPage({
               <FileSignature size={40} />
               <h3>Aucun devis</h3>
               <p>Créez votre premier devis à partir de votre catalogue produits.</p>
-              <Button variant="primary" onClick={() => setShowNewModal(true)}>
+              <Button variant="primary" onClick={() => { setCreationError(''); setQuoteIssuerId('renova_soluces'); setShowNewModal(true) }}>
                 <Plus size={18} /> Nouveau devis
               </Button>
             </div>
@@ -663,12 +754,29 @@ export function DevisPage({
             </>
           }
         >
+          {creationError && <div className="card card-pad text-sm" style={{ color: '#b91c1c', background: '#fef2f2', marginBottom: 12 }}>{creationError}</div>}
           <FloatSelect
             label="Client"
             value={newProspectId}
             onChange={setNewProspectId}
             options={prospects.map(p => ({ value: p.id, label: `${p.prenom} ${p.nom} — ${p.ville || ''}` }))}
           />
+          <div className="mt-4">
+            <FloatSelect
+              label="Émetteur du devis"
+              value={quoteIssuerId}
+              onChange={setQuoteIssuerId}
+              options={[
+                { value: 'renova_soluces', label: entreprise?.raison_sociale || 'Reno Soluces' },
+                ...partenairesDevis.map(p => ({ value: p.id, label: p.devis_nom_affichage || p.nom })),
+              ]}
+            />
+            {quoteIssuerId !== 'renova_soluces' && (
+              <div className="text-xs text-muted mt-2">
+                Le devis sera édité au nom du partenaire autorisé et utilisera ses coordonnées légales et ses CGV enregistrées.
+              </div>
+            )}
+          </div>
         </Modal>
       </div>
     )
@@ -772,6 +880,17 @@ export function DevisPage({
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
         <div className="card card-pad">
           <div className="section-label">Ajouter depuis le catalogue</div>
+          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
+            {([
+              ['particulier', 'Particuliers'],
+              ['professionnel', 'Professionnels'],
+              ['tous', 'Tous'],
+            ] as const).map(([value, label]) => (
+              <button key={value} className={`btn btn-sm ${filtrePublic === value ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic(value); setFiltreCategorie(CATEGORIES[0].value) }}>
+                {label}
+              </button>
+            ))}
+          </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
             {CATEGORIES.map(c => (
               <button
