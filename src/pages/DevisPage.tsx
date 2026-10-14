@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus,
+  Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus, Sparkles, ImagePlus,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { setProspectStatus } from '../lib/crm/workflow'
@@ -20,13 +20,14 @@ import { estimerPrimeCEE } from '../lib/aides/calculAidesCEE'
 import { telechargerDevisPDF } from '../lib/pdf/genererDevisPDF'
 import { useAuth } from '../lib/auth/AuthContext'
 import { numeroDevis } from '../lib/devis/numeroDevis'
+import { uploadDocument } from '../lib/storage/uploadDocument'
 
 const STATUT_BADGE: Record<string, string> = {
   brouillon: 'badge-neutral', envoye: 'badge-warning',
   signe: 'badge-success', refuse: 'badge-error', expire: 'badge-error',
 }
 
-const CATEGORIES = [
+const CATEGORIES: { value: string; label: string }[] = [
   { value: 'combles', label: 'Isolation combles / rampants' },
   { value: 'murs', label: 'Isolation murs' },
   { value: 'plancher', label: 'Isolation plancher bas' },
@@ -36,11 +37,17 @@ const CATEGORIES = [
   { value: 'pac_geothermie', label: 'PAC géothermique' },
   { value: 'ballon_thermodynamique', label: 'Ballon thermodynamique' },
   { value: 'vmc', label: 'VMC' },
+  { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
   { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
+  { value: 'destratificateur', label: 'Destratificateur' },
+  { value: 'hp_flottante', label: 'HP flottante' },
+  { value: 'isolation_toiture_pro', label: 'Isolation de la toiture (pro)' },
   { value: 'professionnel_cee', label: 'Professionnels — CEE' },
   { value: 'professionnel_hors_cee', label: 'Professionnels — hors CEE' },
   { value: 'autre', label: 'Autre prestation' },
 ]
+
+type AssistantSuggestion = { product_id: string; quantite: number; justification: string }
 
 const euro = (n: number | null | undefined) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0)
@@ -80,6 +87,12 @@ export function DevisPage({
   const [tauxCEE, setTauxCEE] = useState(6)
   const [entreprise, setEntreprise] = useState<Entreprise | null>(null)
   const [showSignatureModal, setShowSignatureModal] = useState(false)
+  const [assistantOpen, setAssistantOpen] = useState(false)
+  const [assistantDescription, setAssistantDescription] = useState('')
+  const [assistantPhotos, setAssistantPhotos] = useState<File[]>([])
+  const [assistantSuggestions, setAssistantSuggestions] = useState<AssistantSuggestion[]>([])
+  const [assistantLoading, setAssistantLoading] = useState(false)
+  const [assistantError, setAssistantError] = useState('')
   const [signatureData, setSignatureData] = useState<string | null>(null)
   const [nomSignataire, setNomSignataire] = useState('')
   const [signing, setSigning] = useState(false)
@@ -307,14 +320,57 @@ export function DevisPage({
     setCreatingAvenant(false)
   }
 
+  async function fileToDataUrl(file: File): Promise<string> {
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader()
+      reader.onload = () => resolve(String(reader.result || ''))
+      reader.onerror = () => reject(new Error(`Lecture impossible pour ${file.name}`))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  async function proposerLignesAssistantes() {
+    if (!current) return
+    if (!assistantDescription.trim() && assistantPhotos.length === 0) {
+      setAssistantError('Décrivez le besoin ou joignez au moins une photo.')
+      return
+    }
+    setAssistantLoading(true)
+    setAssistantError('')
+    setAssistantSuggestions([])
+    try {
+      const produitsEligibles = produits.filter(prod => prod.actif && prod.catalogue_groupe !== 'visite_technique' && (filtrePublic === 'tous' || prod.public_cible === filtrePublic || prod.public_cible === 'tous'))
+      if (produitsEligibles.length === 0) throw new Error('Aucun produit actif ne correspond au public sélectionné dans le catalogue.')
+      const photos = await Promise.all(assistantPhotos.map(fileToDataUrl))
+      // Important : aucun prix ni tarif de pose n'est transmis au modèle. Les prix affichés
+      // et ajoutés au devis sont toujours relus depuis le catalogue local de Renova-OS.
+      const catalogueSansPrix = produitsEligibles.map(prod => ({ id: prod.id, nom: prod.nom, marque: prod.marque, reference: prod.reference, description: prod.description, categorie: prod.categorie, public_cible: prod.public_cible, caracteristiques: prod.caracteristiques }))
+      const { data, error } = await supabase.functions.invoke('suggest-devis-lines', { body: { description: assistantDescription, photos, publicCible: filtrePublic, catalogue: catalogueSansPrix } })
+      if (error || data?.error) throw new Error(error?.message || data?.error || 'L’assistant n’a pas pu analyser la demande.')
+      const suggestions = (Array.isArray(data?.suggestions) ? data.suggestions : []).filter((x: any) => produitsEligibles.some(prod => prod.id === x.product_id)).map((x: any) => ({ product_id: String(x.product_id), quantite: Math.max(1, Math.min(100, Math.floor(Number(x.quantite) || 1))), justification: String(x.justification || 'Produit correspondant à la demande.') })) as AssistantSuggestion[]
+      if (!suggestions.length) throw new Error('Aucun produit du catalogue ne semble correspondre. Vous pouvez continuer à ajouter les lignes manuellement.')
+      setAssistantSuggestions(suggestions)
+      // Archive les photos dans le dossier/prospect afin qu'elles restent consultables.
+      for (const photo of assistantPhotos) {
+        const { error: uploadError } = await uploadDocument(photo, { dossierId: current.dossier_id || null, prospectId: current.prospect_id, categorie: 'Photos demande devis', type: photo.type.startsWith('image/') ? photo.type.split('/')[1] : 'fichier' })
+        if (uploadError) setAssistantError(`Suggestions prêtes, mais une photo n’a pas pu être archivée : ${uploadError}`)
+      }
+    } catch (e: any) {
+      setAssistantError(e?.message || 'Erreur pendant la proposition des lignes.')
+    } finally {
+      setAssistantLoading(false)
+    }
+  }
+
   const profilMPR: ProfilMPR | null = useMemo(() => {
     const p = current?.prospect
     if (!p?.rfr || !p.nombre_personnes_foyer) return null
     return determinerProfilMPR(p.rfr, p.nombre_personnes_foyer, !!p.zone_ile_de_france)
   }, [current])
 
-  function ajouterProduit(produit: Produit) {
+  function ajouterProduit(produit: Produit, quantite = 1) {
     const prixApplicable = prixProduitPourZone(produit, p?.code_postal)
+    const qte = Math.max(1, Math.floor(Number(quantite) || 1))
     const ordreBase = lignes.length
     const ligne: DevisLigne = {
       id: `tmp_${Date.now()}_${Math.random()}`,
@@ -323,10 +379,10 @@ export function DevisPage({
       designation: produit.nom,
       description: produit.description,
       caracteristiques: produit.caracteristiques,
-      quantite: 1,
+      quantite: qte,
       prix_unitaire_ht: prixApplicable,
       tva_taux: produit.tva_taux,
-      montant_ht: prixApplicable,
+      montant_ht: prixApplicable * qte,
       ordre: ordreBase,
       created_at: new Date().toISOString(),
     }
@@ -345,10 +401,10 @@ export function DevisPage({
         designation: `Pose — ${produit.nom}`,
         description: '',
         caracteristiques: {},
-        quantite: 1,
+        quantite: qte,
         prix_unitaire_ht: produit.forfait_pose_ht,
         tva_taux: produit.tva_taux,
-        montant_ht: produit.forfait_pose_ht,
+        montant_ht: produit.forfait_pose_ht * qte,
         ordre: ordreBase + 1,
         created_at: new Date().toISOString(),
       })
@@ -361,10 +417,10 @@ export function DevisPage({
         designation: `Évacuation des déchets — ${produit.nom}`,
         description: '',
         caracteristiques: {},
-        quantite: 1,
+        quantite: qte,
         prix_unitaire_ht: produit.forfait_evacuation_ht,
         tva_taux: produit.tva_taux,
-        montant_ht: produit.forfait_evacuation_ht,
+        montant_ht: produit.forfait_evacuation_ht * qte,
         ordre: ordreBase + 2,
         created_at: new Date().toISOString(),
       })
@@ -374,7 +430,7 @@ export function DevisPage({
     if (produit.eligible_mpr && profilMPR) {
       const gesteId = CATEGORIE_VERS_GESTE_MPR[produit.categorie]
       if (gesteId) {
-        const resultat = calculAideMPR(gesteId as any, profilMPR, prixApplicable)
+        const resultat = calculAideMPR(gesteId as any, profilMPR, prixApplicable * qte)
         if (resultat.montant > 0 && !aides.some(a => a.type === 'maprimerenov' && (a.details as any)?.gesteId === gesteId)) {
           setAides(as => [...as, {
             id: `tmp_${Date.now()}_mpr`,
@@ -677,8 +733,30 @@ export function DevisPage({
     fetchListe()
   }
 
+  const categoriesProOnly = ['destratificateur', 'hp_flottante', 'isolation_toiture_pro', 'professionnel_cee', 'professionnel_hors_cee']
+  const categoriesDevis = CATEGORIES.filter(c => filtrePublic === 'tous' || (filtrePublic === 'professionnel' ? (categoriesProOnly.includes(c.value) || c.value === 'pac_air_eau' || c.value === 'autre') : !categoriesProOnly.includes(c.value)))
+  const sectionsParticuliers = [
+    { label: 'Système de Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
+    { label: "Production d’eau Chaude", values: ['ballon_thermodynamique','solaire_thermique'] },
+    { label: 'Isolation', values: ['combles','murs','plancher','menuiseries'] },
+    { label: 'Production d’électricité', values: ['photovoltaique'] },
+    { label: 'Ventilation', values: ['vmc'] },
+    { label: 'Autres prestations', values: ['autre'] },
+  ]
+  const sectionsProfessionnels = [
+    { label: 'Système de Chauffage', values: ['pac_air_eau'] },
+    { label: 'Destratificateur', values: ['destratificateur'] },
+    { label: 'HP Flottante', values: ['hp_flottante'] },
+    { label: 'Isolation', values: ['isolation_toiture_pro','professionnel_cee','professionnel_hors_cee'] },
+    { label: 'Autres prestations', values: ['autre'] },
+  ]
+  const sectionsCatalogue = (filtrePublic === 'professionnel' ? sectionsProfessionnels : sectionsParticuliers).map(section => ({
+    ...section,
+    categories: section.values.map(value => categoriesDevis.find(c => c.value === value)).filter((c): c is { value: string; label: string } => Boolean(c)),
+  })).filter(section => section.categories.length > 0)
   const produitsFiltres = produits.filter(p =>
     p.categorie === filtreCategorie &&
+    p.catalogue_groupe !== 'visite_technique' &&
     (filtrePublic === 'tous' || p.public_cible === filtrePublic || p.public_cible === 'tous')
   )
 
@@ -879,29 +957,22 @@ export function DevisPage({
 
       <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
         <div className="card card-pad">
-          <div className="section-label">Ajouter depuis le catalogue</div>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}><div className="section-label">Ajouter depuis le catalogue</div><Button size="sm" variant="secondary" onClick={()=>{setAssistantError('');setAssistantSuggestions([]);setAssistantOpen(true)}} disabled={estSigne}><Sparkles size={14}/> Assistant</Button></div>
           <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
             {([
               ['particulier', 'Particuliers'],
               ['professionnel', 'Professionnels'],
-              ['tous', 'Tous'],
             ] as const).map(([value, label]) => (
-              <button key={value} className={`btn btn-sm ${filtrePublic === value ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic(value); setFiltreCategorie(CATEGORIES[0].value) }}>
+              <button key={value} className={`btn btn-sm ${filtrePublic === value ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic(value); setFiltreCategorie(value === 'professionnel' ? 'pac_air_eau' : 'combles') }}>
                 {label}
               </button>
             ))}
           </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginBottom: 12 }}>
-            {CATEGORIES.map(c => (
-              <button
-                key={c.value}
-                className={`btn btn-sm ${filtreCategorie === c.value ? 'btn-primary' : 'btn-secondary'}`}
-                style={{ justifyContent: 'flex-start' }}
-                onClick={() => setFiltreCategorie(c.value)}
-              >
-                {c.label}
-              </button>
-            ))}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
+            {sectionsCatalogue.map(section => <div key={section.label}>
+              <div className="section-label" style={{fontSize:11,margin:'6px 0'}}>{section.label}</div>
+              <div style={{display:'flex',flexDirection:'column',gap:4}}>{section.categories.map(c => <button key={c.value} className={`btn btn-sm ${filtreCategorie === c.value ? 'btn-primary' : 'btn-secondary'}`} style={{justifyContent:'flex-start'}} onClick={() => setFiltreCategorie(c.value)}>{c.label}</button>)}</div>
+            </div>)}
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             {produitsFiltres.length === 0 && (
@@ -1062,6 +1133,23 @@ export function DevisPage({
           </div>
         </div>
       </div>
+
+      <Modal
+        open={assistantOpen}
+        onClose={() => setAssistantOpen(false)}
+        title="Assistant de création de devis"
+        width={760}
+        footer={<><Button variant="secondary" onClick={() => setAssistantOpen(false)}>Fermer</Button><Button variant="primary" onClick={() => void proposerLignesAssistantes()} disabled={assistantLoading}>{assistantLoading ? 'Analyse…' : <><Sparkles size={15}/> Proposer des lignes</>}</Button></>}
+      >
+        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+          <p className="text-sm text-muted">Décrivez la demande du client et joignez des photos si besoin. L’assistant sélectionne uniquement des références du catalogue ; les prix restent ceux du catalogue ou ceux que vous modifierez ensuite.</p>
+          <label className="field"><span>Demande du client</span><textarea className="input" rows={4} value={assistantDescription} onChange={e=>setAssistantDescription(e.target.value)} placeholder="Ex. : maison de 110 m², chauffage au fioul, souhaite remplacer la chaudière par une PAC air/eau…"/></label>
+          <label className="field"><span>Photos (façade, équipement existant, étiquette technique…)</span><input className="input" type="file" accept="image/*" multiple onChange={e=>setAssistantPhotos(Array.from(e.target.files||[]))}/><span className="text-xs text-muted">{assistantPhotos.length ? `${assistantPhotos.length} photo(s) sélectionnée(s)` : 'Aucune photo sélectionnée'}</span></label>
+          {assistantError && <div className="card card-pad text-sm" style={{color:'#b91c1c'}}>{assistantError}</div>}
+          {assistantSuggestions.length > 0 && <div style={{display:'flex',flexDirection:'column',gap:8}}><strong>Produits proposés</strong>{assistantSuggestions.map(suggestion=>{const prod=produits.find(x=>x.id===suggestion.product_id);if(!prod)return null;return <div key={suggestion.product_id} className="recap-card" style={{padding:12,display:'flex',gap:12,alignItems:'center'}}><div style={{flex:1}}><div className="font-semibold">{prod.nom}</div><div className="text-sm text-muted">{suggestion.justification}</div><div className="text-sm">Prix catalogue : {euro(prixProduitPourZone(prod,p?.code_postal))} HT / {prod.unite} · Quantité suggérée : {suggestion.quantite}</div></div><Button size="sm" variant="primary" disabled={estSigne} onClick={()=>{ajouterProduit(prod,suggestion.quantite);setAssistantSuggestions(prev=>prev.filter(x=>x.product_id!==suggestion.product_id))}}><Plus size={14}/> Ajouter</Button></div>})}</div>}
+          <p className="text-xs text-muted">Si la fonction d’analyse n’est pas configurée, il faudra renseigner la clé OPENAI_API_KEY dans les secrets Supabase. Aucune valeur de prix n’est transmise à l’assistant.</p>
+        </div>
+      </Modal>
 
       <Modal
         open={showSignatureModal}

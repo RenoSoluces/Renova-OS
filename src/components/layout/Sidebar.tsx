@@ -1,4 +1,4 @@
-import { LayoutDashboard, Users, ClipboardList, Calculator, FolderKanban, Calendar, FileText, Settings } from 'lucide-react'
+import { LayoutDashboard, Users, ClipboardList, Calculator, FolderKanban, Calendar, FileText, Settings, BookOpen } from 'lucide-react'
 
 export const NAV_ITEMS = [
   { id: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
@@ -8,6 +8,7 @@ export const NAV_ITEMS = [
   { id: 'dossiers', label: 'Dossiers', icon: FolderKanban },
   { id: 'planning', label: 'Planning', icon: Calendar },
   { id: 'documents', label: 'Documents', icon: FileText },
+  { id: 'fiches_techniques', label: 'Fiches techniques', icon: BookOpen },
   { id: 'parametres', label: 'Paramètres', icon: Settings },
 ]
 

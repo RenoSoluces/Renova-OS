@@ -72,8 +72,8 @@ export function SimulationsPage({ onNavigateToDevis }: Props = {}) {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1 className="page-title">Simulations 3CL</h1>
-          <p className="page-subtitle">Calculs DPE et aides à la rénovation énergétique</p>
+          <h1 className="page-title">Résultats 3CL</h1>
+          <p className="page-subtitle">Historique des résultats enregistrés depuis les visites techniques</p>
         </div>
       </div>
 
@@ -84,7 +84,7 @@ export function SimulationsPage({ onNavigateToDevis }: Props = {}) {
           <div className="empty-state">
             <Calculator size={40} />
             <h3>Aucune simulation</h3>
-            <p>Les simulations se créent depuis une visite technique, une fois le DPE calculé ("Enregistrer comme simulation").</p>
+            <p>Les résultats 3CL se créent depuis une visite technique, une fois le calcul DPE enregistré.</p>
           </div>
         ) : (
           <div style={{ overflowX: 'auto' }}>

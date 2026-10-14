@@ -24,6 +24,7 @@ interface Props {
   onProspectClick?: (p: Prospect) => void
   /** Redirige vers la page adaptée à la prochaine étape du cycle de vie du prospect (VT, devis, dossier). */
   onContinueLifecycle?: (target: 'visite' | 'simulation' | 'devis' | 'dossier', prospect: Prospect) => void
+  initialView?: 'liste' | 'pipeline'
 }
 
 const CIVILITES = [
@@ -137,7 +138,7 @@ const EMPTY_FORM = {
   source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
 
-export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
+export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialView = 'liste' }: Props) {
   const { profile } = useAuth()
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
@@ -156,7 +157,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
   const [editModal, setEditModal] = useState(false)
   const [editForm, setEditForm] = useState({ ...EMPTY_FORM })
   const [confirmDelete, setConfirmDelete] = useState<Prospect | null>(null)
-  const [view, setView] = useState<'liste' | 'pipeline'>('liste')
+  const [view, setView] = useState<'liste' | 'pipeline'>(initialView)
+  useEffect(() => { setView(initialView) }, [initialView])
   const [tasksByProspect, setTasksByProspect] = useState<Record<string, CrmTask[]>>({})
   const [linkedCounts, setLinkedCounts] = useState<{ visites: number; simulations: number; devis: number; dossiers: number } | null>(null)
   const [tagInput, setTagInput] = useState('')
@@ -401,8 +403,11 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle }: Props) {
       commercial: profile?.nom_complet || null,
       commercial_id: profile?.id || null,
     }
-    await supabase.from('prospects').insert(payload)
+    const { data: nouveauProspect, error: insertError } = await supabase.from('prospects').insert(payload).select('id').single()
     setSaving(false)
+    if (insertError || !nouveauProspect) { alert(`Création du prospect impossible : ${insertError?.message || 'erreur inconnue'}`); return }
+    const { error: notificationError, data: notificationResult } = await supabase.functions.invoke('notify-new-prospect', { body: { prospectIds: [nouveauProspect.id] } })
+    if (notificationError || notificationResult?.error) console.warn('Prospect créé, mais e-mail de notification non envoyé :', notificationError?.message || notificationResult?.error)
     setWizardOpen(false)
     fetchProspects()
   }

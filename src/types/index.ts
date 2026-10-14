@@ -1,6 +1,6 @@
 export type PageKey =
-  | 'dashboard' | 'prospects' | 'visites' | 'simulations'
-  | 'dossiers' | 'devis' | 'catalogue' | 'planning' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme'
+  | 'dashboard' | 'prospects' | 'visites' | 'simulations' | 'resultats_3cl'
+  | 'dossiers' | 'devis' | 'facturation' | 'catalogue' | 'planning' | 'courrier' | 'a_traiter' | 'pipeline' | 'prospection' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'fiches_techniques' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme'
 
 export type TypeProspect = 'particulier' | 'professionnel'
 
@@ -92,12 +92,13 @@ export interface Visite {
 
 export interface Notification {
   id: string
-  type: 'relance_devis' | 'tache_retard' | 'vt_a_qualifier' | 'info'
+  type: 'relance_devis' | 'tache_retard' | 'vt_a_qualifier' | 'nouveau_prospect' | 'evolution_dossier' | 'info'
   titre: string
   message: string
   prospect_id: string | null
   devis_id: string | null
   visite_id?: string | null
+  dossier_id?: string | null
   recipient_id?: string | null
   lue: boolean
   meta: Record<string, unknown>
@@ -346,6 +347,10 @@ export interface DossierFacturation {
   categorie_operation?: string | null
   ordre: number
   notes?: string | null
+  pdf_storage_path?: string | null
+  email_envoye_at?: string | null
+  email_erreur?: string | null
+  devis_id?: string | null
   created_at: string
 }
 
@@ -410,6 +415,8 @@ export interface Document {
   dossier_id: string | null
   prospect_id?: string | null
   partenaire_id?: string | null
+  produit_id?: string | null
+  produit?: Produit | null
   categorie?: string | null
   nom: string
   type: string
@@ -500,6 +507,7 @@ export interface Produit {
   fiche_cee: string
   actif: boolean
   public_cible: 'particulier' | 'professionnel' | 'tous'
+  catalogue_groupe?: 'particulier' | 'professionnel' | 'visite_technique'
   created_at: string
 }
 

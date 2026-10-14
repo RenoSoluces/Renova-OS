@@ -35,7 +35,7 @@ Le consommateur dispose d’un délai de 14 jours pour exercer son droit de rét
 
 Exercice du droit : La notification doit être adressée par écrit (courrier recommandé ou formulaire de rétractation) à :
 
-IDEHOME France – 8 rue Jean Mermoz, 34430 Saint-Jean-de-Védas.
+IDEHOME France – 8 Rue Mermoz, 34430 Saint-Jean-de-Védas.
 
 Exceptions : Le droit de rétractation ne s’applique pas aux prestations pleinement exécutées avant la fin du délai avec accord préalable du client, ni aux travaux d’urgence expressément demandés.
 
@@ -79,7 +79,7 @@ Le fait pour la société de ne pas se prévaloir d’une clause à un moment do
 Article 15 – Réclamation et médiation
 
 En cas de litige, le client doit d’abord adresser une réclamation écrite à la société :
-Adresse : IDEHOME France, 8 rue Jean Mermoz, 34430 Saint-Jean-de-Védas
+Adresse : IDEHOME France, 8 Rue Mermoz, 34430 Saint-Jean-de-Védas
 Email : secretariat@ofce.org / contact@szmediation-solution.com
 
 En cas de réponse insatisfaisante ou d’absence de réponse sous un mois, le client peut recourir gratuitement au médiateur de la consommation :
@@ -99,7 +99,7 @@ BORDEREAU DE RÉTRACTATION
 
 Numéro de commande : ...........................................................
 
-À l’attention de : IDEHOME France – 8 RUE JEAN MERMOZ – 34430 ST JEAN DE VÉDAS
+À l’attention de : IDEHOME France – 8 RUE MERMOZ – 34430 ST JEAN DE VÉDAS
 
 Je vous notifie par la présente ma rétractation du contrat portant sur la vente du bien / la prestation de service ci-dessous :
 

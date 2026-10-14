@@ -3,7 +3,7 @@ import type { Document } from '../../types'
 
 export async function uploadDocument(
   file: File,
-  opts: { dossierId?: string | null; prospectId?: string | null; type?: string; categorie?: string; partenaireId?: string | null; nouvelleVersionDe?: Document } = {}
+  opts: { dossierId?: string | null; prospectId?: string | null; type?: string; categorie?: string; partenaireId?: string | null; produitId?: string | null; nouvelleVersionDe?: Document } = {}
 ) {
   const ext = file.name.split('.').pop() || 'bin'
   const path = `${opts.dossierId || opts.prospectId || 'divers'}/${crypto.randomUUID()}.${ext}`
@@ -12,7 +12,7 @@ export async function uploadDocument(
     cacheControl: '3600',
     upsert: false,
   })
-  if (uploadError) return { error: uploadError.message, document: null }
+  if (uploadError) return { error: uploadError.message, document: null, path: null }
 
   const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
 
@@ -24,6 +24,7 @@ export async function uploadDocument(
       prospect_id: opts.prospectId ?? null,
       categorie: opts.categorie || 'Général',
       partenaire_id: opts.partenaireId ?? null,
+      produit_id: opts.produitId ?? versionPrecedente?.produit_id ?? null,
       nom: file.name,
       type: opts.type || (ext.toLowerCase()),
       taille: file.size,
@@ -35,6 +36,6 @@ export async function uploadDocument(
     .select()
     .single()
 
-  if (error) return { error: error.message, document: null }
-  return { error: null, document: data }
+  if (error) return { error: error.message, document: null, path }
+  return { error: null, document: data, path }
 }

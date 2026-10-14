@@ -1,5 +1,8 @@
+// Le numéro définitif est attribué par le trigger PostgreSQL à l'insertion.
+// Cette valeur de secours respecte le format lisible si le trigger n'est pas encore déployé.
 export function numeroDevis(): string {
   const d = new Date()
-  const rand = Math.floor(1000 + Math.random() * 9000)
-  return `DEV-${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}-${rand}`
+  const mois = String(d.getMonth() + 1).padStart(2, '0')
+  const horodatage = String(Date.now()).slice(-6)
+  return `DEV-${d.getFullYear()}-${mois}-${horodatage}`
 }

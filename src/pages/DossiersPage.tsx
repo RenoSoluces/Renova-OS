@@ -26,6 +26,7 @@ import { uploadDocument } from '../lib/storage/uploadDocument'
 import { jsPDF } from 'jspdf'
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
+import { numeroDevis } from '../lib/devis/numeroDevis'
 
 const STATUT_BADGE: Record<string, string> = {
   en_cours: 'badge-info',
@@ -276,16 +277,14 @@ export function DossiersPage({
     setPieces((data || []) as DocumentPiece[])
     setFacturation((factures || []) as DossierFacturation[])
     const commission = d.devis_id ? commissionsParDevis[d.devis_id] : undefined
-    if (commission && Number(commission.montant_societe) > 0 && (factures || []).length === 0) {
-      setFactureForm({
-        libelle: 'Prestation partenaire',
-        montant_ht: String(Number(commission.montant_societe)),
-        taux_tva: '20',
-        declencheur: 'installation',
-      })
-    } else {
-      setFactureForm({ libelle: 'Prestation partenaire', montant_ht: '', taux_tva: '20', declencheur: 'installation' })
-    }
+    const totalFactureNonAnnulee = (factures || []).filter((f: any) => f.statut !== 'annulee').reduce((sum: number, f: any) => sum + Number(f.montant_ht || 0), 0)
+    const restant = Math.max(0, Number(commission?.montant_societe || 0) - totalFactureNonAnnulee)
+    setFactureForm({
+      libelle: totalFactureNonAnnulee > 0 ? 'Solde partenaire' : 'Prestation partenaire',
+      montant_ht: restant > 0 ? String(restant) : '',
+      taux_tva: '20',
+      declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
+    })
   }
 
   async function ajouterEcheanceFacturation() {
@@ -332,22 +331,36 @@ export function DossiersPage({
     setEditingFacturationId(null)
   }
 
-  async function supprimerEcheanceFacturation(id: string) {
-    if (!confirm('Supprimer cette échéance de facturation ?')) return
-    const { error } = await supabase.from('dossier_facturation').delete().eq('id', id).eq('statut', 'a_facturer')
-    if (error) { setDetailMessage(`Erreur suppression : ${error.message}`); return }
-    setFacturation(prev => prev.filter(x => x.id !== id))
+  async function supprimerEcheanceFacturation(ligne: DossierFacturation) {
+    if (!isAdmin) return
+    if (ligne.statut === 'a_facturer') {
+      if (!confirm(`Supprimer l’échéance « ${ligne.libelle} » de ${euro(Number(ligne.montant_ht) || 0)} HT ?`)) return
+      const { error } = await supabase.from('dossier_facturation').delete().eq('id', ligne.id).eq('statut', 'a_facturer')
+      if (error) { setDetailMessage(`Erreur suppression : ${error.message}`); return }
+      setFacturation(prev => prev.filter(x => x.id !== ligne.id))
+      if (editingFacturationId === ligne.id) setEditingFacturationId(null)
+      return
+    }
+    if (ligne.statut === 'annulee') return
+    if (!confirm(`La facture ${ligne.facture_numero || ''} a déjà été générée. Elle sera marquée comme annulée et conservée dans l’historique comptable. Continuer ?`)) return
+    const { error } = await supabase.from('dossier_facturation').update({ statut: 'annulee', notes: `${ligne.notes || ''}${ligne.notes ? '\n' : ''}Annulée le ${new Date().toLocaleDateString('fr-FR')} par ${profile?.nom_complet || profile?.email || 'administrateur'}` }).eq('id', ligne.id)
+    if (error) { setDetailMessage(`Erreur d’annulation : ${error.message}`); return }
+    setFacturation(prev => prev.map(x => x.id === ligne.id ? { ...x, statut: 'annulee' } : x))
   }
 
   async function genererFactureEcheance(ligne: DossierFacturation) {
     if (!detail || ligne.statut !== 'a_facturer') return
     setFactureSaving(true)
     try {
-      const [{ data: numero }, { data: entreprise }] = await Promise.all([
+      const { data: linkedInvoice } = await supabase.from('dossier_facturation').select('devis_id').eq('id', ligne.id).maybeSingle()
+      const [numeroResult, entrepriseResult] = await Promise.all([
         supabase.rpc('next_facture_number'),
         supabase.from('entreprises').select('*').limit(1).maybeSingle(),
       ])
-      if (!numero) throw new Error('Impossible de générer un numéro de facture.')
+      const numero = numeroResult.data
+      const entreprise = entrepriseResult.data
+      if (numeroResult.error) throw new Error(`Numérotation de facture indisponible : ${numeroResult.error.message}. Vérifiez que la migration de facturation a été appliquée dans Supabase.`)
+      if (!numero) throw new Error('La base de données n’a renvoyé aucun numéro de facture. Appliquez la migration de numérotation des factures dans Supabase.')
       const now = new Date()
       const numeroFacture = String(numero)
       const prospect = detail.prospect as any
@@ -436,19 +449,131 @@ export function DossiersPage({
         doc.text(`BIC : ${entreprise?.bic || '—'}`,18,272)
       }
       doc.setFontSize(7); doc.text('Document généré par RENOVA OS — à conserver comme pièce comptable.',18,286)
+      const pdfBlob = doc.output('blob')
       doc.save(`${numeroFacture}.pdf`)
+      const fichierFacture = new File([pdfBlob], `${numeroFacture}.pdf`, { type: 'application/pdf' })
+      const { document: documentFacture, path: cheminPdf, error: uploadFactureError } = await uploadDocument(fichierFacture, {
+        dossierId: detail.id, prospectId: detail.prospect_id, partenaireId: partnerId, type: 'pdf', categorie: 'Factures partenaires',
+      })
+      if (uploadFactureError || !documentFacture || !cheminPdf) throw new Error(`PDF téléchargé, mais archivage dans le dossier impossible : ${uploadFactureError || 'chemin de stockage manquant'}`)
 
+      // Devis interne de suivi : il augmente les statistiques sans générer une commission travaux.
+      let devisId = linkedInvoice?.devis_id as string | null | undefined
+      if (!devisId) {
+        const { data: devis, error: devisError } = await supabase.from('devis').insert({
+          entreprise_id: entreprise?.id || null,
+          prospect_id: detail.prospect_id,
+          dossier_id: detail.id,
+          numero: numeroDevis(),
+          statut: 'signe',
+          signature_statut: 'signe',
+          signature_date: now.toISOString(),
+          type_operation: 'mono_geste',
+          date_validite: now.toISOString().slice(0, 10),
+          montant_ht: ht,
+          montant_tva: tva,
+          montant_ttc: ttc,
+          montant_aides: 0,
+          reste_a_charge: ttc,
+          notes: `Devis interne de suivi de facturation partenaire — facture ${numeroFacture}. Ne constitue pas un devis de travaux client.`,
+          origine_interne: true,
+          emetteur_type: 'renova_soluces',
+          emetteur_nom_affichage: entreprise?.raison_sociale || 'Reno Soluces',
+        }).select('id').single()
+        if (devisError || !devis) throw new Error(`Facture PDF générée, mais création du devis interne impossible : ${devisError?.message || 'erreur inconnue'}`)
+        devisId = devis.id
+        const { error: linkError } = await supabase.from('dossier_facturation').update({ devis_id: devisId }).eq('id', ligne.id)
+        if (linkError) throw new Error(`Devis créé, mais liaison à la facture impossible : ${linkError.message}`)
+        const { error: ligneError } = await supabase.from('devis_lignes').insert({
+          devis_id: devisId, designation: ligne.libelle || 'Prestation partenaire',
+          description: `Pièce interne liée à la facture ${numeroFacture}`,
+          quantite: 1, prix_unitaire_ht: ht, tva_taux: taux, montant_ht: ht, ordre: 0,
+        })
+        if (ligneError) throw new Error(`Devis créé, mais sa ligne n'a pas pu être enregistrée : ${ligneError.message}`)
+      }
       const { error } = await supabase.from('dossier_facturation').update({
         statut:'facturee', facturee_at:now.toISOString(), facture_numero:numeroFacture,
         date_echeance: ligne.date_echeance || null,
         conditions_paiement: ligne.conditions_paiement || entreprise?.conditions_paiement_defaut || '',
+        devis_id: devisId,
+        pdf_storage_path: cheminPdf,
+        email_erreur: null,
       }).eq('id',ligne.id)
       if (error) throw new Error(`PDF généré, mais enregistrement impossible : ${error.message}`)
-      await logAuditEvent({ action:'dossier_facture', entityType:'facture', entityId:ligne.id, description:`Facture ${numeroFacture} générée`, meta:{facture_numero:numeroFacture,montant_ht:ht,montant_ttc:ttc} })
-      setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,statut:'facturee',facturee_at:now.toISOString(),facture_numero:numeroFacture}:x))
+      await logAuditEvent({ action:'dossier_facture', entityType:'facture', entityId:ligne.id, description:`Facture ${numeroFacture} générée avec devis interne ${devisId}`, meta:{facture_numero:numeroFacture,montant_ht:ht,montant_ttc:ttc,devis_id:devisId} })
+      setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,statut:'facturee',facturee_at:now.toISOString(),facture_numero:numeroFacture,devis_id:devisId,pdf_storage_path:cheminPdf,email_erreur:null}:x))
+      if (!partenaire?.email) {
+        const message = 'Facture générée et archivée, mais aucun e-mail partenaire n’est renseigné.'
+        await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
+        setDetailMessage(message)
+      } else {
+        const { data: envoi, error: envoiError } = await supabase.functions.invoke('send-invoice', { body: { storagePath: cheminPdf, recipient: partenaire.email, invoiceNumber: numeroFacture, partnerName: partenaire.nom, dossierId: detail.id } })
+        if (envoiError || envoi?.error) {
+          const message = `Facture ${numeroFacture} créée et archivée, mais l’e-mail n’a pas été envoyé : ${envoiError?.message || envoi?.error}. Configurez la fonction send-invoice et RESEND_API_KEY.`
+          await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
+          setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,email_erreur:message}:x))
+          setDetailMessage(message)
+        } else {
+          await supabase.from('dossier_facturation').update({ email_envoye_at: new Date().toISOString(), email_erreur: null }).eq('id', ligne.id)
+          setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,email_envoye_at:new Date().toISOString(),email_erreur:null}:x))
+          setDetailMessage(`Facture ${numeroFacture} générée, archivée et envoyée à ${partenaire.email}.`)
+        }
+      }
     } catch (e:any) {
       setDetailMessage(e?.message || 'Impossible de générer la facture.')
     } finally { setFactureSaving(false) }
+  }
+
+  async function genererFactureDepuisCommission() {
+    if (!detail) return
+    const montant = Number(factureForm.montant_ht)
+    if (!Number.isFinite(montant) || montant <= 0) {
+      setDetailMessage('Renseignez un montant HT supérieur à 0 € avant de générer la facture.')
+      return
+    }
+    setFactureSaving(true)
+    const { data, error } = await supabase.from('dossier_facturation').insert({
+      dossier_id: detail.id,
+      libelle: factureForm.libelle.trim() || 'Prestation partenaire',
+      montant_ht: montant,
+      taux_tva: Number(factureForm.taux_tva) || 20,
+      declencheur: factureForm.declencheur || 'installation',
+      ordre: facturation.length,
+    }).select('*').single()
+    setFactureSaving(false)
+    if (error || !data) {
+      setDetailMessage(`Impossible de préparer la facture : ${error?.message || 'erreur inconnue'}`)
+      return
+    }
+    const ligne = data as DossierFacturation
+    setFacturation(prev => [...prev, ligne])
+    await genererFactureEcheance(ligne)
+  }
+
+  async function renvoyerFactureParEmail(ligne: DossierFacturation) {
+    if (!ligne.pdf_storage_path || !ligne.facture_numero || !detail || !isAdmin) {
+      setDetailMessage('Impossible de renvoyer : PDF archivé ou numéro de facture manquant.')
+      return
+    }
+    const prospect = detail.prospect as any
+    const partnerId = detail.installateur_id || prospect?.installateur_id || null
+    if (!partnerId) { setDetailMessage('Aucun partenaire associé à ce dossier.'); return }
+    const { data: partenaire, error } = await supabase.from('installateurs').select('nom,email').eq('id', partnerId).maybeSingle()
+    if (error || !partenaire?.email) { setDetailMessage(`Adresse e-mail du partenaire indisponible : ${error?.message || 'adresse manquante'}`); return }
+    setFactureSaving(true)
+    const { data, error: sendError } = await supabase.functions.invoke('send-invoice', { body: { storagePath: ligne.pdf_storage_path, recipient: partenaire.email, invoiceNumber: ligne.facture_numero, partnerName: partenaire.nom, dossierId: detail.id } })
+    setFactureSaving(false)
+    if (sendError || data?.error) {
+      const message = `Échec de l’envoi : ${sendError?.message || data?.error}`
+      await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
+      setDetailMessage(message)
+      setFacturation(prev => prev.map(x => x.id === ligne.id ? { ...x, email_erreur: message } : x))
+      return
+    }
+    const sentAt = new Date().toISOString()
+    await supabase.from('dossier_facturation').update({ email_envoye_at: sentAt, email_erreur: null }).eq('id', ligne.id)
+    setFacturation(prev => prev.map(x => x.id === ligne.id ? { ...x, email_envoye_at: sentAt, email_erreur: null } : x))
+    setDetailMessage(`Facture ${ligne.facture_numero} envoyée à ${partenaire.email}.`)
   }
 
   async function supprimerDossier() {
@@ -1171,13 +1296,17 @@ export function DossiersPage({
                 <FloatSelect label="Échéance" value={factureForm.declencheur} onChange={v=>setFactureForm(f=>({...f,declencheur:v}))} options={[{value:'installation',label:"À l'installation"},{value:'mpr',label:'Au paiement MaPrimeRénov’'},{value:'autre',label:'Autre échéance'}]} />
                 <Button variant="secondary" onClick={editingFacturationId ? enregistrerModificationEcheance : ajouterEcheanceFacturation} disabled={factureSaving}><PlusCircle size={14}/> {editingFacturationId ? 'Enregistrer' : 'Ajouter'}</Button>{editingFacturationId && <Button variant="ghost" onClick={()=>setEditingFacturationId(null)}>Annuler</Button>}
               </div>
-              {facturation.length===0 ? <div className="text-sm text-muted" style={{marginTop:12}}>Aucune échéance. La commission société du dossier est de <strong>{detail.devis_id && commissionsParDevis[detail.devis_id] ? euro(commissionsParDevis[detail.devis_id].montant_societe) : '—'}</strong>.</div> : <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:8}}>
-                {facturation.map(ligne=>{const ht=Number(ligne.montant_ht)||0;const ttc=ht*(1+(Number(ligne.taux_tva)||0)/100);return <div key={ligne.id} style={{display:'grid',gridTemplateColumns:'minmax(180px,1fr) 110px 120px minmax(130px,1fr) auto',gap:8,alignItems:'center',padding:'10px 0',borderTop:'1px solid #edf1ef'}}>
+              <div style={{marginTop:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
+                <div className="text-sm text-muted">Chaque échéance peut donner lieu à une facture distincte : installation, paiement MaPrimeRénov’ ou autre jalon. Commission société du dossier : <strong>{detail.devis_id && commissionsParDevis[detail.devis_id] ? euro(commissionsParDevis[detail.devis_id].montant_societe) : '—'}</strong>.</div>
+                {!editingFacturationId && <Button variant="primary" onClick={genererFactureDepuisCommission} disabled={factureSaving}><Receipt size={14}/> {factureSaving ? 'Génération…' : 'Ajouter et générer la facture'}</Button>}
+              </div>
+              {facturation.length===0 ? <div className="text-sm text-muted" style={{marginTop:12}}>Aucune échéance enregistrée pour le moment.</div> : <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:8}}>
+                {facturation.map(ligne=>{const ht=Number(ligne.montant_ht)||0;const ttc=ht*(1+(Number(ligne.taux_tva)||0)/100);const annulee=ligne.statut==='annulee';return <div key={ligne.id} style={{display:'grid',gridTemplateColumns:'minmax(180px,1fr) 110px 120px minmax(130px,1fr) auto',gap:8,alignItems:'center',padding:'10px 0',borderTop:'1px solid #edf1ef',opacity: annulee ? 0.65 : 1}}>
                   <div><strong>{ligne.libelle}</strong><div className="text-sm text-muted">{ligne.declencheur==='installation'?'À l’installation':ligne.declencheur==='mpr'?'Au paiement MaPrimeRénov’':'Autre échéance'}</div></div>
-                  <strong>{euro(ht)} HT</strong><span>{euro(ttc)} TTC</span><span className={`badge ${ligne.statut==='payee'?'badge-success':ligne.statut==='facturee'?'badge-info':'badge-warning'}`}>{ligne.statut==='a_facturer'?'À facturer':ligne.statut==='facturee'?'Facturée':'Payée'}{ligne.facture_numero?` · ${ligne.facture_numero}`:''}</span>
-                  <div style={{display:'flex',gap:6,justifyContent:'flex-end'}}>{ligne.statut==='a_facturer'&&<><Button size="sm" variant="ghost" onClick={()=>{setEditingFacturationId(ligne.id);setFactureForm({libelle:ligne.libelle,montant_ht:String(ligne.montant_ht),taux_tva:String(ligne.taux_tva),declencheur:ligne.declencheur})}}>Éditer</Button><Button size="sm" variant="secondary" onClick={()=>genererFactureEcheance(ligne)}><Receipt size={13}/> Facturer</Button><Button size="sm" variant="ghost" onClick={()=>supprimerEcheanceFacturation(ligne.id)}>Supprimer</Button></>}</div>
+                  <strong>{euro(ht)} HT</strong><span>{euro(ttc)} TTC</span><span className={`badge ${ligne.statut==='payee'?'badge-success':ligne.statut==='facturee'?'badge-info':annulee?'badge-error':'badge-warning'}`}>{ligne.statut==='a_facturer'?'À facturer':ligne.statut==='facturee'?'Facturée':ligne.statut==='payee'?'Payée':'Annulée'}{ligne.facture_numero?` · ${ligne.facture_numero}`:''}</span>
+                  <div style={{display:'flex',gap:6,justifyContent:'flex-end',flexWrap:'wrap'}}>{ligne.statut==='a_facturer'&&<><Button size="sm" variant="ghost" onClick={()=>{setEditingFacturationId(ligne.id);setFactureForm({libelle:ligne.libelle,montant_ht:String(ligne.montant_ht),taux_tva:String(ligne.taux_tva),declencheur:ligne.declencheur})}}>Éditer</Button><Button size="sm" variant="secondary" onClick={()=>genererFactureEcheance(ligne)} disabled={factureSaving}><Receipt size={13}/> Facturer</Button></>}{ligne.statut==='facturee' && <Button size="sm" variant="secondary" onClick={()=>renvoyerFactureParEmail(ligne)} disabled={factureSaving}>{ligne.email_envoye_at?'Renvoyer l’e-mail':'Envoyer par e-mail'}</Button>}{!annulee&&<Button size="sm" variant="ghost" onClick={()=>supprimerEcheanceFacturation(ligne)}>{ligne.statut==='a_facturer'?'Supprimer':'Annuler'}</Button>}</div>{ligne.email_erreur && <div className="text-xs" style={{gridColumn:'1 / -1',color:'#b91c1c'}}>{ligne.email_erreur}</div>}
                 </div>})}
-                <div style={{display:'flex',justifyContent:'space-between',paddingTop:8,fontWeight:700}}><span>Total échéances</span><span>{euro(facturation.reduce((s,x)=>s+Number(x.montant_ht||0),0))} HT</span></div>
+                <div style={{display:'flex',justifyContent:'space-between',paddingTop:8,fontWeight:700}}><span>Total des échéances non annulées</span><span>{euro(facturation.filter(x=>x.statut!=='annulee').reduce((s,x)=>s+Number(x.montant_ht||0),0))} HT</span></div>
               </div>}
             </div>}
 

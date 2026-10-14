@@ -5,9 +5,15 @@ import { DashboardPage } from './pages/DashboardPage'
 import { ProspectsPage } from './pages/ProspectsPage'
 import { VisitesPage } from './pages/VisitesPage'
 import { SimulationsPage } from './pages/SimulationsPage'
+import { AidesSimulationPage } from './pages/AidesSimulationPage'
 import { DossiersPage } from './pages/DossiersPage'
 import { PlanningPage } from './pages/PlanningPage'
 import { DocumentsPage } from './pages/DocumentsPage'
+import { FacturationPage } from './pages/FacturationPage'
+import { CourrierPage } from './pages/CourrierPage'
+import { TasksPage } from './pages/TasksPage'
+import { ProspectionPage } from './pages/ProspectionPage'
+import { FichesTechniquesPage } from './pages/FichesTechniquesPage'
 import { CataloguePage } from './pages/CataloguePage'
 import { DevisPage } from './pages/DevisPage'
 import { ParametresPage } from './pages/ParametresPage'
@@ -38,13 +44,20 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, { hasErr
 const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: 'Tableau de bord', subtitle: 'Vue d\'ensemble de votre activité' },
   prospects: { title: 'Prospects', subtitle: 'Gérez vos contacts et prospects' },
+  prospection: { title: 'Prospection', subtitle: 'Import et suivi des contacts à prospecter' },
+  pipeline: { title: 'Pipeline commercial', subtitle: 'Visualisez les étapes de votre portefeuille de prospects' },
+  a_traiter: { title: 'À traiter', subtitle: 'Appels, relances, rendez-vous et actions commerciales' },
+  courrier: { title: 'Mon courrier', subtitle: 'Connexion Gmail professionnelle à configurer' },
+  facturation: { title: 'Facturation client', subtitle: 'Acomptes, démarrage du chantier et soldes' },
   visites: { title: 'Visites techniques', subtitle: 'Audits énergétiques sur site' },
-  simulations: { title: 'Simulations 3CL', subtitle: 'Calculs DPE et aides financières' },
+  simulations: { title: 'Simulation des aides', subtitle: 'Estimez les aides mobilisables pour un prospect' },
+  resultats_3cl: { title: 'Résultats 3CL', subtitle: 'Historique des calculs issus des visites techniques' },
   dossiers: { title: 'Dossiers', subtitle: 'Suivi des dossiers de rénovation' },
   devis: { title: 'Devis', subtitle: 'Devis clients et aides mobilisables' },
   catalogue: { title: 'Catalogue produits', subtitle: 'Vos produits et prestations' },
   planning: { title: 'Planning', subtitle: 'Calendrier des visites et RDV' },
-  documents: { title: 'Documents', subtitle: 'Gestion documentaire' },
+  documents: { title: 'Documents & archives', subtitle: 'Documents généraux et pièces jointes des dossiers' },
+  fiches_techniques: { title: 'Fiches techniques', subtitle: 'Fiches produits et opérations CEE — particuliers et professionnels' },
   parametres: { title: 'Paramètres', subtitle: 'Configuration de l\'application' },
   activite: { title: 'Historique & activité', subtitle: 'Flux centralisé des échanges' },
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
@@ -67,6 +80,7 @@ function AppContent() {
   const [pendingVisiteProspectId, setPendingVisiteProspectId] = useState<string | null>(null)
   const [pendingDevisProspectId, setPendingDevisProspectId] = useState<string | null>(null)
   const [pendingDossierProspectId, setPendingDossierProspectId] = useState<string | null>(null)
+  const [pendingSimulationProspectId, setPendingSimulationProspectId] = useState<string | null>(null)
   const [notifRefresh, setNotifRefresh] = useState(0)
 
   const navigate = useCallback((p: PageKey) => setPage(p), [])
@@ -78,8 +92,8 @@ function AppContent() {
     if (target === 'visite') setPendingVisiteProspectId(prospect.id)
     if (target === 'devis') setPendingDevisProspectId(prospect.id)
     if (target === 'dossier') setPendingDossierProspectId(prospect.id)
-    // Les simulations 3CL sont produites depuis l'assistant de visite technique (pas de création
-    // autonome) : on ouvre simplement la liste, qui affichera celle déjà liée au prospect.
+    if (target === 'simulation') setPendingSimulationProspectId(prospect.id)
+    // La simulation d'aides est préremplie avec le prospect choisi ; les résultats 3CL restent archivés séparément.
     setPage(target === 'visite' ? 'visites' : target === 'devis' ? 'devis' : target === 'dossier' ? 'dossiers' : 'simulations')
   }, [])
 
@@ -127,8 +141,10 @@ function AppContent() {
         <Topbar title={pageTitle.title} subtitle={pageTitle.subtitle} onNavigate={navigate} refreshKey={notifRefresh} />
         <div className="page-scroll">
           {page === 'dashboard' && <DashboardPage onNavigate={navigate} />}
-          {page === 'prospects' && <ProspectsPage onContinueLifecycle={continuerCycleProspect} />}
-          {page === 'simulations' && <SimulationsPage onNavigateToDevis={goToDevis} />}
+          {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} />}
+          {page === 'prospection' && <ProspectionPage />}
+          {page === 'simulations' && <AidesSimulationPage initialProspectId={pendingSimulationProspectId} onInitialProspectHandled={() => setPendingSimulationProspectId(null)} />}
+          {page === 'resultats_3cl' && <SimulationsPage onNavigateToDevis={goToDevis} />}
           {page === 'dossiers' && (
             <DossiersPage
               initialProspectId={pendingDossierProspectId}
@@ -146,11 +162,15 @@ function AppContent() {
           {page === 'catalogue' && <CataloguePage />}
           {page === 'planning' && <PlanningPage />}
           {page === 'documents' && <DocumentsPage />}
+          {page === 'courrier' && <CourrierPage />}
+          {page === 'facturation' && <FacturationPage />}
+          {page === 'a_traiter' && <TasksPage />}
+          {page === 'fiches_techniques' && <FichesTechniquesPage />}
           {page === 'parametres' && <ParametresPage />}
           {page === 'activite' && <ActivitePage />}
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
-          {page === 'partenaires' && (profile?.role === 'admin' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
+          {page === 'partenaires' && (profile?.role === 'admin' || profile?.role === 'manager' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'performance' && (profile?.role === 'admin' || profile?.role === 'manager') ? <PerformancePage /> : null}
           {page === 'sante_systeme' && <SystemHealthPage />}
         </div>

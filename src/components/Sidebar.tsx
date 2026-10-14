@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck,
+  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -18,37 +18,39 @@ interface SidebarProps {
 }
 
 const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = (prospectCount) => [
-  {
-    label: 'Pilotage',
-    items: [
-      { key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
-      { key: 'prospects', label: 'Prospects', icon: Users, badge: prospectCount },
-      { key: 'visites', label: 'Visites techniques', icon: ClipboardCheck },
-      { key: 'activite', label: 'Historique & activité', icon: History },
-    ],
-  },
-  {
-    label: 'Opérations',
-    items: [
-      { key: 'simulations', label: 'Simulations 3CL', icon: Calculator },
-      { key: 'devis', label: 'Devis', icon: FileSignature },
-      { key: 'dossiers', label: 'Dossiers', icon: FolderOpen },
-      { key: 'planning', label: 'Planning', icon: Calendar },
-      { key: 'documents', label: 'Documents', icon: FileText },
-      { key: 'suivi_chantier', label: 'Suivi chantier', icon: HardHat },
-      { key: 'commissions', label: 'Commissions', icon: Wallet },
-      { key: 'partenaires', label: 'Partenaires', icon: Building2 },
-      { key: 'performance', label: 'Performance & CA', icon: BarChart3 },
-    ],
-  },
-  {
-    label: 'Système',
-    items: [
-      { key: 'catalogue', label: 'Catalogue produits', icon: Package },
-      { key: 'parametres', label: 'Paramètres', icon: Settings },
-      { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
-    ],
-  },
+  { label: 'Accueil', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
+  { label: 'Ma Journée', items: [
+    { key: 'a_traiter', label: 'À traiter', icon: ClipboardCheck },
+    { key: 'planning', label: 'Agenda ', icon: Calendar },
+    { key: 'courrier', label: 'Mon courrier', icon: Mail },
+  ] },
+  { label: 'Ventes', items: [
+    { key: 'prospects', label: 'Prospects', icon: Users, badge: prospectCount },
+    { key: 'devis', label: 'Devis', icon: FileSignature },
+    { key: 'dossiers', label: 'Dossiers CEE', icon: FolderOpen },
+    { key: 'simulations', label: 'Simulation des aides', icon: Calculator },
+    { key: 'facturation', label: 'Facturation client', icon: Receipt },
+    { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
+    { key: 'prospection', label: 'Prospection', icon: PhoneCall },
+  ] },
+  { label: 'Terrain', items: [
+    { key: 'visites', label: 'Visite technique', icon: ClipboardCheck },
+    { key: 'suivi_chantier', label: 'Suivi chantier', icon: HardHat },
+  ] },
+  { label: 'Suivi', items: [
+    { key: 'commissions', label: 'Commissions', icon: Wallet },
+    { key: 'partenaires', label: 'Mon réseau', icon: Building2 },
+    { key: 'performance', label: 'Performances & CA', icon: BarChart3 },
+    { key: 'activite', label: 'Historique & activités', icon: History },
+    { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
+  ] },
+  { label: 'Système', items: [
+    { key: 'catalogue', label: 'Catalogue produits', icon: Package },
+    { key: 'fiches_techniques', label: 'Fiches techniques', icon: BookOpen },
+    { key: 'documents', label: 'Documents & archives', icon: FileText },
+    { key: 'parametres', label: 'Paramètres', icon: Settings },
+    { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
+  ] },
 ]
 
 export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge, prospectsBadge }: SidebarProps) {
@@ -98,7 +100,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
               return (
                 <button
                   key={item.key}
-                  className={`sidebar-item ${current === item.key ? 'active' : ''}`}
+                  className={`sidebar-item ${current === item.key || (current === 'a_traiter' && item.key === 'a_traiter') ? 'active' : ''}`}
                   onClick={() => onNavigate(item.key)}
                   title={collapsed ? item.label : undefined}
                 >

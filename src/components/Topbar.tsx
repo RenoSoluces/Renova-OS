@@ -1,4 +1,4 @@
-import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download } from 'lucide-react'
+import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download, Users, FolderOpen } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -17,6 +17,8 @@ const ICONS: Record<string, any> = {
   relance_devis: FileWarning,
   tache_retard: Clock,
   vt_a_qualifier: ClipboardCheck,
+  nouveau_prospect: Users,
+  evolution_dossier: FolderOpen,
   info: Info,
 }
 
@@ -95,6 +97,7 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
       setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, lue: true } : x))
     }
     if (n.type === 'vt_a_qualifier' && n.visite_id) onNavigate?.('visites')
+    else if (n.dossier_id) onNavigate?.('dossiers')
     else if (n.devis_id) onNavigate?.('devis')
     else if (n.prospect_id) onNavigate?.('prospects')
     setNotifOpen(false)
