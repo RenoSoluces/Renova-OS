@@ -920,7 +920,7 @@ export function DossiersPage({
                   <th>Prospect</th>
                   <th>Statut</th>
                   <th>CA (devis TTC)</th>
-                  <th>Commission société</th>
+                  {isAdmin && <th>Commission société</th>}
                   <th>Commission commerciale</th>
                 </tr>
               </thead>
@@ -962,13 +962,15 @@ export function DossiersPage({
                         {euro(d.montant_total)}
                       </td>
 
-                      <td>
-                        <strong>
-                          {commission
-                            ? euro(commission.montant_societe)
-                            : '—'}
-                        </strong>
-                      </td>
+                      {isAdmin && (
+                        <td>
+                          <strong>
+                            {commission
+                              ? euro(commission.montant_societe)
+                              : '—'}
+                          </strong>
+                        </td>
+                      )}
 
                       <td>
                         <strong>
@@ -1221,20 +1223,22 @@ export function DossiersPage({
                   </div>
                 </div>
 
-                <div>
-                  <div
-                    className="text-sm text-muted"
-                    style={{ marginBottom: 5 }}
-                  >
-                    Commission société
-                  </div>
+                {isAdmin && (
+                  <div>
+                    <div
+                      className="text-sm text-muted"
+                      style={{ marginBottom: 5 }}
+                    >
+                      Commission société
+                    </div>
 
-                  <div className="font-semibold" style={{ fontSize: 16 }}>
-                    {detail.devis_id && commissionsParDevis[detail.devis_id]
-                      ? euro(commissionsParDevis[detail.devis_id].montant_societe)
-                      : '—'}
+                    <div className="font-semibold" style={{ fontSize: 16 }}>
+                      {detail.devis_id && commissionsParDevis[detail.devis_id]
+                        ? euro(commissionsParDevis[detail.devis_id].montant_societe)
+                        : '—'}
+                    </div>
                   </div>
-                </div>
+                )}
 
                 <div>
                   <div
