@@ -3,6 +3,8 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Transpile le JavaScript pour Safari/iPadOS plus anciens.
+  build: { target: 'safari13' },
   plugins: [
     react(),
     VitePWA({
@@ -27,6 +29,9 @@ export default defineConfig({
         ],
       },
       workbox: {
+        cleanupOutdatedCaches: true,
+        clientsClaim: true,
+        skipWaiting: true,
         // On ne met en cache que les fichiers statiques (JS/CSS/images).
         // Les appels Supabase (API/data) ne sont jamais mis en cache : on veut
         // toujours des données fraîches, jamais une version périmée des dossiers clients.

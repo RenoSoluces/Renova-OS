@@ -18,7 +18,22 @@
     <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div id="startup-fallback" style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;font-family:system-ui,-apple-system,BlinkMacSystemFont,sans-serif;color:#18352b;background:#f6f8f7;text-align:center">
+        <div style="max-width:420px">
+          <div style="font-size:22px;font-weight:700;margin-bottom:12px">Renova OS</div>
+          <div id="startup-message">Chargement de l’application…</div>
+        </div>
+      </div>
+    </div>
+    <script>
+      window.setTimeout(function () {
+        if (!document.documentElement.dataset.renovaStarted) {
+          var message = document.getElementById('startup-message');
+          if (message) message.innerHTML = 'Le chargement de Renova OS semble bloqué par le navigateur. Vérifiez votre connexion, puis rechargez la page. Si le problème persiste sur iPad, fermez l’onglet et rouvrez l’application depuis Safari.';
+        }
+      }, 10000);
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

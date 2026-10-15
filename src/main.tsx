@@ -1,3 +1,4 @@
+import './lib/compat'
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/reset.css'
@@ -16,7 +17,9 @@ import { registerSW } from 'virtual:pwa-register'
 
 // Met à jour automatiquement l'appli en arrière-plan dès qu'une nouvelle
 // version est déployée (pas besoin de désinstaller/réinstaller).
-registerSW({ immediate: true })
+registerSW({ immediate: true, onRegisterError(error) { console.error('[RENOVA OS] Enregistrement du service worker impossible :', error) } })
+
+document.documentElement.dataset.renovaStarted = 'true'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

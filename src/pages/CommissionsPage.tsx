@@ -122,6 +122,11 @@ export function CommissionsPage() {
   const [echeanceSaving, setEcheanceSaving] = useState(false)
   const [echeanceForm, setEcheanceForm] = useState({ libelle: '', montant: '', date_prevue: '' })
 
+  const [editCommission, setEditCommission] = useState<CommissionWithCommercial | null>(null)
+  const [editAmounts, setEditAmounts] = useState({ montant_commercial: '', montant_societe: '' })
+  const [editReason, setEditReason] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
+
   const [search, setSearch] = useState('')
   const [commercialFilter, setCommercialFilter] =
     useState('all')
@@ -560,6 +565,49 @@ export function CommissionsPage() {
     const { error } = await supabase.from('commission_echeances').delete().eq('id', e.id)
     if (error) { alert(`Erreur suppression : ${error.message}`); return }
     setEcheances(prev => prev.filter(x => x.id !== e.id)); load()
+  }
+
+  function openCommissionEdit(c: CommissionWithCommercial) {
+    setEditCommission(c)
+    setEditAmounts({
+      montant_commercial: String(c.montant_commercial ?? 0),
+      montant_societe: String(c.montant_societe ?? 0),
+    })
+    setEditReason('')
+  }
+
+  async function saveCommissionEdit() {
+    if (!editCommission || !admin || editSaving) return
+
+    const commercial = Number(editAmounts.montant_commercial)
+    const societe = Number(editAmounts.montant_societe)
+
+    if (!Number.isFinite(commercial) || !Number.isFinite(societe) || commercial < 0 || societe < 0) {
+      alert('Les deux montants doivent être positifs ou nuls.')
+      return
+    }
+    if (!editReason.trim()) {
+      alert('Indique le motif de la correction.')
+      return
+    }
+
+    setEditSaving(true)
+    try {
+      const { error } = await supabase.rpc('ajuster_commission', {
+        p_commission_id: editCommission.id,
+        p_montant_commercial: commercial,
+        p_montant_societe: societe,
+        p_motif: editReason.trim(),
+      })
+      if (error) {
+        alert(`Modification impossible : ${error.message}`)
+        return
+      }
+      setEditCommission(null)
+      await load()
+    } finally {
+      setEditSaving(false)
+    }
   }
 
   async function savePayment() {
@@ -1369,6 +1417,14 @@ export function CommissionsPage() {
                                 </Button>
                               )}
 
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => openCommissionEdit(c)}
+                              >
+                                <Pencil size={14} /> Modifier les montants
+                              </Button>
+
                               <Button variant="ghost" size="sm" onClick={() => openEcheances(c, 'commercial')}>Échéancier commercial</Button>
 
                               <Button
@@ -1997,6 +2053,57 @@ export function CommissionsPage() {
             ]}
           />
         </div>
+      </Modal>
+
+      <Modal
+        open={!!editCommission}
+        onClose={() => {
+          if (!editSaving) setEditCommission(null)
+        }}
+        title="Modifier les montants de commission"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setEditCommission(null)} disabled={editSaving}>
+              Annuler
+            </Button>
+            <Button variant="primary" onClick={saveCommissionEdit} disabled={editSaving}>
+              {editSaving ? 'Enregistrement…' : 'Enregistrer'}
+            </Button>
+          </>
+        }
+      >
+        <p className="text-sm text-muted">{editCommission?.libelle || 'Commission'}</p>
+        <div style={{ marginTop: 16 }}>
+          <FloatInput
+            label="Commission commerciale (€)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={editAmounts.montant_commercial}
+            onChange={v => setEditAmounts(current => ({ ...current, montant_commercial: v }))}
+          />
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <FloatInput
+            label="Commission Reno Soluces (€)"
+            type="number"
+            min="0"
+            step="0.01"
+            value={editAmounts.montant_societe}
+            onChange={v => setEditAmounts(current => ({ ...current, montant_societe: v }))}
+          />
+        </div>
+        <div style={{ marginTop: 16 }}>
+          <FloatInput
+            label="Motif obligatoire"
+            value={editReason}
+            onChange={setEditReason}
+            placeholder="Ex. : correction pour 2 monosplits"
+          />
+        </div>
+        <p className="text-sm text-muted" style={{ marginTop: 12 }}>
+          Les paiements déjà enregistrés sont conservés. La correction est refusée si le montant déjà payé dépasse le nouveau total.
+        </p>
       </Modal>
 
       <Modal
