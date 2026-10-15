@@ -67,8 +67,8 @@ export function DossiersPage({
   onInitialProspectHandled,
 }: DossiersPageProps = {}) {
   const { profile } = useAuth()
-  const isAdmin =
-    profile?.role === 'admin' || profile?.role === 'manager'
+  const role = String(profile?.role || '').trim().toLowerCase()
+  const isAdmin = role === 'admin' || role === 'manager'
 
   const [rows, setRows] = useState<DossierAvecRelations[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -123,31 +123,31 @@ export function DossiersPage({
 
     // La commission d'un dossier est celle générée automatiquement (barème)
     // au moment de la signature du devis qui lui est associé.
-    supabase
-      .from('commissions')
-      .select('reference_id, montant_commercial, montant_societe')
-      .eq('reference_type', 'devis')
-      .then(({ data, error }) => {
-        if (error) {
-          console.error('Erreur chargement commissions des dossiers:', error)
-          return
+    // Ne jamais charger le montant société dans la session d'un commercial.
+    const chargerCommissions = async () => {
+      const result = isAdmin
+        ? await supabase.from('commissions').select('reference_id, montant_commercial, montant_societe').eq('reference_type', 'devis')
+        : await supabase.from('commissions').select('reference_id, montant_commercial').eq('reference_type', 'devis')
+      const { data, error } = result
+      if (error) {
+        console.error('Erreur chargement commissions des dossiers:', error)
+        return
+      }
+      const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
+      for (const c of data || []) {
+        if (!c.reference_id) continue
+        map[c.reference_id] = {
+          montant_commercial: Number(c.montant_commercial) || 0,
+          montant_societe: isAdmin && 'montant_societe' in c ? Number(c.montant_societe) || 0 : 0,
         }
-
-        const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
-
-        for (const c of data || []) {
-          if (!c.reference_id) continue
-          map[c.reference_id] = {
-            montant_commercial: Number(c.montant_commercial) || 0,
-            montant_societe: Number(c.montant_societe) || 0,
-          }
-        }
-
-        setCommissionsParDevis(map)
-      })
+      }
+      setCommissionsParDevis(map)
+    }
+    void chargerCommissions()
   }
 
   useEffect(() => {
+    if (!profile) return
     fetchListe()
 
     supabase
@@ -157,7 +157,7 @@ export function DossiersPage({
       .then(({ data }) => {
         setProspects((data || []) as Prospect[])
       })
-  }, [])
+  }, [profile?.id, profile?.role])
 
   useEffect(() => {
     if (!newProspectId) {

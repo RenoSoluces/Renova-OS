@@ -189,7 +189,7 @@ Deno.serve(async (req: Request) => {
                 <tr>
                   <td align="center" style="padding:28px 24px;background:#ffffff;border-bottom:3px solid #e8a23a;">
                     <img
-                      src="https://renova-os.netlify.app/Logo%20RenoSoluces.png"
+                      src="https://www.renosoluces.fr/Logo%20RenoSoluces.png"
                       alt="Reno Soluces"
                       width="210"
                       style="display:block;width:210px;max-width:100%;height:auto;border:0;"

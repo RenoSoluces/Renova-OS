@@ -26,6 +26,7 @@ export interface Prospect {
   categorie_mpr: string | null
   statut_occupation: string
   fiches_cee: string[]
+  produits_interesses?: string[]
   zone_ile_de_france: boolean
   commercial: string | null
   commercial_id: string | null
