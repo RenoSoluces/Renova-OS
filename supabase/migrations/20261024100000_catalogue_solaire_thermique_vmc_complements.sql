@@ -1314,4 +1314,22 @@ $products$::jsonb)
   END LOOP;
 
   RAISE NOTICE 'Compléments solaire thermique / SSC / VMC : % ajout(s), % mise(s) à jour', v_ajoutes, v_maj;
-END $$;
+END $;
+
+-- Classement des sous-catégories de Production d’électricité.
+-- Les kits photovoltaïques intégrant une batterie restent des kits PV ; seuls les produits
+-- de stockage autonomes sont déplacés vers batterie_stockage.
+UPDATE public.catalogue_produits
+SET categorie = 'batterie_stockage'
+WHERE entreprise_id = (SELECT id FROM public.entreprises ORDER BY created_at LIMIT 1)
+  AND (
+    reference IN ('BAT-512-MONO', 'BAT-1024-MONO', 'BAT-1024-TRI', 'RENON-512-ADD')
+    OR (categorie = 'photovoltaique' AND lower(coalesce(nom,'')) LIKE 'stockage batterie%')
+  );
+
+-- Les accessoires de pilotage énergétique Comwatt sont rangés dans Domotique.
+UPDATE public.catalogue_produits
+SET categorie = 'domotique'
+WHERE entreprise_id = (SELECT id FROM public.entreprises ORDER BY created_at LIMIT 1)
+  AND reference IN ('COMPACT-GEN4', 'MODULE-SG-READY', 'SMARTPLUG-GEN4');
+
