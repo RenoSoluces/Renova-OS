@@ -112,7 +112,13 @@ as $
             owner_profile.manager_id = auth.uid()
           )
           or (
-            p.commercial_id is null and coalesce(p.pot_commun, false) = true
+            p.commercial_id is null
+            and coalesce(p.pot_commun, false) = true
+            and exists (
+              select 1 from public.organisations o
+              where o.id = public.current_organisation_id()
+                and o.type = 'interne'
+            )
           )
           or exists (
             select 1 from public.prospect_shares s
@@ -230,8 +236,12 @@ with check (
   or (
     commercial_id is null and coalesce(pot_commun, false) = true
     and exists (
-      select 1 from public.profiles me
-      where me.id = auth.uid() and me.role in ('admin', 'manager', 'commercial_manager')
+      select 1
+      from public.profiles me
+      join public.organisations o on o.id = me.organisation_id
+      where me.id = auth.uid()
+        and o.type = 'interne'
+        and me.role in ('admin', 'manager', 'commercial_manager', 'commercial')
     )
   )
 );
