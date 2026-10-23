@@ -195,9 +195,24 @@ export function genererDevisPDF(
   sectionText("Données personnelles",`Les données sont utilisées pour établir et exécuter le devis et gérer la relation client. Le client peut exercer les droits prévus par la réglementation relative aux données personnelles auprès de l’entreprise${email?` (${email})`:""}, et peut saisir la CNIL.`);
 
   // CGV de l'émetteur, en annexe paginée
-  const cgv=safe(devis.emetteur_cgv||entreprise?.conditions_generales_devis||"").trim();
-  if(cgv){const paragraphs=cgv.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean);doc.addPage();fil(doc,C.vert);doc.rect(0,0,PW,16,"F");doc.setFont("helvetica","bold");doc.setFontSize(11);txt(doc,C.blanc);doc.text("CONDITIONS GÉNÉRALES DE VENTE",M,10.2,{charSpace:1});y=25;
+  const cgvBrutes=safe(devis.emetteur_cgv||entreprise?.conditions_generales_devis||"").trim();
+  const matchBordereau=cgvBrutes.match(/BORDEREAU DE RÉTRACTATION/i);
+  const cgv=matchBordereau?.index!==undefined?cgvBrutes.slice(0,matchBordereau.index).trim():cgvBrutes;
+  const bordereau=matchBordereau?.index!==undefined?cgvBrutes.slice(matchBordereau.index).trim():"";
+  if(cgv){
+    const paragraphs=cgv.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean).filter(p=>!/^CONDITIONS GÉNÉRALES DE VENTE$/i.test(p));
+    doc.addPage();fil(doc,C.vert);doc.rect(0,0,PW,16,"F");doc.setFont("helvetica","bold");doc.setFontSize(11);txt(doc,C.blanc);doc.text("CONDITIONS GÉNÉRALES DE VENTE",M,10.2,{charSpace:1});y=25;
     for(const p of paragraphs){doc.setFont("helvetica",/^Article\s+\d+/i.test(p)?"bold":"normal");doc.setFontSize(8);txt(doc,/^Article\s+\d+/i.test(p)?C.vert:[60,68,63]);const rows=doc.splitTextToSize(p,W) as string[];const h=rows.length*3.7+4;if(y+h>PH-18){doc.addPage();fil(doc,C.vert);doc.rect(0,0,PW,16,"F");doc.setFont("helvetica","bold");doc.setFontSize(10);txt(doc,C.blanc);doc.text("CONDITIONS GÉNÉRALES DE VENTE (SUITE)",M,10.2);y=25;}doc.text(rows,M,y);y+=h;}
+  }
+  if(bordereau){
+    doc.addPage();const bx=M,by=30,bh=215;doc.setFont("helvetica","normal");doc.setFontSize(7.5);txt(doc,C.gris);doc.text("DÉCOUPER SUIVANT LES POINTILLÉS",M,22,{charSpace:.8});
+    drw(doc,C.gris);doc.setLineWidth(.5);doc.setLineDashPattern([2,1.5],0);doc.roundedRect(bx,by,W,bh,2,2,"S");doc.setLineDashPattern([],0);
+    doc.setFont("helvetica","bold");doc.setFontSize(14);txt(doc,C.vert);doc.text("BORDEREAU DE RÉTRACTATION",PW/2,by+14,{align:"center",charSpace:.8});
+    doc.setFont("helvetica","italic");doc.setFontSize(8);txt(doc,C.gris);doc.text("À renvoyer uniquement si vous souhaitez vous rétracter.",PW/2,by+21,{align:"center"});
+    const formLines=bordereau.replace(/^BORDEREAU DE RÉTRACTATION\s*/i,"").replace(/\(À renvoyer uniquement[^)]*\)/i,"").split(/\n+/).map(s=>s.trim()).filter(Boolean);
+    let fy=by+34;doc.setFont("helvetica","normal");doc.setFontSize(9);txt(doc,C.ink);
+    for(const line of formLines){const rows=doc.splitTextToSize(line,W-16) as string[];const blank=/[.…]{5,}/.test(line);const h=Math.max(blank?12:8,rows.length*4.5+3);if(fy+h>by+bh-10)break;doc.text(rows,bx+8,fy);if(blank){drw(doc,C.clair);doc.setLineWidth(.2);doc.line(bx+8,fy+4,bx+W-8,fy+4);}fy+=h;}
+    doc.setFont("helvetica","italic");doc.setFontSize(7);txt(doc,C.gris);doc.text("Conservez une copie de ce document.",PW/2,by+bh-7,{align:"center"});
   }
 
   // Pied de page commun
