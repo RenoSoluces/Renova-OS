@@ -35,7 +35,6 @@ export interface Prospect {
   pot_commun_at?: string | null
   pot_commun_ancien_commercial?: string | null
   tags: string[]
-  montant_potentiel: number | null
   temperature: 'chaud' | 'tiede' | 'froid' | null
   derniere_interaction_at: string | null
   // Prospects professionnels (personne morale) — nom/prenom/email/telephone restent
