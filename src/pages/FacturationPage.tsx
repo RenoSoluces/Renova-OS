@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Download, Mail, Plus, Receipt, XCircle } from 'lucide-react'
-import { jsPDF } from 'jspdf'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { genererFacturePDF } from '../lib/pdf/genererFacturePDF'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import type { Devis, DevisLigne, Entreprise, Prospect } from '../types'
@@ -121,27 +121,20 @@ export function FacturationPage(): JSX.Element {
       const montantTva = Math.round(invoiceLines.reduce((sum,line)=>sum+line.montant_ht*line.taux_tva/100,0)*100)/100
       const ttc = Math.round((ht+montantTva)*100)/100
       const tauxMoyen = ht>0 ? Math.round((montantTva/ht*100)*100)/100 : fallbackRate
-      const doc=new jsPDF()
-      const drawLine=(text:string,x:number,y:number)=>doc.text(doc.splitTextToSize(text,174),x,y)
-      doc.setFont('helvetica','bold');doc.setFontSize(18);doc.text(company?.raison_sociale||'Reno Soluces',18,22)
-      doc.setFont('helvetica','normal');doc.setFontSize(9)
-      let y=30
-      for(const value of [company?.forme_juridique,company?.adresse,[company?.code_postal,company?.ville].filter(Boolean).join(' '),company?.telephone,company?.email,company?.siret?`SIRET : ${company.siret}`:'',company?.numero_tva?`TVA : ${company.numero_tva}`:''].filter(Boolean)){doc.text(String(value),18,y);y+=5}
-      doc.setFont('helvetica','bold');doc.setFontSize(19);doc.text('FACTURE CLIENT',135,22)
-      doc.setFont('helvetica','normal');doc.setFontSize(10);doc.text(`N° ${numero}`,135,31);doc.text(`Date : ${now.toLocaleDateString('fr-FR')}`,135,37)
-      doc.line(18,65,192,65);doc.setFont('helvetica','bold');doc.text('CLIENT',18,76);doc.setFont('helvetica','normal')
-      let cy=84
-      for(const value of [`${client.prenom||''} ${client.nom||''}`.trim(),client.raison_sociale,client.adresse_rue||client.adresse,[client.code_postal,client.ville].filter(Boolean).join(' '),client.email,client.telephone].filter(Boolean)){doc.text(String(value),18,cy);cy+=5}
-      doc.setFont('helvetica','bold');doc.text('DÉTAIL',18,124);doc.setFont('helvetica','normal');doc.text('Désignation',18,134);doc.text('Montant HT',145,134);doc.line(18,138,192,138)
-      let lineY=147
-      for(const line of invoiceLines){
-        const descriptionLines=doc.splitTextToSize(line.designation,115)
-        if(lineY>225){doc.addPage();lineY=24;doc.setFont('helvetica','bold');doc.text(`Facture ${numero} — suite`,18,lineY);lineY+=12;doc.setFont('helvetica','normal')}
-        doc.text(descriptionLines,18,lineY);doc.text(euro(line.montant_ht),145,lineY);lineY+=Math.max(8,descriptionLines.length*5)
-      }
-      lineY+=6;if(lineY>220){doc.addPage();lineY=24;doc.setFont('helvetica','bold');doc.text(`Facture ${numero} — récapitulatif`,18,lineY);lineY+=12;doc.setFont('helvetica','normal')}doc.line(18,lineY-4,192,lineY-4);doc.setFont('helvetica','bold');doc.text('Total HT',130,lineY+4);doc.text(euro(ht),165,lineY+4);doc.text('TVA',130,lineY+12);doc.text(euro(montantTva),165,lineY+12);doc.setFontSize(12);doc.text('TOTAL TTC',130,lineY+24);doc.text(euro(ttc),165,lineY+24)
-      doc.setFont('helvetica','normal');doc.setFontSize(9);doc.text(`Nature : ${TYPE_LABEL[typeFacture]}.`,18,lineY+24);doc.text(`Échéance : ${dateEcheance?new Date(`${dateEcheance}T12:00:00`).toLocaleDateString('fr-FR'):'selon les conditions du devis'}.`,18,lineY+32)
-      const legalY=Math.min(242,lineY+38);doc.setFont('helvetica','normal');doc.setFontSize(8);drawLine(`Conditions de paiement : ${company?.conditions_paiement_defaut||devisSelectionne.conditions_paiement||'Selon le devis signé'}`,18,legalY);drawLine(`Pénalités de retard : ${company?.taux_penalite_retard||'3 fois le taux d’intérêt légal'}. Escompte : ${company?.escompte_defaut||'Néant'}.`,18,legalY+7);if(client.type_prospect==='professionnel')doc.text('Indemnité forfaitaire pour frais de recouvrement : 40 €.',18,legalY+14);if(company?.banque||company?.iban||company?.bic){const bankY=Math.min(268,legalY+24);doc.setFont('helvetica','bold');doc.text('COORDONNÉES BANCAIRES',18,bankY);doc.setFont('helvetica','normal');doc.text(`Banque : ${company?.banque||'—'}`,18,bankY+7);doc.text(`IBAN : ${company?.iban||'—'}`,18,bankY+14);doc.text(`BIC : ${company?.bic||'—'}`,18,bankY+21)}
+      const doc=genererFacturePDF({
+        numero,
+        dateEmission: now,
+        dateEcheance,
+        typeLabel: TYPE_LABEL[typeFacture] || typeFacture,
+        libelle: libelle.trim(),
+        montantHt: ht,
+        montantTva,
+        montantTtc: ttc,
+        lignes: invoiceLines,
+        devis: devisSelectionne,
+        client,
+        entreprise: company,
+      })
       const blob=doc.output('blob');doc.save(`${numero}.pdf`)
       const {document:stored,path,error:uploadError}=await uploadDocument(new File([blob],`${numero}.pdf`,{type:'application/pdf'}),{dossierId:devisSelectionne.dossier_id||null,prospectId:client.id,categorie:'Factures clients',type:'pdf'})
       if(uploadError||!stored||!path)throw new Error(`PDF généré, mais archivage impossible : ${uploadError||'chemin manquant'}`)
