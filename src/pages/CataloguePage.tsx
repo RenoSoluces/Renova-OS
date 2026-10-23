@@ -231,7 +231,12 @@ export function CataloguePage() {
     if (!error && data) setCategoriesPersonnalisees(data as CategoriePersonnalisee[])
   }
 
-  const categoriesAffichees = [...CATEGORIES, ...categoriesPersonnalisees.map(c => ({ value: c.slug, label: c.nom, public_cible: c.public_cible, catalogue_groupe: c.catalogue_groupe || c.public_cible }))]
+  // Les catégories de produits présentes en base doivent rester accessibles même si
+  // une catégorie a été ajoutée/importée sans définition statique dans le code.
+  const categoriesConnues = new Set([...CATEGORIES.map(c => c.value), ...categoriesPersonnalisees.map(c => c.slug)])
+  const categoriesProduitsManquantes = [...new Set(rows.map(p => String(p.categorie || '').trim()).filter(value => value && !categoriesConnues.has(value)))]
+    .map(value => ({ value, label: value === 'vmc' ? 'VMC' : value === 'ssc' ? 'Système solaire combiné (SSC) — BAR-TH-143' : value.replace(/_/g, ' ').replace(/^./, s => s.toUpperCase()) }))
+  const categoriesAffichees = [...CATEGORIES, ...categoriesPersonnalisees.map(c => ({ value: c.slug, label: c.nom, public_cible: c.public_cible, catalogue_groupe: c.catalogue_groupe || c.public_cible })), ...categoriesProduitsManquantes]
   const categorieCompatibleGroupe = (c: any, groupe: GroupeCatalogue) => {
     if (c.catalogue_groupe) return c.catalogue_groupe === groupe
     if (['vt_complete','vt_produit','vt_diagnostic_3cl'].includes(c.value)) return groupe === 'visite_technique'
