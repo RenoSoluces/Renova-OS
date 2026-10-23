@@ -9,6 +9,7 @@ export function ProspectShareControl({ prospectId }: { prospectId: string }) {
   const [organisations, setOrganisations] = useState<Organisation[]>([])
   const [sharedIds, setSharedIds] = useState<string[]>([])
   const [selectedId, setSelectedId] = useState('')
+  const [newOrganisationName, setNewOrganisationName] = useState('')
   const [loading, setLoading] = useState(false)
   const [message, setMessage] = useState('')
 
@@ -22,6 +23,21 @@ export function ProspectShareControl({ prospectId }: { prospectId: string }) {
   }
 
   useEffect(() => { void load() }, [prospectId])
+
+  async function createOrganisation() {
+    const nom = newOrganisationName.trim()
+    if (!nom) return
+    setLoading(true)
+    setMessage('')
+    const { error } = await supabase.from('organisations').insert({ nom, type: 'partenaire', actif: true })
+    if (error) setMessage(error.code === '23505' ? 'Une organisation porte déjà ce nom.' : 'Impossible de créer le partenaire.')
+    else {
+      setNewOrganisationName('')
+      setMessage('Organisation partenaire créée. Le compte du partenaire devra être invité séparément.')
+      await load()
+    }
+    setLoading(false)
+  }
 
   async function share() {
     if (!selectedId) return
@@ -57,6 +73,16 @@ export function ProspectShareControl({ prospectId }: { prospectId: string }) {
   return (
     <div className="right-mini-section">
       <div className="right-mini-section-label"><Share2 size={14} style={{ verticalAlign: 'middle', marginRight: 6 }} />Partager avec un partenaire</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 8 }}>
+        <input
+          className="pipeline-inline-input"
+          value={newOrganisationName}
+          onChange={e => setNewOrganisationName(e.target.value)}
+          placeholder="Nom du nouveau partenaire"
+          aria-label="Nom du nouveau partenaire"
+        />
+        <Button variant="ghost" onClick={createOrganisation} disabled={!newOrganisationName.trim() || loading}>Créer</Button>
+      </div>
       {organisations.length === 0 ? (
         <div className="text-xs text-muted">Aucune organisation partenaire n’est encore créée.</div>
       ) : (
