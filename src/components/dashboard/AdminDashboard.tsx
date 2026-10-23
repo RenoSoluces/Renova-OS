@@ -28,7 +28,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
         supabase.from('prospects').select('*').order('created_at',{ascending:false}),
         supabase.from('devis').select('*').order('created_at',{ascending:false}),
         supabase.from('dossiers').select('*').order('created_at',{ascending:false}),
-        supabase.from('commissions').select('*, commercial:profiles(id, nom_complet, couleur)').order('date_generation',{ascending:false}),
+        supabase.from('commissions_safe').select('*').order('date_generation',{ascending:false}),
         supabase.from('installateurs').select('*').eq('actif',true).order('nom'),
         supabase.from('commission_bareme').select('*').eq('actif',true),
         supabase.from('devis_lignes').select('id,devis_id,produit_id,montant_ht,ordre'),
