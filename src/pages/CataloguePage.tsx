@@ -184,6 +184,9 @@ function emptyForm(): FormState {
   }
 }
 
+/** Catégories rangées par marque (filtre « Marque » affiché). */
+const CATEGORIES_FILTRE_MARQUE = ['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'ballon_thermodynamique', 'photovoltaique', 'pro_photovoltaique']
+
 export function CataloguePage() {
   const { profile } = useAuth()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
@@ -406,7 +409,7 @@ export function CataloguePage() {
     .filter(r => { const g = r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier'); return g === filtrePublic })
     .filter(r => filtrePublic !== 'visite_technique' || filtreVtPublic === 'tous' || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier') === filtreVtPublic)
     .filter(r => filtreCategorie === 'toutes' ? true : r.categorie === filtreCategorie)
-    .filter(r => !['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'photovoltaique', 'pro_photovoltaique'].includes(filtreCategorie) || filtreMarque === 'toutes' || (r.marque || '').trim() === filtreMarque)
+    .filter(r => !CATEGORIES_FILTRE_MARQUE.includes(filtreCategorie) || filtreMarque === 'toutes' || (r.marque || '').trim() === filtreMarque)
     .filter(r => filtreAudit === 'aucun' || (filtreAudit === 'conformite' ? auditerProduit(r).length > 0 : auditerCommercialement(r).length > 0))
     .filter(r => {
       if (!recherche.trim()) return true
@@ -552,7 +555,7 @@ export function CataloguePage() {
         </button>
       </div>
 
-      {['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'photovoltaique', 'pro_photovoltaique'].includes(filtreCategorie) && (
+      {CATEGORIES_FILTRE_MARQUE.includes(filtreCategorie) && (
         <div className="panel" style={{ marginBottom: 14 }}>
           <div className="fam">
             <b>Filtrer par marque</b>
