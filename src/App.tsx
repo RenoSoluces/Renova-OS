@@ -67,9 +67,15 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
 }
 
+function pageFromLocation(): PageKey {
+  const match = window.location.pathname.match(/^\/app\/([^/]+)\/?$/)
+  const candidate = match?.[1] as PageKey | undefined
+  return candidate && Object.prototype.hasOwnProperty.call(PAGE_TITLES, candidate) ? candidate : 'dashboard'
+}
+
 function AppContent() {
   const { session, loading: authLoading, profile, profileError, signOut, refreshProfile } = useAuth()
-  const [page, setPage] = useState<PageKey>('dashboard')
+  const [page, setPage] = useState<PageKey>(() => pageFromLocation())
   const [collapsed, setCollapsed] = useState(false)
   const tasksBadge = useOpenTasksCount(page)
   // Devis créé depuis les recommandations de travaux d'une visite technique : on bascule
@@ -83,7 +89,26 @@ function AppContent() {
   const [pendingSimulationProspectId, setPendingSimulationProspectId] = useState<string | null>(null)
   const [notifRefresh, setNotifRefresh] = useState(0)
 
-  const navigate = useCallback((p: PageKey) => setPage(p), [])
+  const navigate = useCallback((p: PageKey) => {
+    setPage(p)
+    const nextPath = `/app/${p}`
+    if (window.location.pathname !== nextPath) window.history.pushState({ page: p }, '', nextPath)
+  }, [])
+
+  // Keep browser back/forward and direct URLs synchronized with the visible page.
+  useEffect(() => {
+    const syncPageFromUrl = () => {
+      const nextPage = pageFromLocation()
+      setPage(nextPage)
+      const canonicalPath = `/app/${nextPage}`
+      if (window.location.pathname !== canonicalPath) window.history.replaceState({ page: nextPage }, '', canonicalPath)
+    }
+    if (window.location.pathname === '/' || !/^\/app\/[^/]+\/?$/.test(window.location.pathname)) {
+      window.history.replaceState({ page }, '', `/app/${page}`)
+    }
+    window.addEventListener('popstate', syncPageFromUrl)
+    return () => window.removeEventListener('popstate', syncPageFromUrl)
+  }, [page])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
     setPage('devis')
