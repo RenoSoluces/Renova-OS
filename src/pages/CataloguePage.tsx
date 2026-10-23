@@ -43,6 +43,8 @@ const CATEGORIES = [
   { value: 'ballon_thermodynamique', label: 'Ballon thermodynamique' },
   { value: 'vmc', label: 'VMC' },
   { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
+  { value: 'batterie_stockage', label: 'Batterie de stockage' },
+  { value: 'domotique', label: 'Domotique et pilotage énergétique' },
   { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
   { value: 'ssc', label: 'Système solaire combiné (SSC) — BAR-TH-143' },
   { value: 'professionnel_cee', label: 'Professionnels — CEE', public_cible: 'professionnel' },
