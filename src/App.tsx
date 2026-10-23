@@ -103,7 +103,7 @@ function AppContent() {
       const canonicalPath = `/app/${nextPage}`
       if (window.location.pathname !== canonicalPath) window.history.replaceState({ page: nextPage }, '', canonicalPath)
     }
-    if (window.location.pathname === '/' || !/^\/app\/[^/]+\/?$/.test(window.location.pathname)) {
+    if (window.location.pathname !== `/app/${page}`) {
       window.history.replaceState({ page }, '', `/app/${page}`)
     }
     window.addEventListener('popstate', syncPageFromUrl)
@@ -214,7 +214,7 @@ function AppContent() {
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
           {page === 'partenaires' && (profile?.role === 'admin' || profile?.role === 'manager' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
-          {page === 'performance' && (profile?.role === 'admin' || profile?.role === 'manager') ? <PerformancePage /> : null}
+          {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
         </div>
       </div>
