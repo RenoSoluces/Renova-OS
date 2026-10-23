@@ -67,9 +67,15 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
 }
 
+function pageFromLocation(): PageKey {
+  const match = window.location.pathname.match(/^\/app\/([^/]+)\/?$/)
+  const candidate = match?.[1] as PageKey | undefined
+  return candidate && Object.prototype.hasOwnProperty.call(PAGE_TITLES, candidate) ? candidate : 'dashboard'
+}
+
 function AppContent() {
-  const { session, loading: authLoading, profile } = useAuth()
-  const [page, setPage] = useState<PageKey>('dashboard')
+  const { session, loading: authLoading, profile, profileError, signOut, refreshProfile } = useAuth()
+  const [page, setPage] = useState<PageKey>(() => pageFromLocation())
   const [collapsed, setCollapsed] = useState(false)
   const tasksBadge = useOpenTasksCount(page)
   // Devis créé depuis les recommandations de travaux d'une visite technique : on bascule
@@ -83,19 +89,38 @@ function AppContent() {
   const [pendingSimulationProspectId, setPendingSimulationProspectId] = useState<string | null>(null)
   const [notifRefresh, setNotifRefresh] = useState(0)
 
-  const navigate = useCallback((p: PageKey) => setPage(p), [])
+  const navigate = useCallback((p: PageKey) => {
+    setPage(p)
+    const nextPath = `/app/${p}`
+    if (window.location.pathname !== nextPath) window.history.pushState({ page: p }, '', nextPath)
+  }, [])
+
+  // Keep browser back/forward and direct URLs synchronized with the visible page.
+  useEffect(() => {
+    const syncPageFromUrl = () => {
+      const nextPage = pageFromLocation()
+      setPage(nextPage)
+      const canonicalPath = `/app/${nextPage}`
+      if (window.location.pathname !== canonicalPath) window.history.replaceState({ page: nextPage }, '', canonicalPath)
+    }
+    if (window.location.pathname !== `/app/${page}`) {
+      window.history.replaceState({ page }, '', `/app/${page}`)
+    }
+    window.addEventListener('popstate', syncPageFromUrl)
+    return () => window.removeEventListener('popstate', syncPageFromUrl)
+  }, [page])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
-    setPage('devis')
-  }, [])
+    navigate('devis')
+  }, [navigate])
   const continuerCycleProspect = useCallback((target: 'visite' | 'simulation' | 'devis' | 'dossier', prospect: { id: string }) => {
     if (target === 'visite') setPendingVisiteProspectId(prospect.id)
     if (target === 'devis') setPendingDevisProspectId(prospect.id)
     if (target === 'dossier') setPendingDossierProspectId(prospect.id)
     if (target === 'simulation') setPendingSimulationProspectId(prospect.id)
     // La simulation d'aides est préremplie avec le prospect choisi ; les résultats 3CL restent archivés séparément.
-    setPage(target === 'visite' ? 'visites' : target === 'devis' ? 'devis' : target === 'dossier' ? 'dossiers' : 'simulations')
-  }, [])
+    navigate(target === 'visite' ? 'visites' : target === 'devis' ? 'devis' : target === 'dossier' ? 'dossiers' : 'simulations')
+  }, [navigate])
 
   // Vérifie les devis sans réponse et les tâches en retard à chaque ouverture de
   // l'app (idempotent, voir lib/crm/relances.ts), puis rafraîchit la cloche de notifications.
@@ -117,6 +142,24 @@ function AppContent() {
 
   if (!session) {
     return <LoginPage />
+  }
+
+  // A valid Auth session is not enough: the database profile is required to
+  // resolve the user's role. Fail closed if it is missing or cannot be read.
+  if (!profile) {
+    return (
+      <div className="page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="card card-pad" style={{ maxWidth: 560, textAlign: 'center' }}>
+          <AlertTriangle size={28} style={{ color: 'var(--c-warning,#e8a317)', marginBottom: 12 }} />
+          <h2>Accès à Renova OS indisponible</h2>
+          <p className="text-muted">{profileError || "Votre profil n'est pas encore disponible."}</p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={() => void refreshProfile()}>Réessayer</button>
+            <button className="btn" onClick={() => void signOut()}>Se déconnecter</button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Visites page takes over the full content area (no topbar)
@@ -171,8 +214,8 @@ function AppContent() {
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
           {page === 'partenaires' && (profile?.role === 'admin' || profile?.role === 'manager' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
-          {page === 'performance' && (profile?.role === 'admin' || profile?.role === 'manager') ? <PerformancePage /> : null}
-          {page === 'sante_systeme' && <SystemHealthPage />}
+          {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
+          {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
         </div>
       </div>
     </div>

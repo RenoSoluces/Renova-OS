@@ -212,7 +212,7 @@ export function CataloguePage() {
     setLoading(true)
     supabase
       .from('catalogue_produits')
-      .select('*')
+      .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
       // Le produit générique « Isolation » est remplacé par les produits détaillés.
       .neq('nom', 'Isolation')
       .order('categorie', { ascending: true })

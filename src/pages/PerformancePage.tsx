@@ -30,10 +30,10 @@ export function PerformancePage() {
       supabase.from('dossiers').select('id,prospect_id,devis_id,installateur_id,montant_total,statut'),
       supabase.from('prospects').select('id,commercial_id,installateur_id'),
       supabase.from('devis').select('id,prospect_id,montant_ttc'),
-      supabase.from('commissions').select('id,commercial_id,montant_commercial,montant_societe,statut,date_paiement_commercial,date_paiement_societe').neq('statut','annulee'),
+      supabase.from('commissions_safe').select('id,commercial_id,montant_commercial,montant_societe,statut,date_paiement_commercial,date_paiement_societe').neq('statut','annulee'),
       supabase.from('visites').select('id,prospect_id,statut,date_visite'),
       supabase.from('dossier_facturation').select('id,dossier_id,statut'),
-      supabase.from('commissions').select('id,reference_type,reference_id,statut,date_paiement_societe').in('reference_type',['visites','planning_events']).neq('statut','annulee'),
+      supabase.from('commissions_safe').select('id,reference_type,reference_id,statut,date_paiement_societe').in('reference_type',['visites','planning_events']).neq('statut','annulee'),
     ]).then(([p, c, d, pr, dv, co, vt, df, vtCom]) => {
       setPartners((p.data || []) as Partner[])
       setCommercials((c.data || []).filter((x: Commercial) => x.role === 'commercial') as Commercial[])

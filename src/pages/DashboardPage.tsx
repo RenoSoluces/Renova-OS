@@ -115,22 +115,10 @@ export function DashboardPage({
         .limit(1)
         .maybeSingle(),
 
-      isAdmin
-        ? supabase
-            .from('commissions')
-            .select(
-              '*, commercial:profiles(id, nom_complet, couleur)',
-            )
-            .order('date_generation', { ascending: false })
-        : profile?.id
-          ? supabase
-              .from('commissions')
-              .select(
-                '*, commercial:profiles(id, nom_complet, couleur)',
-              )
-              .eq('commercial_id', profile.id)
-              .order('date_generation', { ascending: false })
-          : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from('commissions_safe')
+        .select('*')
+        .order('date_generation', { ascending: false }),
     ]).then(([p, v, d, s, a, ag, ent, com]) => {
       setProspects(p.data || [])
       setVisites((v.data || []) as any)
