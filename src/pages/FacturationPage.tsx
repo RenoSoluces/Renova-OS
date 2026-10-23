@@ -121,7 +121,7 @@ export function FacturationPage(): JSX.Element {
       const montantTva = Math.round(invoiceLines.reduce((sum,line)=>sum+line.montant_ht*line.taux_tva/100,0)*100)/100
       const ttc = Math.round((ht+montantTva)*100)/100
       const tauxMoyen = ht>0 ? Math.round((montantTva/ht*100)*100)/100 : fallbackRate
-      const doc=genererFacturePDF({
+      const doc=await genererFacturePDF({
         numero,
         dateEmission: now,
         dateEcheance,
