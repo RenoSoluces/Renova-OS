@@ -99,7 +99,7 @@ create or replace function public.prospect_visible(p_prospect_id uuid)
 returns boolean
 language sql stable security definer
 set search_path = public
-as $$
+as $
   select public.is_super_admin()
     or exists (
       select 1
@@ -129,7 +129,17 @@ as $$
           )
         )
     );
-$$;
+$;
+
+-- RLS policies need these helpers for authenticated sessions, not anonymous callers.
+revoke all on function public.is_super_admin() from public, anon;
+revoke all on function public.current_organisation_id() from public, anon;
+revoke all on function public.can_manage_profile(uuid) from public, anon;
+revoke all on function public.prospect_visible(uuid) from public, anon;
+grant execute on function public.is_super_admin() to authenticated;
+grant execute on function public.current_organisation_id() to authenticated;
+grant execute on function public.can_manage_profile(uuid) to authenticated;
+grant execute on function public.prospect_visible(uuid) to authenticated;
 
 -- An explicit share grants visibility to the receiving organisation; it does not
 -- change the prospect's original commercial_id or organisation ownership.
