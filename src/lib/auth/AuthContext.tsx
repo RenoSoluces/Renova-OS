@@ -11,6 +11,8 @@ export interface Profile {
   telephone?: string | null
   created_at: string
   objectif_mensuel?: number | null
+  organisation_id?: string | null
+  manager_id?: string | null
 }
 
 interface AuthState {
@@ -40,7 +42,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id,email,nom_complet,couleur,role,telephone,created_at,objectif_mensuel')
+        .select('id,email,nom_complet,couleur,role,telephone,created_at,objectif_mensuel,organisation_id,manager_id')
         .eq('id', userId)
         .maybeSingle()
 
