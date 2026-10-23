@@ -109,7 +109,7 @@ BEGIN
         forfait_evacuation_ht = CASE WHEN COALESCE(forfait_evacuation_ht, 0) > 0 THEN forfait_evacuation_ht ELSE COALESCE(v_dup.forfait_evacuation_ht, 0) END,
         caracteristiques = (COALESCE(v_dup.caracteristiques, '{}'::jsonb)
                               - 'fiche_cee' - 'source_tarifs' - 'source_date'
-                              - 'prix_fourniture_ht' - 'forfait_pose_ht')
+                              - 'prix_fourniture_ht' - 'forfait_pose_ht' - 'doublon_de'::text)
                            || COALESCE(caracteristiques, '{}'::jsonb)
       WHERE id = v_canon;
 
