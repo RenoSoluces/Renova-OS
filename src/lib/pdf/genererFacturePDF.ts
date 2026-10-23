@@ -17,7 +17,7 @@ export type DonneesFacturePDF={
  devis:Devis; client:Prospect; entreprise:Entreprise|null;
 };
 
-export function genererFacturePDF(data:DonneesFacturePDF):jsPDF{
+export async function genererFacturePDF(data:DonneesFacturePDF):Promise<jsPDF>{
  const {numero,dateEmission,dateEcheance,typeLabel,libelle,montantHt,montantTva,montantTtc,lignes,devis,client,entreprise}=data;
  const doc=new jsPDF({unit:"mm",format:"a4"}),PW=doc.internal.pageSize.getWidth(),PH=doc.internal.pageSize.getHeight(),M=16,W=PW-2*M;
  const partner=devis.emetteur_type==="partenaire";
@@ -31,7 +31,8 @@ export function genererFacturePDF(data:DonneesFacturePDF):jsPDF{
  const date=(v:Date|string)=> (v instanceof Date ? v : new Date(v)).toLocaleDateString("fr-FR");
  let y=0;
  // Identité et en-tête
- const logo=devis.emetteur_logo_url||entreprise?.logo_url||"";
+ let logo=devis.emetteur_logo_url||entreprise?.logo_url||"";
+ if(logo&&!logo.startsWith("data:image")){try{const response=await fetch(logo);const blob=await response.blob();logo=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(blob);});}catch{logo="";}}
  if(logo.startsWith("data:image")){try{doc.addImage(logo,logo.includes("image/png")?"PNG":"JPEG",M,13,22,22,undefined,"FAST");}catch{}}
  const xName=logo.startsWith("data:image")?M+27:M;
  doc.setFont("helvetica","bold");doc.setFontSize(17);txt(doc,C.vert);doc.text(safe(name),xName,23);
