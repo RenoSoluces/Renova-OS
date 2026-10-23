@@ -559,12 +559,13 @@ BEGIN
     "categorie": "vmc",
     "nom": "VMC simple flux hygroréglable Hygro A Infinity",
     "marque": "Infinity",
-    "prix_ht": 0,
+    "prix_ht": null,
     "unite": "unite",
     "caracteristiques": {
       "type_flux": "simple",
       "type_hygro": "A",
-      "prix_a_confirmer": true
+      "prix_a_confirmer": true,
+      "note_prix": "Tarif 0 fourni à confirmer ; ne pas écraser un prix existant sans validation."
     }
   },
   {
@@ -1273,6 +1274,74 @@ BEGIN
       "type_flux": "double",
       "pilotage": "CO2",
       "prix_fournisseur_ht": 4006.67
+    }
+  },
+  {
+    "reference": "VMC-DF-FRANCEAIR-COCOON20",
+    "categorie": "vmc",
+    "nom": "France Air Cocoon 20 — VMC double flux haut rendement",
+    "marque": "France Air",
+    "prix_ht": 3856,
+    "unite": "unite",
+    "caracteristiques": {
+      "reference_fabricant": "61017995",
+      "rendement_pct": 95,
+      "gamme": "haut de gamme",
+      "prix_fournisseur_ht": 3856
+    }
+  },
+  {
+    "reference": "VMC-DF-FRANCEAIR-COCOON50",
+    "categorie": "vmc",
+    "nom": "France Air Cocoon 50 — VMC double flux haut rendement",
+    "marque": "France Air",
+    "prix_ht": 5565,
+    "unite": "unite",
+    "caracteristiques": {
+      "reference_fabricant": "61017997",
+      "rendement_pct": 95,
+      "gamme": "haut de gamme",
+      "prix_fournisseur_ht": 5565
+    }
+  },
+  {
+    "reference": "VMC-DF-FRANCEAIR-DFX90",
+    "categorie": "vmc",
+    "nom": "France Air DFX 90 — VMC double flux rendement 90 %",
+    "marque": "France Air",
+    "prix_ht": 2310,
+    "unite": "unite",
+    "caracteristiques": {
+      "reference_fabricant": "61002364",
+      "rendement_pct": 90,
+      "gamme": "milieu de gamme",
+      "prix_fournisseur_ht": 2310
+    }
+  },
+  {
+    "reference": "VMC-DF-FRANCEAIR-DFX-QAI",
+    "categorie": "vmc",
+    "nom": "France Air DFX QAI — VMC double flux avec module QAI",
+    "marque": "France Air",
+    "prix_ht": 2705,
+    "unite": "unite",
+    "caracteristiques": {
+      "reference_fabricant": "61034267",
+      "rendement_pct": 90,
+      "gamme": "milieu de gamme",
+      "prix_fournisseur_ht": 2705
+    }
+  },
+  {
+    "reference": "VMC-SIMPLEFLUX-HYGROB",
+    "categorie": "vmc",
+    "nom": "VMC simple flux hygroréglable type B générique — référence historique",
+    "marque": "Générique",
+    "prix_ht": 450,
+    "unite": "unite",
+    "caracteristiques": {
+      "note": "Référence historique distincte de la prestation VMC Hygro B avec pose.",
+      "prix_fournisseur_ht": 450
     }
   }
 ]
