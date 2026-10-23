@@ -28,7 +28,7 @@ export function genererFacturePDF(data:DonneesFacturePDF):jsPDF{
  const city=[devis.emetteur_code_postal||entreprise?.code_postal,devis.emetteur_ville||entreprise?.ville].filter(Boolean).join(" ");
  const siret=devis.emetteur_siret||entreprise?.siret||"",vat=devis.emetteur_numero_tva||entreprise?.numero_tva||"";
  const phone=devis.emetteur_telephone||entreprise?.telephone||"",email=devis.emetteur_email||entreprise?.email||"";
- const date=(v:Date|string)=>new Date(v).toLocaleDateString("fr-FR");
+ const date=(v:Date|string)=> (v instanceof Date ? v : new Date(v)).toLocaleDateString("fr-FR");
  let y=0;
  // Identité et en-tête
  const logo=devis.emetteur_logo_url||entreprise?.logo_url||"";
