@@ -55,7 +55,7 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
         supabase.from('prospects').select('*').eq('commercial_id', userId).order('created_at', { ascending: false }),
         supabase.from('devis').select('*').order('created_at', { ascending: false }),
         supabase.from('dossiers').select('*').order('created_at', { ascending: false }),
-        supabase.from('commissions').select('*, commercial:profiles(id,nom_complet,couleur)').eq('commercial_id', userId).order('date_generation', { ascending: false }),
+        supabase.from('commissions_safe').select('*').eq('commercial_id', userId).order('date_generation', { ascending: false }),
         supabase.from('profiles').select('objectif_mensuel').eq('id', userId).maybeSingle(),
         supabase.from('installateurs').select('id,nom,telephone').eq('actif', true).order('nom'),
         supabase.from('tasks').select('*, prospect:prospects(*)').eq('done', false).order('due_at', { ascending: true, nullsFirst: false }).limit(50),
