@@ -139,10 +139,8 @@ export function CommissionsPage() {
     setLoading(true)
 
     const commissionQuery = supabase
-      .from('commissions')
-      .select(
-        '*, commercial:profiles(id, nom_complet)',
-      )
+      .from('commissions_safe')
+      .select('*')
       .order('date_generation', {
         ascending: false,
       })
