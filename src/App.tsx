@@ -68,7 +68,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
 }
 
 function AppContent() {
-  const { session, loading: authLoading, profile } = useAuth()
+  const { session, loading: authLoading, profile, profileError, signOut, refreshProfile } = useAuth()
   const [page, setPage] = useState<PageKey>('dashboard')
   const [collapsed, setCollapsed] = useState(false)
   const tasksBadge = useOpenTasksCount(page)
@@ -117,6 +117,24 @@ function AppContent() {
 
   if (!session) {
     return <LoginPage />
+  }
+
+  // A valid Auth session is not enough: the database profile is required to
+  // resolve the user's role. Fail closed if it is missing or cannot be read.
+  if (!profile) {
+    return (
+      <div className="page" style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div className="card card-pad" style={{ maxWidth: 560, textAlign: 'center' }}>
+          <AlertTriangle size={28} style={{ color: 'var(--c-warning,#e8a317)', marginBottom: 12 }} />
+          <h2>Accès à Renova OS indisponible</h2>
+          <p className="text-muted">{profileError || "Votre profil n'est pas encore disponible."}</p>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', flexWrap: 'wrap', marginTop: 16 }}>
+            <button className="btn btn-primary" onClick={() => void refreshProfile()}>Réessayer</button>
+            <button className="btn" onClick={() => void signOut()}>Se déconnecter</button>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   // Visites page takes over the full content area (no topbar)
