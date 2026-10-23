@@ -111,16 +111,16 @@ function AppContent() {
   }, [page])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
-    setPage('devis')
-  }, [])
+    navigate('devis')
+  }, [navigate])
   const continuerCycleProspect = useCallback((target: 'visite' | 'simulation' | 'devis' | 'dossier', prospect: { id: string }) => {
     if (target === 'visite') setPendingVisiteProspectId(prospect.id)
     if (target === 'devis') setPendingDevisProspectId(prospect.id)
     if (target === 'dossier') setPendingDossierProspectId(prospect.id)
     if (target === 'simulation') setPendingSimulationProspectId(prospect.id)
     // La simulation d'aides est préremplie avec le prospect choisi ; les résultats 3CL restent archivés séparément.
-    setPage(target === 'visite' ? 'visites' : target === 'devis' ? 'devis' : target === 'dossier' ? 'dossiers' : 'simulations')
-  }, [])
+    navigate(target === 'visite' ? 'visites' : target === 'devis' ? 'devis' : target === 'dossier' ? 'dossiers' : 'simulations')
+  }, [navigate])
 
   // Vérifie les devis sans réponse et les tâches en retard à chaque ouverture de
   // l'app (idempotent, voir lib/crm/relances.ts), puis rafraîchit la cloche de notifications.
@@ -215,7 +215,7 @@ function AppContent() {
           {page === 'suivi_chantier' && <SuiviChantierPage />}
           {page === 'partenaires' && (profile?.role === 'admin' || profile?.role === 'manager' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'performance' && (profile?.role === 'admin' || profile?.role === 'manager') ? <PerformancePage /> : null}
-          {page === 'sante_systeme' && <SystemHealthPage />}
+          {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
         </div>
       </div>
     </div>
