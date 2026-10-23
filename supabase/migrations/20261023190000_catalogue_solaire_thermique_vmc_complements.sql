@@ -1370,8 +1370,9 @@ $products$::jsonb)
         nom = p->>'nom',
         marque = COALESCE(p->>'marque', cp.marque),
         caracteristiques = COALESCE(cp.caracteristiques,'{}'::jsonb) || COALESCE(p->'caracteristiques','{}'::jsonb),
+        -- Préserver le prix déjà en base quand le prix entrant n'est pas fourni.
         prix_unitaire_ht = CASE
-          WHEN p->'prix_ht' IS NULL OR p->'prix_ht' = 'null'::jsonb THEN CASE WHEN COALESCE((p->'caracteristiques'->>'prix_a_renseigner')::boolean, false) THEN 0 ELSE cp.prix_unitaire_ht END
+          WHEN p->'prix_ht' IS NULL OR p->'prix_ht' = 'null'::jsonb THEN cp.prix_unitaire_ht
           ELSE (p->>'prix_ht')::numeric
         END,
         unite = COALESCE(p->>'unite',cp.unite),
@@ -1390,7 +1391,7 @@ END $;
 -- de stockage autonomes sont déplacés vers batterie_stockage.
 UPDATE public.catalogue_produits
 SET categorie = 'batterie_stockage'
-WHERE entreprise_id = (SELECT id FROM public.entreprises ORDER BY created_at LIMIT 1)
+WHERE entreprise_id = v_entreprise
   AND (
     reference IN ('BAT-512-MONO', 'BAT-1024-MONO', 'BAT-1024-TRI', 'RENON-512-ADD')
     OR (categorie = 'photovoltaique' AND lower(coalesce(nom,'')) LIKE 'stockage batterie%')
@@ -1399,6 +1400,6 @@ WHERE entreprise_id = (SELECT id FROM public.entreprises ORDER BY created_at LIM
 -- Les accessoires de pilotage énergétique Comwatt sont rangés dans Domotique.
 UPDATE public.catalogue_produits
 SET categorie = 'domotique'
-WHERE entreprise_id = (SELECT id FROM public.entreprises ORDER BY created_at LIMIT 1)
+WHERE entreprise_id = v_entreprise
   AND reference IN ('COMPACT-GEN4', 'MODULE-SG-READY', 'SMARTPLUG-GEN4');
 
