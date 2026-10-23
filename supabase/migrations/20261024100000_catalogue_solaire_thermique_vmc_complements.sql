@@ -1290,7 +1290,7 @@ $products$::jsonb)
         prix_unitaire_ht, unite, tva_taux, eligible_mpr, eligible_cee, fiche_cee, actif, public_cible
       ) VALUES (
         v_entreprise, p->>'categorie', p->>'nom', COALESCE(p->>'marque',''), p->>'reference',
-        COALESCE(p->>'description',''), COALESCE(p->'caracteristiques','{}'::jsonb),
+        COALESCE(NULLIF(p->>'description',''), concat_ws(' — ', NULLIF(p->>'marque',''), NULLIF(p->>'nom',''), 'Voir les caractéristiques techniques de la fiche produit')), COALESCE(p->'caracteristiques','{}'::jsonb),
         CASE WHEN p->'prix_ht' IS NULL OR p->'prix_ht' = 'null'::jsonb THEN 0 ELSE (p->>'prix_ht')::numeric END,
         COALESCE(p->>'unite','unite'), 20, false, false, NULL, true, 'particulier'
       );
