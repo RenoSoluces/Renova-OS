@@ -77,6 +77,7 @@ const CATEGORIES: { value: string; label: string }[] = [
   { value: 'vmc', label: 'VMC' },
   { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
   { value: 'batterie_stockage', label: 'Batterie de stockage' },
+  { value: 'domotique', label: 'Domotique et pilotage énergétique' },
   { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
   { value: 'ssc', label: 'Système solaire combiné (SSC) — BAR-TH-143' },
   { value: 'destratificateur', label: 'Destratificateur d’air' },
@@ -95,7 +96,7 @@ function familleCategorie(categorie: string): string {
   if (['combles_perdus', 'rampants', 'ite', 'plancher', 'isolation_toiture_pro'].includes(categorie)) return 'isolation'
   if (['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'destratificateur', 'hp_flottante'].includes(categorie)) return 'chauffage'
   if (['ballon_thermodynamique', 'solaire_thermique', 'ssc'].includes(categorie)) return 'eau_chaude'
-  if (['photovoltaique', 'pro_photovoltaique', 'batterie_stockage'].includes(categorie)) return 'electricite'
+  if (['photovoltaique', 'pro_photovoltaique', 'batterie_stockage', 'domotique'].includes(categorie)) return 'electricite'
   if (['menuiseries', 'menuiseries_portes'].includes(categorie)) return 'menuiseries'
   if (categorie === 'vmc') return 'ventilation'
   if (categorie === 'professionnel_cee' || categorie === 'professionnel_hors_cee') return 'professionnels'
