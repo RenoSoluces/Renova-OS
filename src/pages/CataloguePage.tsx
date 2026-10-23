@@ -245,7 +245,7 @@ export function CataloguePage() {
     { label: 'Menuiseries Extérieures', values: ['menuiseries','menuiseries_portes'] },
     { label: 'Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
     { label: 'Production d’eau chaude', values: ['ballon_thermodynamique','solaire_thermique','ssc'] },
-    { label: 'Production d’électricité', values: ['photovoltaique'] },
+    { label: 'Production d’électricité', values: ['photovoltaique','batterie_stockage','domotique'] },
     { label: 'VMC', values: ['vmc'] },
     { label: 'Autres catégories', values: ['autre'] },
   ] : filtrePublic === 'professionnel' ? [
