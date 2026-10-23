@@ -63,7 +63,7 @@ export async function genererFacturePDF(data:DonneesFacturePDF):Promise<jsPDF>{
  y+=4;
  const tx=PW-M-82;const totalRows:[string,string,boolean][]=[["Total HT",euro(montantHt),false],["TVA",euro(montantTva),false],["TOTAL TTC",euro(montantTtc),true]];
  for(const [k,v,bold] of totalRows){if(bold){drw(doc,C.trait);doc.line(tx,y-4,PW-M,y-4);}doc.setFont("helvetica",bold?"bold":"normal");doc.setFontSize(bold?11:9);txt(doc,bold?C.ink:C.gris);doc.text(k,tx,y);txt(doc,C.ink);doc.text(v,PW-M,y,{align:"right"});y+=7;}
- y+=4;fil(doc,C.vert);doc.roundedRect(tx-4,y-2,86,15,2,2,"F");label(doc,"À régler",tx+1,y+4,[190,215,200]);doc.setFont("helvetica","bold");doc.setFontSize(14);txt(doc,C.blanc);doc.text(euro(montantTtc),PW-M-3,y+9,{align:"right"});y+=22;
+ y+=4;fil(doc,C.vert);doc.roundedRect(tx-4,y-2,86,15,2,2,"F");doc.setFont("helvetica","bold");doc.setFontSize(6.8);doc.setTextColor(190,215,200);doc.text("À régler".toUpperCase(),tx+1,y+4,{charSpace:.6});doc.setFont("helvetica","bold");doc.setFontSize(14);txt(doc,C.blanc);doc.text(euro(montantTtc),PW-M-3,y+9,{align:"right"});y+=22;
  // Paiement et mentions
  const payment=devis.conditions_paiement||entreprise?.devis_conditions_paiement_defaut||entreprise?.conditions_paiement_defaut||"Selon les conditions convenues";
  const due=dateEcheance?date(`${dateEcheance}T12:00:00`):"Selon les conditions du devis";
