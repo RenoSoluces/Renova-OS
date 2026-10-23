@@ -19,6 +19,7 @@ import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { ProspectShareControl } from '../components/crm/ProspectShareControl'
 
 interface Props {
   onProspectClick?: (p: Prospect) => void
@@ -923,16 +924,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     <div className="text-xs text-muted" style={{marginTop:6}}>L’Admin peut modifier l’attribution à tout moment.</div>
                   </div>
                 )}
-                <div className="right-mini-section">
-                  <div className="right-mini-section-label">CA potentiel</div>
-                  <input
-                    className="pipeline-inline-input"
-                    type="number"
-                    placeholder="0"
-                    defaultValue={selected.montant_potentiel || ''}
-                    onBlur={ev => updateProspectField('montant_potentiel', ev.target.value ? Number(ev.target.value) : 0)}
-                  />
-                </div>
+                {isAdmin && <ProspectShareControl prospectId={selected.id} />}
                 <div className="right-mini-section">
                   <div className="right-mini-section-label">Température</div>
                   <div className="temp-toggle-row">
