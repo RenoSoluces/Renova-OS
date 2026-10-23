@@ -1383,9 +1383,6 @@ $products$::jsonb)
     v_id := NULL;
   END LOOP;
 
-  RAISE NOTICE 'Compléments solaire thermique / SSC / VMC : % ajout(s), % mise(s) à jour', v_ajoutes, v_maj;
-END $;
-
 -- Classement des sous-catégories de Production d’électricité.
 -- Les kits photovoltaïques intégrant une batterie restent des kits PV ; seuls les produits
 -- de stockage autonomes sont déplacés vers batterie_stockage.
@@ -1403,3 +1400,5 @@ SET categorie = 'domotique'
 WHERE entreprise_id = v_entreprise
   AND reference IN ('COMPACT-GEN4', 'MODULE-SG-READY', 'SMARTPLUG-GEN4');
 
+  RAISE NOTICE 'Compléments solaire thermique / SSC / VMC : % ajout(s), % mise(s) à jour', v_ajoutes, v_maj;
+END $$;
