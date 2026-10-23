@@ -568,7 +568,7 @@ BEGIN
     }
   },
   {
-    "reference": "VMC-SF-HYGRO-B",
+    "reference": "VMC-SF-HYGRO-B-POSEE",
     "categorie": "vmc",
     "nom": "VMC simple flux hygroréglable Hygro B",
     "marque": "Générique",
