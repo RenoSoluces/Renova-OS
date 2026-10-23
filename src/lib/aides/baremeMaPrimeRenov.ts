@@ -99,6 +99,7 @@ export type GesteMPR =
   | "poele_granules"
   | "ballon_thermodynamique"
   | "isolation_combles_amenages" // rampants / plafonds de combles aménagés — €/m²
+  | "isolation_combles_perdus" // combles perdus — €/m²
   | "menuiseries_simple_vitrage" // remplacement de simple vitrage uniquement — forfait/équipement
   | "vmc_double_flux";
 
@@ -149,8 +150,18 @@ export const BAREME_GESTES_MPR: BaremeGeste[] = [
     unite: "forfait",
     plafondDepenseEligible: 4000,
     conditionsTechniques: "COP ≥ 2,6",
-    eligibleParcoursGeste: true,
+    eligibleParcoursGeste: false, // hors parcours par geste pour les dossiers déposés à partir du 01/09/2026 (décret 2026-822)
     note: "Montant non confirmé par une source 2026 directe lors de la dernière vérification — à valider sur france-renov.gouv.fr avant devis.",
+  },
+  {
+    id: "isolation_combles_perdus",
+    nom: "Isolation des combles perdus",
+    montants: { bleu: 25, jaune: 20, violet: 15 },
+    unite: "m2",
+    plafondDepenseEligible: 75,
+    conditionsTechniques: "R ≥ 7 m².K/W (BAR-EN-101, à vérifier selon fiche applicable)",
+    eligibleParcoursGeste: false, // hors parcours par geste pour les dossiers déposés à partir du 01/09/2026 (décret 2026-822)
+    note: "Barème 2026 transmis par Reno Soluces ; profil Rose non éligible en geste seul.",
   },
   {
     id: "isolation_combles_amenages",
@@ -159,8 +170,8 @@ export const BAREME_GESTES_MPR: BaremeGeste[] = [
     unite: "m2",
     plafondDepenseEligible: 75, // €/m²
     conditionsTechniques: "R ≥ 6 m².K/W",
-    eligibleParcoursGeste: true,
-    note: "Les combles PERDUS ne sont éligibles qu'en parcours rénovation d'ampleur depuis la réforme, pas en mono-geste.",
+    eligibleParcoursGeste: false, // hors parcours par geste pour les dossiers déposés à partir du 01/09/2026 (décret 2026-822)
+    note: "Barème rampants/combles aménagés ; vérifier la fiche et les critères techniques de l’opération.",
   },
   {
     id: "menuiseries_simple_vitrage",
@@ -169,7 +180,7 @@ export const BAREME_GESTES_MPR: BaremeGeste[] = [
     unite: "equipement",
     plafondDepenseEligible: 100,
     conditionsTechniques: "Uw ≤ 1,3 W/m².K, remplace un simple vitrage existant",
-    eligibleParcoursGeste: true,
+    eligibleParcoursGeste: false, // hors parcours par geste pour les dossiers déposés à partir du 01/09/2026 (décret 2026-822)
     note: "Le remplacement d'un double vitrage existant n'est plus éligible au parcours par geste depuis 2026.",
   },
   {
@@ -179,7 +190,7 @@ export const BAREME_GESTES_MPR: BaremeGeste[] = [
     unite: "forfait",
     plafondDepenseEligible: 6000,
     conditionsTechniques: "Rendement ≥ 85%",
-    eligibleParcoursGeste: true,
+    eligibleParcoursGeste: false, // hors parcours par geste pour les dossiers déposés à partir du 01/09/2026 (décret 2026-822)
     note: "Montant non confirmé par une source 2026 directe lors de la dernière vérification — à valider sur france-renov.gouv.fr avant devis.",
   },
 ];
@@ -203,6 +214,12 @@ export function calculAideMPR(
 ): { montant: number; plafondAtteint: boolean; geste: BaremeGeste } {
 
   const geste = BAREME_GESTES_MPR.find(g => g.id === gesteId);
+
+  // Depuis le 01/09/2026, seuls les gestes « eligibleParcoursGeste » ouvrent droit à MPR par geste
+  // (PAC de chauffage, raccordement réseau de chaleur, dépose de cuve fioul, audit).
+  if (geste && !geste.eligibleParcoursGeste) {
+    return { montant: 0, plafondAtteint: false, geste };
+  }
 
   if (!geste || profil === "rose") {
     // Profil Rose exclu du parcours par geste depuis le 01/01/2026

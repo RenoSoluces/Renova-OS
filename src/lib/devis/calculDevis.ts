@@ -61,13 +61,15 @@ export function calculResteACharge(
 
 // Correspondance entre une catégorie du catalogue produits et un geste MaPrimeRénov' /
 // un geste CEE, pour proposer automatiquement le calcul d'aide adapté à la ligne de devis.
+/** Repasser à true uniquement pour un dossier MPR déposé avant le 01/09/2026. */
+export const MPR_ISOLATION_PAR_GESTE_ACTIF = false
+
 export const CATEGORIE_VERS_GESTE_MPR: Record<string, string> = {
   pac_air_eau: "pac_air_eau",
   pac_geothermie: "pac_geothermie",
-  ballon_thermodynamique: "ballon_thermodynamique",
-  combles: "isolation_combles_amenages",
-  menuiseries: "menuiseries_simple_vitrage",
-  vmc: "vmc_double_flux",
+  // Depuis le 01/09/2026 (décret 2026-822, critère = date de dépôt du dossier), l'isolation,
+  // les menuiseries, la VMC et le chauffe-eau thermodynamique ne relèvent plus de MaPrimeRénov'
+  // par geste (uniquement rénovation d'ampleur). Ils ne déclenchent donc plus d'aide MPR automatique.
   // murs : plus éligible au parcours par geste depuis 2026 (uniquement rénovation d'ampleur)
   // plancher : non couvert par le barème mono-geste actuel (voir avertissement du module)
 };
@@ -75,6 +77,8 @@ export const CATEGORIE_VERS_GESTE_MPR: Record<string, string> = {
 export const CATEGORIE_VERS_GESTE_CEE: Record<string, string> = {
   pac_air_eau: "pac_air_eau",
   combles: "isolation_combles",
+  rampants: "isolation_rampants",
+  combles_perdus: "isolation_combles_perdus",
   murs: "isolation_murs",
   menuiseries: "menuiseries",
   vmc: "vmc",

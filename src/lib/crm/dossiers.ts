@@ -15,10 +15,9 @@ export function dossierStatutLabel(s: string | null | undefined): DossierStatut 
 
 // Checklist type par défaut créée avec chaque nouveau dossier de rénovation énergétique.
 export const CHECKLIST_PIECES: { type: string; nom: string }[] = [
-  { type: 'devis_signe', nom: 'Devis signé' },
-  { type: 'avis_imposition', nom: 'Avis d\'imposition N-2' },
-  { type: 'rib', nom: 'RIB du bénéficiaire' },
-  { type: 'photos_avant', nom: 'Photos avant travaux' },
-  { type: 'piece_identite', nom: 'Pièce d\'identité' },
-  { type: 'taxe_fonciere', nom: 'Taxe foncière (justificatif de propriété)' },
+  { type: 'avis_imposition', nom: "Avis d’impôts (avis d’imposition)" },
+  { type: 'taxe_fonciere', nom: 'Taxe foncière' },
+  { type: 'piece_identite', nom: 'Carte nationale d’identité (CNI)' },
+  { type: 'justificatif_domicile', nom: 'Justificatif de domicile' },
+  { type: 'photos', nom: 'Photos avant travaux' },
 ]

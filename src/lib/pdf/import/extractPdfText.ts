@@ -1,3 +1,8 @@
+import * as pdfjsLib from 'pdfjs-dist'
+import pdfWorker from 'pdfjs-dist/build/pdf.worker.min.mjs?url'
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker
+
 export interface PdfTextExtractionResult {
   success: boolean
   text: string
@@ -5,33 +10,39 @@ export interface PdfTextExtractionResult {
   erreurs: string[]
 }
 
-/**
- * Charge PDF.js uniquement au moment où l'utilisateur importe un PDF.
- * Cela évite de bloquer le démarrage général de l'application sur les
- * navigateurs mobiles si le module PDF rencontre un problème de compatibilité.
- */
 export async function extractPdfText(
   file: File,
 ): Promise<PdfTextExtractionResult> {
   const erreurs: string[] = []
 
   try {
-    const [pdfjsLib, pdfWorker] = await Promise.all([
-      import('pdfjs-dist'),
-      import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
-    ])
-
-    pdfjsLib.GlobalWorkerOptions.workerSrc = pdfWorker.default
-
     const arrayBuffer = await file.arrayBuffer()
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise
+
+    const pdf = await pdfjsLib.getDocument({
+      data: arrayBuffer,
+    }).promise
+
     const pages: string[] = []
 
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+    for (
+      let pageNumber = 1;
+      pageNumber <= pdf.numPages;
+      pageNumber += 1
+    ) {
       const page = await pdf.getPage(pageNumber)
       const content = await page.getTextContent()
+
       const pageText = content.items
-        .map((item) => ('str' in item && typeof item.str === 'string' ? item.str : ''))
+        .map((item) => {
+          if (
+            'str' in item &&
+            typeof item.str === 'string'
+          ) {
+            return item.str
+          }
+
+          return ''
+        })
         .filter(Boolean)
         .join(' ')
 
@@ -66,7 +77,9 @@ export async function extractPdfText(
       success: false,
       text: '',
       pages: 0,
-      erreurs: [`Impossible de lire le PDF : ${message}`],
+      erreurs: [
+        `Impossible de lire le PDF : ${message}`,
+      ],
     }
   }
 }

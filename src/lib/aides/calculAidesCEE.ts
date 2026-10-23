@@ -5,7 +5,7 @@
 // dépend de DEUX éléments propres à chaque entreprise et qu'aucun barème public ne fixe :
 //
 // 1. Le kWh cumac exact du geste, calculé selon la "fiche d'opération standardisée"
-//    officielle correspondante (ex: BAR-EN-101 pour l'isolation de combles, BAR-TH-104 pour
+//    officielle correspondante (ex: BAR-EN-101 pour l'isolation de combles, BAR-TH-171 pour
 //    une PAC...). Chaque fiche a sa propre formule (fonction de la surface, de la puissance,
 //    de la zone climatique, du type de bâtiment...) publiée par l'ADEME/PNCEE.
 // 2. Le prix du kWh cumac (€/MWh cumac) : NON réglementé, négocié librement entre chaque
@@ -39,7 +39,7 @@ export const COEFFICIENTS_CEE_INDICATIFS: CoefficientCEE[] = [
   {
     gesteId: "isolation_combles",
     nom: "Isolation combles / rampants",
-    ficheReference: "BAR-EN-101 / BAR-EN-102",
+    ficheReference: "BAR-EN-101",
     mwhCumacParUnite: 0.6,
     unite: "m2",
     note: "Formule officielle réelle fonction de la zone climatique et du type d'énergie de chauffage remplacée",
@@ -47,7 +47,7 @@ export const COEFFICIENTS_CEE_INDICATIFS: CoefficientCEE[] = [
   {
     gesteId: "isolation_murs",
     nom: "Isolation des murs",
-    ficheReference: "BAR-EN-103",
+    ficheReference: "BAR-EN-102",
     mwhCumacParUnite: 0.45,
     unite: "m2",
     note: "Formule officielle réelle fonction de la zone climatique",
@@ -55,7 +55,7 @@ export const COEFFICIENTS_CEE_INDICATIFS: CoefficientCEE[] = [
   {
     gesteId: "pac_air_eau",
     nom: "Pompe à chaleur Air/Eau",
-    ficheReference: "BAR-TH-104",
+    ficheReference: "BAR-TH-171", // BAR-TH-104 abrogée, remplacée par BAR-TH-171 (air/eau) et BAR-TH-172 (eau/eau)
     mwhCumacParUnite: 55,
     unite: "forfait",
     note: "Formule officielle réelle fonction de la puissance et de la zone climatique",
@@ -70,8 +70,8 @@ export const COEFFICIENTS_CEE_INDICATIFS: CoefficientCEE[] = [
   },
   {
     gesteId: "vmc",
-    nom: "VMC Double Flux",
-    ficheReference: "BAR-TH-127",
+    nom: "VMC simple flux hygroréglable",
+    ficheReference: "BAR-TH-127", // la double flux relève de BAR-TH-125
     mwhCumacParUnite: 18,
     unite: "forfait",
     note: "Formule officielle réelle fonction de la surface ventilée",
@@ -92,8 +92,15 @@ export function estimerPrimeCEE(
   tauxEurParMwhCumac: number
 ): { montantEstime: number; coefficient: CoefficientCEE | undefined; avertissement: string } {
 
+  // Les gestes « isolation_rampants » et « isolation_combles_perdus » (catégories du catalogue)
+  // relèvent tous deux de BAR-EN-101 : même coefficient indicatif que « isolation_combles ».
+  const ALIAS_GESTES: Record<string, string> = {
+    isolation_rampants: "isolation_combles",
+    isolation_combles_perdus: "isolation_combles",
+    isolation_combles_amenages: "isolation_combles",
+  };
   const coefficient =
-    COEFFICIENTS_CEE_INDICATIFS.find(c => c.gesteId === gesteId);
+    COEFFICIENTS_CEE_INDICATIFS.find(c => c.gesteId === (ALIAS_GESTES[gesteId] || gesteId));
 
   if (!coefficient) {
     return {
@@ -114,7 +121,7 @@ export function estimerPrimeCEE(
   return {
     montantEstime,
     coefficient,
-    avertissement: `Estimation indicative (fiche ${coefficient.ficheReference}) — à confirmer avec le calcul exact de la fiche officielle et le taux contractuel réel du délégataire.`,
+    avertissement: `Estimation indicative (fiche ${coefficient.ficheReference})${coefficient.unite === "forfait" && quantite > 1 ? " — forfait compté une seule fois par logement : vérifier si plusieurs équipements sont réellement valorisables" : ""} — à confirmer avec le calcul exact de la fiche officielle et le taux contractuel réel du délégataire.`,
   };
 
 }

@@ -1,0 +1,34 @@
+/* Éditeur de devis : disposition formulaire + contrôle de conformité + aperçu A4 */
+.devis-workspace{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(360px,.9fr);gap:24px;align-items:start}
+.devis-editor-column{display:flex;flex-direction:column;gap:20px;min-width:0}
+.devis-preview-column{position:sticky;top:12px;display:flex;flex-direction:column;gap:12px;min-width:0;max-height:calc(100vh - 24px);overflow:auto}
+.devis-preview-toolbar{display:flex;justify-content:space-between;align-items:center;gap:8px}
+.devis-preview-actions{display:flex;gap:8px;flex-wrap:wrap}
+.devis-line-identifiers{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+.devis-line-identifiers label{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--c-text-muted,#7a7a7a)}
+.devis-line-identifiers input{height:34px;border:1px solid var(--c-border,#e0ddd5);border-radius:8px;padding:0 10px;font-size:13px}
+.devis-line-identifiers input.bad{border-color:#dc2626;background:#fef2f2}
+.devis-paper{background:#fff;color:#1a1a1a;border:1px solid var(--c-border,#e0ddd5);border-radius:6px;box-shadow:0 6px 24px rgba(15,42,32,.08);padding:28px 30px;font-size:11.5px;line-height:1.45;min-height:560px}
+.devis-paper h2{margin:2px 0 6px;font-size:26px;letter-spacing:.04em;color:var(--c-primary,#1b4332)}
+.devis-paper-head{display:flex;justify-content:space-between;gap:16px;border-bottom:2px solid var(--c-primary,#1b4332);padding-bottom:14px}
+.devis-paper-kicker,.devis-paper-label{font-size:9.5px;letter-spacing:.08em;font-weight:700;color:var(--c-primary-400,#2d6a4f)}
+.devis-paper-muted{color:#555}
+.devis-paper-company{text-align:right}
+.devis-paper-parties{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin:16px 0}
+.devis-paper-table{width:100%;border-collapse:collapse;margin-top:6px}
+.devis-paper-table th{background:var(--c-primary-50,#d8f3dc);color:var(--c-primary,#1b4332);text-align:left;font-size:10px;padding:6px 8px}
+.devis-paper-table th:nth-child(n+2),.devis-paper-table td:nth-child(n+2){text-align:right;white-space:nowrap}
+.devis-paper-table td{padding:7px 8px;border-bottom:1px solid #eee;vertical-align:top}
+.devis-paper-table td small{display:block;color:#666;font-size:10px}
+.devis-paper-table tr.fam td{background:#eaf0ec;color:#1f4536;font-weight:700;font-size:10px;letter-spacing:.03em;text-align:left!important;border-left:3px solid #1f4536}
+.devis-paper-empty{text-align:center!important;color:#999;padding:24px!important}
+.devis-paper-totals{margin:14px 0 0 auto;width:60%;display:flex;flex-direction:column;gap:4px}
+.devis-paper-totals>div{display:flex;justify-content:space-between}
+.devis-paper-grand-total{font-size:13px;border-top:1px solid #ccc;padding-top:5px;margin-top:3px;color:var(--c-primary,#1b4332)}
+.devis-paper-aides{margin-top:14px;padding:10px 12px;background:#f6f8f7;border-radius:6px}
+.devis-paper-aides small{display:block;color:#666;margin-top:4px}
+.devis-paper-footer{margin-top:18px;font-size:10.5px;color:#444}
+.devis-paper-footer p{margin:6px 0}
+.devis-paper-signatures{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-top:18px}
+.devis-paper-signatures>div{border:1px dashed #bbb;border-radius:6px;min-height:70px;padding:8px;font-size:10px;color:#666}
+@media (max-width:1180px){.devis-workspace{grid-template-columns:minmax(0,1fr)}.devis-preview-column{position:static;max-height:none}}

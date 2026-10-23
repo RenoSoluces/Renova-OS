@@ -124,21 +124,29 @@ export function genererDevisPDF(
   // Lignes du devis — inclut les caractéristiques techniques complètes
   // (obligatoire en mono-geste pour l'instruction des dossiers d'aides)
   // ---------------------------------------------------------------
-  const body = lignes.map(l => {
+  const labelsCategorie: Record<string, string> = {
+    ite: 'Isolation par l’extérieur (ITE)', murs: 'Isolation des murs', combles: 'Isolation des rampants', rampants: 'Isolation des rampants', combles_perdus: 'Isolation des combles perdus',
+    plancher: 'Isolation plancher bas', menuiseries: 'Menuiseries Extérieures - Fenêtres', menuiseries_portes: 'Menuiseries Extérieures - Portes', pac_air_eau: 'Pompe à chaleur Air/Eau (PAC Air/Eau)',
+    pac_air_air: 'Pompe à chaleur Air/Air (PAC Air/Air)', pac_geothermie: 'Pompe à chaleur géothermique',
+    ballon_thermodynamique: 'Ballon thermodynamique', vmc: 'Ventilation (VMC)', photovoltaique: 'Photovoltaïque',
+    solaire_thermique: 'Solaire thermique', autre: 'Autres prestations', professionnel_cee: 'Professionnels — CEE',
+    professionnel_hors_cee: 'Professionnels — hors CEE', destratificateur: 'Destratificateur', hp_flottante: 'HP flottante',
+    isolation_toiture_pro: 'Isolation de toiture',
+  };
+  const body: any[] = [];
+  let categoriePrecedente = '';
+  for (const l of lignes) {
+    const categorie = l.categorie || 'autre';
+    if (categorie !== categoriePrecedente) {
+      body.push([{ content: labelsCategorie[categorie] || categorie, colSpan: 5, styles: { fillColor: [234, 240, 236], textColor: [31, 69, 54], fontStyle: 'bold', fontSize: 9, cellPadding: 2.5 } }]);
+      categoriePrecedente = categorie;
+    }
     const carac = Object.entries(l.caracteristiques || {});
     let designation = l.designation;
     if (l.description) designation += `\n${l.description}`;
-    if (carac.length > 0) {
-      designation += `\nCaractéristiques : ${carac.map(([k, v]) => `${k} : ${v}`).join(" · ")}`;
-    }
-    return [
-      designation,
-      String(l.quantite),
-      euro(l.prix_unitaire_ht),
-      `${l.tva_taux}%`,
-      euro(l.montant_ht),
-    ];
-  });
+    if (carac.length > 0) designation += `\nCaractéristiques : ${carac.map(([k, v]) => `${k} : ${v}`).join(" · ")}`;
+    body.push([designation, String(l.quantite), euro(l.prix_unitaire_ht), `${l.tva_taux}%`, euro(l.montant_ht)]);
+  }
 
   autoTable(doc, {
     startY: y,

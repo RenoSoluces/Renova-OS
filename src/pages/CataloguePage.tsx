@@ -1,17 +1,42 @@
 import { useEffect, useState } from 'react'
-import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText } from 'lucide-react'
+import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText, ShieldCheck } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
 import type { Produit } from '../types'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
+import {
+  extraireFiche, ficheDuProduit, estHorsChampBarEn104, estPrestationSansFiche, FICHE_PAR_CATEGORIE, CATEGORIES_MPR_PAR_GESTE, DATE_REGLES,
+  valeursFiche, verifierFiche, estChampDeFiche, type PointFiche,
+} from '../lib/devis/conformite'
+import { REGLES_FICHES } from '../lib/devis/reglesFichesCEE'
+import { LigneFicheFields } from '../components/devis/LigneFicheFields'
+import { Drawer } from '../components/devis/Drawer'
+import '../components/devis/rv.css'
+
+const nettoyerDescriptionProduit = (value: string | null | undefined) => String(value || '')
+  .replace(/Prix HT communiqué dans le catalogue fourni/gi, '')
+  .replace(/Texte transmis par Reno Soluces le \d{2}\/\d{2}\/\d{4}/gi, '')
+  .replace(/Classeur Reno Soluces du \d{2}\/\d{2}\/\d{4}/gi, '')
+  .replace(/\b(?:prix_source|source_import|source_fiche_cee|source_tarifs|source_date)\s*[:=]\s*[^\n;|]*/gi, '')
+  // Mentions réglementaires internes héritées des imports Atlantic / De Dietrich :
+  // la fiche CEE est portée par le champ « fiche_cee », pas par la description client.
+  .replace(/(?:^|\s)Fiche (?:CEE )?de r[ée]f[ée]rence\s*:\s*(?:BAR|BAT|BAE|IND|RES|TRA)-[A-Z]{2}-\d{3}[^.\n]*\.?/gi, '')
+  .replace(/(?:^|\s)Fiche CEE (?:BAR|BAT|BAE|IND|RES|TRA)-[A-Z]{2}-\d{3}\s*:[^.\n]*\.?/gi, '')
+  .replace(/[ \t]+([,;|])/g, '$1')
+  .replace(/[ \t]{2,}/g, ' ')
+  .replace(/^[ \t—–;,|]+|[ \t—–;,|]+$/gm, '')
+  .replace(/\n{3,}/g, '\n\n')
+  .trim()
 
 const CATEGORIES = [
-  { value: 'combles', label: 'Isolation combles / rampants' },
-  { value: 'murs', label: 'Isolation murs' },
+  { value: 'combles_perdus', label: 'Isolation des combles perdus' },
+  { value: 'rampants', label: 'Isolation des rampants' },
+  { value: 'ite', label: 'Isolation par l’extérieur (ITE)' },
   { value: 'plancher', label: 'Isolation plancher bas' },
-  { value: 'menuiseries', label: 'Menuiseries' },
+  { value: 'menuiseries', label: 'Menuiseries Extérieures - Fenêtres' },
+  { value: 'menuiseries_portes', label: 'Menuiseries Extérieures - Portes' },
   { value: 'pac_air_eau', label: 'Pompe à chaleur Air/Eau' },
   { value: 'pac_air_air', label: 'Pompe à chaleur Air/Air' },
   { value: 'pac_geothermie', label: 'Pompe à chaleur géothermique' },
@@ -19,11 +44,14 @@ const CATEGORIES = [
   { value: 'vmc', label: 'VMC' },
   { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
   { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
+  { value: 'ssc', label: 'Système solaire combiné (SSC) — BAR-TH-143' },
   { value: 'professionnel_cee', label: 'Professionnels — CEE', public_cible: 'professionnel' },
   { value: 'professionnel_hors_cee', label: 'Professionnels — hors CEE', public_cible: 'professionnel' },
-  { value: 'destratificateur', label: 'Destratificateur', public_cible: 'professionnel' },
+  { value: 'destratificateur', label: 'Destratificateur d’air', public_cible: 'professionnel' },
   { value: 'hp_flottante', label: 'HP flottante', public_cible: 'professionnel' },
-  { value: 'isolation_toiture_pro', label: 'Isolation de la toiture', public_cible: 'professionnel' },
+  { value: 'isolation_toiture_pro', label: 'Isolation toiture plate', public_cible: 'professionnel' },
+  { value: 'isolation_combles_pro', label: 'Isolation combles / rampants — professionnels', public_cible: 'professionnel' },
+  { value: 'pro_photovoltaique', label: 'Panneaux photovoltaïques', public_cible: 'professionnel' },
   { value: 'vt_complete', label: 'Visite technique complète', catalogue_groupe: 'visite_technique' },
   { value: 'vt_produit', label: 'Visite technique produit', catalogue_groupe: 'visite_technique' },
   { value: 'vt_diagnostic_3cl', label: 'Diagnostic / analyse 3CL', catalogue_groupe: 'visite_technique' },
@@ -66,16 +94,93 @@ interface FormState {
   zones_prix: { zone: string; prix_unitaire_ht: string }[]
   forfait_pose_ht: string
   forfait_evacuation_ht: string
+  forfait_consommables_ht: string
+}
+
+const carObj = (list: CaracLigne[]): Record<string, string> =>
+  Object.fromEntries(list.filter(c => c.cle.trim()).map(c => [c.cle.trim(), c.valeur]))
+const carList = (o: Record<string, any>): CaracLigne[] => Object.entries(o).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
+const rempli = (v: unknown) => String(v ?? '').trim() !== ''
+
+/** Un prix strictement positif prime toujours sur l'ancien drapeau d'import « prix_a_renseigner ». */
+const prixARenseigner = (p: { prix_unitaire_ht?: number | null; caracteristiques?: Record<string, any> | null }) =>
+  !(Number(p.prix_unitaire_ht) > 0)
+
+/** Points à corriger pour qu'un produit soit utilisable sur un devis aidé (hors justificatifs propres au devis). */
+function pointsProduit(p: { fiche: string | null; marque?: string | null; reference?: string | null; caracteristiques?: Record<string, any> | null }): PointFiche[] {
+  if (!p.fiche) return []
+  const pts = verifierFiche(p.fiche, valeursFiche(p.fiche, p.caracteristiques), false)
+  const regle = REGLES_FICHES[p.fiche]
+  if (regle?.verifiee) {
+    if (!rempli(p.marque)) pts.push({ gravite: 'bloc', message: 'Marque à renseigner (obligatoire sur le devis)', champ: 'marque' })
+    if (!rempli(p.reference)) pts.push({ gravite: 'bloc', message: 'Référence fabricant à renseigner (obligatoire sur le devis)', champ: 'reference' })
+  }
+  return pts
+}
+
+function statutProduit(p: Produit): { kind: 'aucun' | 'non_integre' | 'a_completer' | 'conforme'; blocs: number } {
+  const fiche = ficheDuProduit(p)
+  if (!fiche) return estHorsChampBarEn104(p) || estPrestationSansFiche(p) || !p.eligible_cee ? { kind: 'aucun', blocs: 0 } : { kind: 'a_completer', blocs: 1 }
+  if (!REGLES_FICHES[fiche]?.verifiee) return { kind: 'non_integre', blocs: 0 }
+  const blocs = pointsProduit({ fiche, marque: p.marque, reference: p.reference, caracteristiques: p.caracteristiques }).filter(x => x.gravite === 'bloc').length
+  return { kind: blocs ? 'a_completer' : 'conforme', blocs }
+}
+
+/** Audit transversal du catalogue : n'invente jamais une exigence ou une certification absente. */
+function auditerProduit(p: Produit): string[] {
+  const issues: string[] = []
+  const fiche = ficheDuProduit(p)
+  const description = nettoyerDescriptionProduit(p.description)
+  const car = p.caracteristiques || {}
+  const groupe = p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')
+  // L’échafaudage et l’enduit ITE sont des postes de prestation/fourniture dédiés,
+  // facturés séparément au m². Ils ne nécessitent ni marque/référence fabricant
+  // comme un équipement, ni un forfait de pose additionnel.
+  const prestation = groupe === 'visite_technique' || estPrestationSansFiche(p) || /visite|diagnostic|prestation|main.?d.?œuvre/i.test(`${p.nom} ${p.categorie}`)
+  if (!description || description.length < 35) issues.push('Description technique absente ou trop courte')
+  if (/fiche cee|prix source|source tarif|pose incluse|fourniture et pose|conformit[eé] à v[eé]rifier|aides indicatives/i.test(description)) {
+    issues.push('Description contaminée par des notes internes/tarifaires')
+  }
+  if (!prestation && !p.marque?.trim()) issues.push('Marque non renseignée')
+  if (!prestation && !p.reference?.trim()) issues.push('Référence fabricant non renseignée')
+  if (p.eligible_cee && !fiche && !estHorsChampBarEn104(p) && !estPrestationSansFiche(p)) issues.push('Produit déclaré CEE sans fiche de référence identifiable')
+  // Fiche non intégrée au moteur (ex. BAT-*) : information affichée sur la pastille
+  // « Règles non intégrées », mais pas une anomalie corrigeable depuis le catalogue.
+  // Elle ne maintient donc plus le produit dans « À auditer ».
+  if (fiche && REGLES_FICHES[fiche]?.verifiee) {
+    const manquants = pointsProduit({ fiche, marque: p.marque, reference: p.reference, caracteristiques: car })
+      .filter(x => x.gravite === 'bloc')
+    if (manquants.length) issues.push(`Champs réglementaires à compléter (${manquants.length})`)
+  }
+  if (!Object.keys(car).some(k => !['source_tarifs','source_date','prix_fourniture_ht','forfait_pose_ht','prix_a_renseigner','forfait_pose_a_renseigner','fiche_cee','aides_estimatives_a_verifier','conditions_cee','tva_indicative'].includes(k))) {
+    if (!prestation) issues.push('Caractéristiques techniques détaillées absentes')
+  }
+  // L’audit réglementaire ne doit pas confondre conformité et tarification.
+  // Les prix et forfaits peuvent être renseignés ultérieurement sans maintenir
+  // un produit dans « À auditer » si ses données techniques/réglementaires sont complètes.
+  return [...new Set(issues)]
+}
+
+/** Contrôle commercial distinct de l'audit réglementaire : ne modifie pas le statut de conformité. */
+function auditerCommercialement(p: Produit): string[] {
+  const issues: string[] = []
+  const car = p.caracteristiques || {}
+  const groupe = p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')
+  const prestation = groupe === 'visite_technique' || estPrestationSansFiche(p) || String(car.pose_separee) === 'true'
+    || /visite|diagnostic|prestation|main.?d.?œuvre|consommable/i.test(`${p.nom} ${p.categorie}`)
+  if (prixARenseigner(p)) issues.push('Prix de fourniture à renseigner')
+  if (!(Number(p.forfait_pose_ht) > 0) && !prestation) issues.push('Forfait de pose à renseigner ou confirmer')
+  return issues
 }
 
 function emptyForm(): FormState {
   return {
-    categorie: 'combles', catalogue_groupe: 'particulier', public_cible: 'particulier', nom: '', marque: '', reference: '', description: '',
+    categorie: 'rampants', catalogue_groupe: 'particulier', public_cible: 'particulier', nom: '', marque: '', reference: '', description: '',
     caracteristiques: [{ cle: '', valeur: '' }],
     prix_unitaire_ht: '', unite: 'unite', tva_taux: 5.5,
     eligible_mpr: false, eligible_cee: false, fiche_cee: '', actif: true,
     zones_prix: [],
-    forfait_pose_ht: '', forfait_evacuation_ht: '',
+    forfait_pose_ht: '', forfait_evacuation_ht: '', forfait_consommables_ht: '',
   }
 }
 
@@ -87,18 +192,24 @@ export function CataloguePage() {
   const [loading, setLoading] = useState(true)
   const [filtrePublic, setFiltrePublic] = useState<GroupeCatalogue>('particulier')
   const [filtreCategorie, setFiltreCategorie] = useState<string>('toutes')
+  const [filtreMarque, setFiltreMarque] = useState<string>('toutes')
+  const [filtreVtPublic, setFiltreVtPublic] = useState<'tous' | 'particulier' | 'professionnel'>('particulier')
   const [recherche, setRecherche] = useState('')
   const [groupement, setGroupement] = useState<'categorie' | 'fournisseur'>('categorie')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Produit | null>(null)
   const [form, setForm] = useState<FormState>(emptyForm())
   const [saving, setSaving] = useState(false)
+  const [ficheDetail, setFicheDetail] = useState<Produit | null>(null)
+  const [filtreAudit, setFiltreAudit] = useState<'aucun' | 'conformite' | 'commercial'>('aucun')
 
   function fetchProduits() {
     setLoading(true)
     supabase
       .from('catalogue_produits')
       .select('*')
+      // Le produit générique « Isolation » est remplacé par les produits détaillés.
+      .neq('nom', 'Isolation')
       .order('categorie', { ascending: true })
       .order('nom', { ascending: true })
       .then(({ data, error }) => {
@@ -120,22 +231,24 @@ export function CataloguePage() {
     if (c.catalogue_groupe) return c.catalogue_groupe === groupe
     if (['vt_complete','vt_produit','vt_diagnostic_3cl'].includes(c.value)) return groupe === 'visite_technique'
     if (c.public_cible === 'professionnel') return groupe === 'professionnel'
-    if (c.value === 'pac_air_eau' || c.value === 'autre' || c.value === 'combles') return groupe === 'particulier' || groupe === 'professionnel'
+    if (c.value === 'pac_air_eau' || c.value === 'autre' || ['combles','combles_perdus','rampants'].includes(c.value)) return groupe === 'particulier' || groupe === 'professionnel'
     return groupe === 'particulier'
   }
   const categoriesPourGroupe = categoriesAffichees.filter(c => categorieCompatibleGroupe(c, filtrePublic))
   const definitionsSections: { label: string; values: string[] }[] = filtrePublic === 'particulier' ? [
-    { label: 'Système de Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
-    { label: 'Production d’eau Chaude', values: ['ballon_thermodynamique','solaire_thermique'] },
-    { label: 'Isolation', values: ['combles','murs','plancher','menuiseries'] },
+    { label: 'Isolation', values: ['combles_perdus','rampants','ite','plancher'] },
+    { label: 'Menuiseries Extérieures', values: ['menuiseries','menuiseries_portes'] },
+    { label: 'Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
+    { label: 'Production d’eau chaude', values: ['ballon_thermodynamique','solaire_thermique','ssc'] },
     { label: 'Production d’électricité', values: ['photovoltaique'] },
-    { label: 'Ventilation', values: ['vmc'] },
+    { label: 'VMC', values: ['vmc'] },
     { label: 'Autres catégories', values: ['autre'] },
   ] : filtrePublic === 'professionnel' ? [
-    { label: 'Système de Chauffage', values: ['pac_air_eau'] },
-    { label: 'Destratificateur', values: ['destratificateur'] },
-    { label: 'HP Flottante', values: ['hp_flottante'] },
-    { label: 'Isolation', values: ['isolation_toiture_pro','combles','professionnel_cee','professionnel_hors_cee'] },
+    { label: 'HP flottante', values: ['hp_flottante'] },
+    { label: 'Destratificateur d’air', values: ['destratificateur'] },
+    { label: 'Chauffage', values: ['pac_air_eau'] },
+    { label: 'Isolation toiture plate', values: ['isolation_toiture_pro','isolation_combles_pro','professionnel_cee','professionnel_hors_cee'] },
+    { label: 'Production d’électricité', values: ['pro_photovoltaique'] },
     { label: 'Autres catégories', values: ['autre'] },
   ] : [{ label: 'Visites Techniques', values: ['vt_complete','vt_produit','vt_diagnostic_3cl'] }, { label: 'Autres catégories', values: [] }]
   const sectionsAffichees = definitionsSections.map(section => ({ label: section.label, categories: section.values.map(value => categoriesPourGroupe.find(c => c.value === value)).filter(Boolean) }))
@@ -161,8 +274,8 @@ export function CataloguePage() {
 
   function openCreate() {
     setEditing(null)
-    const categorie = filtrePublic === 'professionnel' ? 'pac_air_eau' : filtrePublic === 'visite_technique' ? 'vt_complete' : 'combles'
-    setForm({ ...emptyForm(), catalogue_groupe: filtrePublic, public_cible: filtrePublic === 'professionnel' ? 'professionnel' : filtrePublic === 'visite_technique' ? 'tous' : 'particulier', categorie })
+    const categorie = filtrePublic === 'professionnel' ? 'pac_air_eau' : filtrePublic === 'visite_technique' ? 'vt_complete' : 'rampants'
+    setForm({ ...emptyForm(), catalogue_groupe: filtrePublic, public_cible: filtrePublic === 'professionnel' ? 'professionnel' : 'particulier', categorie })
     setModalOpen(true)
   }
 
@@ -171,14 +284,14 @@ export function CataloguePage() {
     const carac = Object.entries(p.caracteristiques || {}).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
     setForm({
       categorie: p.categorie, catalogue_groupe: (p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) as GroupeCatalogue, public_cible: p.public_cible || 'particulier', nom: p.nom, marque: p.marque, reference: p.reference,
-      description: p.description,
+      description: nettoyerDescriptionProduit(p.description),
       caracteristiques: carac.length ? carac : [{ cle: '', valeur: '' }],
-      prix_unitaire_ht: String(p.prix_unitaire_ht),
+      prix_unitaire_ht: prixARenseigner(p) ? '' : String(p.prix_unitaire_ht),
       unite: p.unite, tva_taux: p.tva_taux,
       eligible_mpr: p.eligible_mpr, eligible_cee: p.eligible_cee, fiche_cee: p.fiche_cee,
       actif: p.actif,
       zones_prix: (p.zones_prix || []).map(z => ({ zone: z.zone, prix_unitaire_ht: String(z.prix_unitaire_ht) })),
-      forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''),
+      forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''), forfait_consommables_ht: String(p.forfait_consommables_ht ?? ''),
     })
     setModalOpen(true)
   }
@@ -190,14 +303,14 @@ export function CataloguePage() {
     const carac = Object.entries(p.caracteristiques || {}).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
     setForm({
       categorie: p.categorie, catalogue_groupe: (p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) as GroupeCatalogue, public_cible: p.public_cible || 'particulier', nom: `${p.nom} (copie)`, marque: p.marque, reference: '',
-      description: p.description,
+      description: nettoyerDescriptionProduit(p.description),
       caracteristiques: carac.length ? carac : [{ cle: '', valeur: '' }],
-      prix_unitaire_ht: String(p.prix_unitaire_ht),
+      prix_unitaire_ht: prixARenseigner(p) ? '' : String(p.prix_unitaire_ht),
       unite: p.unite, tva_taux: p.tva_taux,
       eligible_mpr: p.eligible_mpr, eligible_cee: p.eligible_cee, fiche_cee: p.fiche_cee,
       actif: true,
       zones_prix: (p.zones_prix || []).map(z => ({ zone: z.zone, prix_unitaire_ht: String(z.prix_unitaire_ht) })),
-      forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''),
+      forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''), forfait_consommables_ht: String(p.forfait_consommables_ht ?? ''),
     })
     setModalOpen(true)
   }
@@ -222,22 +335,34 @@ export function CataloguePage() {
     setForm(f => ({ ...f, caracteristiques: f.caracteristiques.filter((_, idx) => idx !== i) }))
   }
 
+  // Fiche CEE active du formulaire (celle saisie, sinon celle de la catégorie) et contrôle en direct
+  const ficheForm = form.eligible_cee ? (extraireFiche(form.fiche_cee) || FICHE_PAR_CATEGORIE[form.categorie] || null) : null
+  const pointsForm = ficheForm ? pointsProduit({ fiche: ficheForm, marque: form.marque, reference: form.reference, caracteristiques: carObj(form.caracteristiques) }) : []
+  const blocsForm = pointsForm.filter(x => x.gravite === 'bloc')
+  const regleForm = ficheForm ? REGLES_FICHES[ficheForm] : null
+  const mauvaisChamp = (c: string) => blocsForm.some(x => x.champ === c)
+  const estChampFicheForm = (cle: string) => !!ficheForm && !!REGLES_FICHES[ficheForm]?.verifiee && estChampDeFiche(ficheForm, cle)
+  const mprPossible = CATEGORIES_MPR_PAR_GESTE.includes(form.categorie)
+
   async function save() {
     if (!form.nom.trim()) return
+    if (blocsForm.length > 0 && !window.confirm(`Ce produit ne respecte pas encore sa fiche ${ficheForm} (${blocsForm.length} point(s) à compléter) :\n\n${blocsForm.slice(0, 6).map(x => '• ' + x.message).join('\n')}\n\nUn devis aidé utilisant ce produit sera bloqué tant que ces données ne sont pas complétées. Enregistrer quand même ?`)) return
     setSaving(true)
 
     const caracteristiques = Object.fromEntries(
       form.caracteristiques.filter(c => c.cle.trim()).map(c => [c.cle.trim(), c.valeur])
     )
+    if ((parseFloat(form.prix_unitaire_ht) || 0) > 0) delete caracteristiques.prix_a_renseigner
+    if ((parseFloat(form.forfait_pose_ht) || 0) > 0) delete caracteristiques.forfait_pose_a_renseigner
 
     const payload = {
       categorie: form.categorie,
       catalogue_groupe: form.catalogue_groupe,
-      public_cible: form.catalogue_groupe === 'visite_technique' ? 'tous' : form.public_cible,
+      public_cible: form.public_cible,
       nom: form.nom,
       marque: form.marque,
       reference: form.reference,
-      description: form.description,
+      description: nettoyerDescriptionProduit(form.description),
       caracteristiques,
       prix_unitaire_ht: parseFloat(form.prix_unitaire_ht) || 0,
       unite: form.unite,
@@ -251,6 +376,7 @@ export function CataloguePage() {
         .map(z => ({ zone: z.zone.trim(), prix_unitaire_ht: parseFloat(z.prix_unitaire_ht) || 0 })),
       forfait_pose_ht: parseFloat(form.forfait_pose_ht) || 0,
       forfait_evacuation_ht: parseFloat(form.forfait_evacuation_ht) || 0,
+      forfait_consommables_ht: parseFloat(form.forfait_consommables_ht) || 0,
     }
 
     const result = editing
@@ -278,7 +404,10 @@ export function CataloguePage() {
 
   const filtered = rows
     .filter(r => { const g = r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier'); return g === filtrePublic })
+    .filter(r => filtrePublic !== 'visite_technique' || filtreVtPublic === 'tous' || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier') === filtreVtPublic)
     .filter(r => filtreCategorie === 'toutes' ? true : r.categorie === filtreCategorie)
+    .filter(r => !['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'photovoltaique', 'pro_photovoltaique'].includes(filtreCategorie) || filtreMarque === 'toutes' || (r.marque || '').trim() === filtreMarque)
+    .filter(r => filtreAudit === 'aucun' || (filtreAudit === 'conformite' ? auditerProduit(r).length > 0 : auditerCommercialement(r).length > 0))
     .filter(r => {
       if (!recherche.trim()) return true
       const q = recherche.trim().toLowerCase()
@@ -310,6 +439,18 @@ export function CataloguePage() {
       .map(([label, produits]) => ({ label, produits }))
   })()
 
+  function exporterAuditCatalogue() {
+    const entete = ['ID','Nom','Catégorie','Groupe','Marque','Référence','Fiche CEE','Éligible CEE','Éligible MPR','Description','Problèmes détectés']
+    const lignes = rows.map(p => {
+      const issues = auditerProduit(p)
+      return [p.id, p.nom, labelsCategories[p.categorie] || p.categorie, p.catalogue_groupe || p.public_cible || '', p.marque || '', p.reference || '', ficheDuProduit(p) || p.fiche_cee || '', p.eligible_cee ? 'Oui' : 'Non', p.eligible_mpr ? 'Oui' : 'Non', nettoyerDescriptionProduit(p.description), issues.join(' | ')]
+    }).filter((row, index) => auditerProduit(rows[index]).length > 0)
+    const csv = [entete, ...lignes].map(row => row.map(v => `"${String(v ?? '').replace(/"/g, '""')}"`).join(';')).join('\r\n')
+    const blob = new Blob(['\ufeff', csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = `audit-reglementaire-catalogue-${new Date().toISOString().slice(0,10)}.csv`; a.click(); URL.revokeObjectURL(url)
+  }
+
   async function generateFicheTechnique(p: Produit) {
     const doc = new jsPDF()
     const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR' }).format(n)
@@ -328,7 +469,7 @@ export function CataloguePage() {
     const meta = [['Marque', p.marque], ['Référence', p.reference], ['Catégorie', labelsCategories[p.categorie] || p.categorie], ['Unité', UNITES.find(u => u.value === p.unite)?.label || p.unite]]
     for (const [label, value] of meta) { if (value) { doc.setFont('helvetica','bold'); doc.text(`${label} :`, 18, y); doc.setFont('helvetica','normal'); doc.text(String(value), 55, y); y += 7 } }
     y += 3; doc.setFont('helvetica','bold'); doc.text('Description', 18, y); y += 7; doc.setFont('helvetica','normal')
-    const desc = doc.splitTextToSize(p.description || 'Aucune description renseignée.', 174); doc.text(desc, 18, y); y += desc.length * 5 + 8
+    const desc = doc.splitTextToSize(nettoyerDescriptionProduit(p.description) || 'Aucune description renseignée.', 174); doc.text(desc, 18, y); y += desc.length * 5 + 8
     if (p.caracteristiques && Object.keys(p.caracteristiques).length) {
       doc.setFont('helvetica','bold'); doc.text('Caractéristiques techniques', 18, y); y += 7; doc.setFont('helvetica','normal')
       for (const [k,v] of Object.entries(p.caracteristiques)) { const lines=doc.splitTextToSize(`${k} : ${String(v)}`,174); doc.text(lines,18,y); y+=lines.length*5+2; if(y>270){doc.addPage();y=22} }
@@ -336,13 +477,13 @@ export function CataloguePage() {
     y += 5; doc.setFont('helvetica','bold'); doc.text('Éligibilité aux aides',18,y); y+=7; doc.setFont('helvetica','normal')
     doc.text(`MaPrimeRénov' : ${p.eligible_mpr ? 'Oui' : 'Non'}`,18,y); y+=6
     doc.text(`CEE : ${p.eligible_cee ? `Oui${p.fiche_cee ? ` — ${p.fiche_cee}` : ''}` : 'Non'}`,18,y)
-    if (isAdmin) { y+=10; doc.setFont('helvetica','bold'); doc.text(`Tarif interne HT : ${euro(Number(p.prix_unitaire_ht)||0)}`,18,y) }
+    if (isAdmin) { y+=10; doc.setFont('helvetica','bold'); doc.text(`Tarif interne HT : ${prixARenseigner(p) ? 'À renseigner' : euro(Number(p.prix_unitaire_ht)||0)}`,18,y) }
     doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.text(`Fiche générée le ${new Date().toLocaleDateString('fr-FR')} — Document technique RENOVA OS`,18,286)
     doc.save(`fiche-technique-${(p.nom||'produit').replace(/[^a-z0-9]+/gi,'-').replace(/^-|-$/g,'').toLowerCase()}.pdf`)
   }
 
   return (
-    <div className="page">
+    <div className="page rv">
       <div className="page-header">
         <div>
           <h1 className="page-title">Catalogue produits</h1>
@@ -354,48 +495,96 @@ export function CataloguePage() {
         </div>}
       </div>
 
-      <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 16, alignItems: 'center', justifyContent: 'space-between' }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {([{value:'particulier',label:'Particuliers'},{value:'professionnel',label:'Professionnels'},{value:'visite_technique',label:'Visites Techniques'}] as const).map(g => <button key={g.value} className={`btn btn-sm ${filtrePublic === g.value ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic(g.value); setFiltreCategorie('toutes') }}>{g.label}</button>)}
-          <span style={{ width: 1, background: 'var(--c-border)', margin: '0 4px' }} />
-          <button className={`btn btn-sm ${filtreCategorie === 'toutes' ? 'btn-primary' : 'btn-secondary'}`} onClick={() => setFiltreCategorie('toutes')}>
-            Toutes ({rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic).length})
-          </button>
-          <div style={{display:'flex',gap:14,flexWrap:'wrap',flexBasis:'100%'}}>
-            {sectionsAffichees.map(section => <div key={section.label} style={{display:'flex',flexDirection:'column',gap:5,minWidth:145}}>
-              <span className="field-label" style={{fontSize:11}}>{section.label}</span>
-              {section.categories.map((c:any) => {
-                const count = rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic && r.categorie === c.value).length
-                return <button key={c.value} className={`btn btn-sm ${filtreCategorie === c.value ? 'btn-primary' : 'btn-secondary'}`} style={{justifyContent:'flex-start'}} onClick={() => setFiltreCategorie(c.value)}>{c.label} ({count})</button>
-              })}
-            </div>)}
+      <div className="toolbar" style={{ marginTop: 0 }}>
+        <div className="chips">
+          {([{ value: 'particulier', label: 'Particuliers' }, { value: 'professionnel', label: 'Professionnels' }, { value: 'visite_technique', label: 'Visites Techniques' }] as const).map(g => (
+            <button key={g.value} className="chip" aria-pressed={filtrePublic === g.value} onClick={() => { setFiltrePublic(g.value); setFiltreCategorie('toutes'); setFiltreMarque('toutes'); if (g.value === 'visite_technique') setFiltreVtPublic('particulier') }}>
+              {g.label}<small>{rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === g.value).length}</small>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {filtrePublic === 'visite_technique' && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div className="fam">
+            <b>Public des visites techniques</b>
+            <div className="chips">
+              <button className="chip" aria-pressed={filtreVtPublic === 'particulier'} onClick={() => { setFiltreVtPublic('particulier'); setFiltreCategorie('toutes') }}>Particuliers<small>{rows.filter(r => r.catalogue_groupe === 'visite_technique' && r.public_cible !== 'professionnel').length}</small></button>
+              <button className="chip" aria-pressed={filtreVtPublic === 'professionnel'} onClick={() => { setFiltreVtPublic('professionnel'); setFiltreCategorie('toutes') }}>Professionnels<small>{rows.filter(r => r.catalogue_groupe === 'visite_technique' && r.public_cible === 'professionnel').length}</small></button>
+              <button className="chip" aria-pressed={filtreVtPublic === 'tous'} onClick={() => { setFiltreVtPublic('tous'); setFiltreCategorie('toutes') }}>Tous les publics</button>
+            </div>
           </div>
         </div>
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-          <div className="pro-search-wrap" style={{ maxWidth: 280 }}>
-            <Search />
-            <input
-              placeholder="Rechercher un produit, une marque, une référence…"
-              value={recherche}
-              onChange={e => setRecherche(e.target.value)}
-            />
+      )}
+
+      {isAdmin && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <div>
+              <b>Audit conformité et données techniques du catalogue</b>
+              <p className="note" style={{ margin: '5px 0 0' }}>
+                {rows.length} produits chargés · {rows.filter(p => auditerProduit(p).length > 0).length} anomalies conformité/technique · {rows.filter(p => auditerCommercialement(p).length > 0).length} à compléter commercialement · {rows.filter(p => p.eligible_cee && !ficheDuProduit(p) && !estHorsChampBarEn104(p)).length} déclarés CEE sans fiche identifiable · {rows.filter(p => ficheDuProduit(p) && !REGLES_FICHES[ficheDuProduit(p)!]?.verifiee).length} avec règles non intégrées.
+              </p>
+            </div>
+            <Button variant="secondary" onClick={exporterAuditCatalogue}><FileText size={16} /> Exporter l’audit CSV</Button>
           </div>
-          <div style={{ display: 'flex', gap: 4 }}>
-            <button
-              className={`btn btn-sm ${groupement === 'categorie' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setGroupement('categorie')}
-              title="Grouper par catégorie technique"
-            >
-              Par catégorie
-            </button>
-            <button
-              className={`btn btn-sm ${groupement === 'fournisseur' ? 'btn-primary' : 'btn-secondary'}`}
-              onClick={() => setGroupement('fournisseur')}
-              title="Grouper par fournisseur / marque"
-            >
-              Par fournisseur
-            </button>
+          <p className="note" style={{ margin: '8px 0 0' }}>
+            L’audit repère les informations manquantes ou douteuses sans fabriquer de valeurs réglementaires. Les exigences non intégrées doivent être vérifiées sur la fiche officielle applicable avant de déclarer un produit conforme.
+          </p>
+        </div>
+      )}
+
+      <div className="panel" style={{ marginBottom: 14 }}>
+        {sectionsAffichees.map(section => (
+          <div key={section.label} className="fam">
+            <b>{section.label}</b>
+            <div className="chips">
+              {section.categories.map((c: any) => {
+                const count = rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic && r.categorie === c.value).length
+                return <button key={c.value} className="chip" aria-pressed={filtreCategorie === c.value} onClick={() => { setFiltreCategorie(c.value); setFiltreMarque('toutes') }}>{c.label}<small>{count}</small></button>
+              })}
+            </div>
           </div>
+        ))}
+        <button className="chip" aria-pressed={filtreCategorie === 'toutes'} onClick={() => { setFiltreCategorie('toutes'); setFiltreMarque('toutes') }}>
+          Tout afficher<small>{rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic).length}</small>
+        </button>
+      </div>
+
+      {['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'photovoltaique', 'pro_photovoltaique'].includes(filtreCategorie) && (
+        <div className="panel" style={{ marginBottom: 14 }}>
+          <div className="fam">
+            <b>Filtrer par marque</b>
+            <div className="chips">
+              <button className="chip" aria-pressed={filtreMarque === 'toutes'} onClick={() => setFiltreMarque('toutes')}>
+                Toutes les marques<small>{rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic && r.categorie === filtreCategorie).length}</small>
+              </button>
+              {[...new Set(rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic && r.categorie === filtreCategorie && (r.marque || '').trim()).map(r => r.marque.trim()))].sort((a, b) => a.localeCompare(b, 'fr')).map(marque => (
+                <button key={marque} className="chip" aria-pressed={filtreMarque === marque} onClick={() => setFiltreMarque(marque)}>
+                  {marque}<small>{rows.filter(r => (r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) === filtrePublic && r.categorie === filtreCategorie && (r.marque || '').trim() === marque).length}</small>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="toolbar" style={{ marginTop: 0 }}>
+        <span style={{ position: 'relative', display: 'inline-flex', flex: 1, maxWidth: 400 }}>
+          <Search size={15} style={{ position: 'absolute', left: 11, top: 12, color: 'var(--rv-mute)' }} />
+          <input className="search" style={{ paddingLeft: 32, width: '100%' }} placeholder="Rechercher un produit, une marque, une référence…" value={recherche} onChange={e => setRecherche(e.target.value)} />
+        </span>
+        <button className="chip" aria-pressed={filtreAudit === 'conformite'} onClick={() => setFiltreAudit(v => v === 'conformite' ? 'aucun' : 'conformite')} title="Filtrer les anomalies techniques et réglementaires, sans tenir compte des prix ni des forfaits de pose">
+          <ShieldCheck size={13} style={{ verticalAlign: -2, marginRight: 5 }} />À auditer — conformité<small>{rows.filter(r => auditerProduit(r).length > 0).length}</small>
+        </button>
+        <button className="chip" aria-pressed={filtreAudit === 'commercial'} onClick={() => setFiltreAudit(v => v === 'commercial' ? 'aucun' : 'commercial')} title="Filtrer séparément les produits dont le prix de fourniture ou le forfait de pose reste à renseigner/confirmer">
+          <FileText size={13} style={{ verticalAlign: -2, marginRight: 5 }} />À compléter — tarifs<small>{rows.filter(r => auditerCommercialement(r).length > 0).length}</small>
+        </button>
+        <div className="spacer" />
+        <div className="chips">
+          <button className="chip" aria-pressed={groupement === 'categorie'} onClick={() => setGroupement('categorie')} title="Grouper par catégorie technique">Par catégorie</button>
+          <button className="chip" aria-pressed={groupement === 'fournisseur'} onClick={() => setGroupement('fournisseur')} title="Grouper par fournisseur / marque">Par fournisseur</button>
         </div>
       </div>
 
@@ -415,75 +604,89 @@ export function CataloguePage() {
           </div>
         </div>
       ) : (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
           {groupes.map(groupe => (
-            <div className="card" key={groupe.label}>
-              <div className="card-header">
-                <div className="card-title">{groupe.label}</div>
-                <span className="badge badge-neutral">{groupe.produits.length} produit{groupe.produits.length > 1 ? 's' : ''}</span>
+            <section className="panel" key={groupe.label} style={{ padding: 0 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 18px 4px' }}>
+                <h2 className="rv-h" style={{ margin: 0 }}>{groupe.label}</h2>
+                <span className="pill n">{groupe.produits.length} produit{groupe.produits.length > 1 ? 's' : ''}</span>
               </div>
-              <table className="table">
-                <thead>
-                  <tr>
-                    <th>Produit</th>
-                    {groupement === 'fournisseur' && <th>Catégorie</th>}
-                    {isAdmin && <th>Prix HT</th>}
-                    <th>TVA</th>
-                    <th>Aides</th>
-                    <th>Statut</th>
-                    <th></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {groupe.produits.map(p => (
-                    <tr key={p.id} style={{ opacity: p.actif ? 1 : 0.5 }}>
-                      <td>
-                        <div className="font-semibold">{p.nom}</div>
-                        <div className="text-xs" style={{ marginTop: 3 }}><span className="badge badge-neutral">{p.public_cible === 'professionnel' ? 'PRO' : p.public_cible === 'tous' ? 'TOUS' : 'PARTICULIER'}</span></div>
-                        <div className="text-sm text-muted">{[p.marque, p.reference].filter(Boolean).join(' · ') || '—'}</div>
-                        {p.zones_prix && p.zones_prix.length > 0 && (
-                          <div className="text-xs text-muted mt-1">{p.zones_prix.length} zone{p.zones_prix.length > 1 ? 's' : ''} tarifaire{p.zones_prix.length > 1 ? 's' : ''}</div>
-                        )}
-                      </td>
-                      {groupement === 'fournisseur' && <td>{labelsCategories[p.categorie] || p.categorie}</td>}
-                      {isAdmin && <td>{euro(p.prix_unitaire_ht)} / {UNITES.find(u => u.value === p.unite)?.label || p.unite}</td>}
-                      <td>{p.tva_taux}%</td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          {p.eligible_mpr && <span className="badge badge-info">MaPrimeRénov'</span>}
-                          {p.eligible_cee && <span className="badge badge-info">CEE{p.fiche_cee ? ` ${p.fiche_cee}` : ''}</span>}
-                          {!p.eligible_mpr && !p.eligible_cee && <span className="text-muted text-sm">—</span>}
-                        </div>
-                      </td>
-                      <td>
-                        <button className={`badge ${p.actif ? 'badge-success' : 'badge-neutral'}`} onClick={() => toggleActif(p)} style={{ cursor: 'pointer', border: 'none' }}>
-                          {p.actif ? 'Actif' : 'Inactif'}
-                        </button>
-                      </td>
-                      <td>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          <button className="btn-icon" onClick={() => generateFicheTechnique(p)} title="Télécharger la fiche technique"><FileText size={16} /></button>
-                          {isAdmin && <>
-                            <button className="btn-icon" onClick={() => openDuplicate(p)} title="Dupliquer (nouvelle variante de cette gamme)"><Copy size={16} /></button>
-                            <button className="btn-icon" onClick={() => openEdit(p)} title="Modifier"><Pencil size={16} /></button>
-                            <button className="btn-icon" onClick={() => remove(p)} title="Supprimer"><Trash2 size={16} /></button>
-                          </>}
-                        </div>
-                      </td>
+              <div className="scroll">
+                <table className="cat">
+                  <thead>
+                    <tr>
+                      <th>Produit</th>
+                      {groupement === 'fournisseur' && <th>Catégorie</th>}
+                      <th>Fiche</th>
+                      <th>Conformité à la fiche</th>
+                      {isAdmin && <th>Prix HT</th>}
+                      <th>TVA</th>
+                      <th>Statut</th>
+                      <th></th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                  </thead>
+                  <tbody>
+                    {groupe.produits.map(p => {
+                      const st = statutProduit(p)
+                      const fiche = ficheDuProduit(p)
+                      return (
+                        <tr key={p.id} className={`row ${p.actif ? '' : 'off'}`}>
+                          <td>
+                            <div className="pn">{p.nom}
+                              <small>{[p.marque, p.reference].filter(Boolean).join(' · ') || '—'}{p.zones_prix && p.zones_prix.length > 0 ? ` · ${p.zones_prix.length} zone${p.zones_prix.length > 1 ? 's' : ''} tarifaire${p.zones_prix.length > 1 ? 's' : ''}` : ''}</small>
+                            </div>
+                          </td>
+                          {groupement === 'fournisseur' && <td>{labelsCategories[p.categorie] || p.categorie}</td>}
+                          <td>
+                            {fiche ? <span className="pill">{fiche}</span> : <span className="pill n">Hors CEE</span>}
+                            {p.eligible_mpr && <> <span className="pill g">MaPrimeRénov’</span></>}
+                          </td>
+                          <td>
+                            {st.kind === 'aucun' && <span className="note">Sans contrôle de fiche</span>}
+                            {st.kind !== 'aucun' && (
+                              <button className="iconbtn" style={{ padding: 0 }} onClick={() => setFicheDetail(p)} title="Voir le contrôle de la fiche">
+                                {st.kind === 'non_integre' && <span className="pill n" title="Fiche non intégrée au moteur : contrôle manuel à réaliser sur la fiche officielle. N'est pas comptée dans « À auditer ».">Règles non intégrées — contrôle manuel</span>}
+                                {st.kind === 'a_completer' && <span className="pill w">{st.blocs} à compléter</span>}
+                                {st.kind === 'conforme' && <span className="pill g">Conforme</span>}
+                              </button>
+                            )}
+                          </td>
+                          {isAdmin && <td className="num">{prixARenseigner(p) ? 'À renseigner' : euro(p.prix_unitaire_ht)} <span className="note">/ {UNITES.find(u => u.value === p.unite)?.label || p.unite}</span></td>}
+                          <td className="num">{p.tva_taux} %</td>
+                          <td>
+                            <button className={`pill ${p.actif ? 'g' : 'n'}`} onClick={() => toggleActif(p)} style={{ cursor: 'pointer', border: 'none' }}>{p.actif ? 'Actif' : 'Inactif'}</button>
+                          </td>
+                          <td>
+                            <div style={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
+                              <button className="iconbtn" onClick={() => generateFicheTechnique(p)} title="Télécharger la fiche technique"><FileText size={16} /></button>
+                              {isAdmin && <>
+                                <button className="iconbtn" onClick={() => openDuplicate(p)} title="Dupliquer (nouvelle variante de cette gamme)"><Copy size={16} /></button>
+                                <button className="iconbtn" onClick={() => openEdit(p)} title="Modifier"><Pencil size={16} /></button>
+                                <button className="iconbtn" onClick={() => remove(p)} title="Supprimer"><Trash2 size={16} /></button>
+                              </>}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </section>
           ))}
         </div>
       )}
 
-      <Modal
+      <Drawer
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editing ? 'Modifier le produit' : 'Ajouter un produit'}
-        width={640}
+        eyebrow={editing ? 'Catalogue produits' : 'Nouveau produit'}
+        title={editing ? (form.nom || 'Modifier le produit') : 'Ajouter un produit'}
+        badges={<>
+          {ficheForm ? <span className="pill">{ficheForm}</span> : <span className="pill n">Hors CEE</span>}
+          {form.eligible_mpr && <span className="pill g">MaPrimeRénov’</span>}
+          <span className={`pill ${form.actif ? 'g' : 'n'}`}>{form.actif ? 'Actif' : 'Inactif'}</span>
+        </>}
         footer={
           <>
             <Button variant="secondary" onClick={() => setModalOpen(false)}>Annuler</Button>
@@ -491,6 +694,7 @@ export function CataloguePage() {
           </>
         }
       >
+        <section className="panel sect">
         <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
           <div className="grid grid-2">
             <label className="field">
@@ -508,26 +712,26 @@ export function CataloguePage() {
           <div className="grid grid-2">
             <label className="field">
               <span>Famille du catalogue</span>
-              <select value={form.catalogue_groupe} onChange={e => setForm(f => { const catalogue_groupe = e.target.value as GroupeCatalogue; const options = categoriesAffichees.filter(c => categorieCompatibleGroupe(c, catalogue_groupe)); const categorie = options.some(c => c.value === f.categorie) ? f.categorie : (options[0]?.value || 'autre'); const public_cible = catalogue_groupe === 'professionnel' ? 'professionnel' : catalogue_groupe === 'visite_technique' ? 'tous' : 'particulier'; return { ...f, catalogue_groupe, public_cible, categorie } })}>
+              <select value={form.catalogue_groupe} onChange={e => setForm(f => { const catalogue_groupe = e.target.value as GroupeCatalogue; const options = categoriesAffichees.filter(c => categorieCompatibleGroupe(c, catalogue_groupe)); const categorie = options.some(c => c.value === f.categorie) ? f.categorie : (options[0]?.value || 'autre'); const public_cible = catalogue_groupe === 'professionnel' ? 'professionnel' : 'particulier'; return { ...f, catalogue_groupe, public_cible, categorie } })}>
                 <option value="particulier">Particuliers</option><option value="professionnel">Professionnels</option><option value="visite_technique">Visites Techniques</option>
               </select>
             </label>
             <label className="field">
               <span>Public du devis</span>
-              <select value={form.public_cible} onChange={e => setForm(f => ({ ...f, public_cible: e.target.value as FormState['public_cible'] }))} disabled={form.catalogue_groupe === 'visite_technique'}>
-                <option value="particulier">Particulier</option><option value="professionnel">Professionnel</option><option value="tous">Tous publics</option>
+              <select value={form.public_cible} onChange={e => setForm(f => ({ ...f, public_cible: e.target.value as FormState['public_cible'] }))}>
+                <option value="particulier">Particulier</option><option value="professionnel">Professionnel</option>{form.catalogue_groupe !== 'visite_technique' && <option value="tous">Tous publics</option>}
               </select>
             </label>
           </div>
 
           <div className="grid grid-2">
             <label className="field">
-              <span>Marque</span>
-              <input value={form.marque} onChange={e => setForm(f => ({ ...f, marque: e.target.value }))} placeholder="ex: Daikin" />
+              <span>Marque{form.eligible_cee ? ' *' : ''}</span>
+              <input style={mauvaisChamp('marque') ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} value={form.marque} onChange={e => setForm(f => ({ ...f, marque: e.target.value }))} placeholder="ex: Daikin" />
             </label>
             <label className="field">
-              <span>Référence</span>
-              <input value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="ex: ETSX16P50D" />
+              <span>Référence fabricant{form.eligible_cee ? ' *' : ''}</span>
+              <input style={mauvaisChamp('reference') ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="ex: ETSX16P50D" />
             </label>
           </div>
 
@@ -536,12 +740,24 @@ export function CataloguePage() {
             <textarea rows={2} value={form.description} onChange={e => setForm(f => ({ ...f, description: e.target.value }))} placeholder="Description commerciale du produit" />
           </label>
 
+
+          {ficheForm && (
+            <div>
+              <div className="field-label" style={{ marginBottom: 6 }}>
+                Caractéristiques exigées par la fiche {ficheForm}
+                <span className="text-sm text-muted" style={{ fontWeight: 400 }}> — reprises sur le devis, contrôlées à l'ajout au devis</span>
+              </div>
+              <LigneFicheFields fiche={ficheForm} surLigne={false} ouvert caracteristiques={carObj(form.caracteristiques)}
+                onChange={next => setForm(f => ({ ...f, caracteristiques: [...carList(next), { cle: '', valeur: '' }] }))} />
+            </div>
+          )}
+
           <div>
             <div className="field-label" style={{ marginBottom: 6 }}>
-              Caractéristiques techniques
+              Autres caractéristiques techniques
               <span className="text-sm text-muted" style={{ fontWeight: 400 }}> — affichées sur le devis mono-geste</span>
             </div>
-            {form.caracteristiques.map((c, i) => (
+            {form.caracteristiques.map((c, i) => estChampFicheForm(c.cle) ? null : (
               <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
                 <input placeholder="ex: COP" value={c.cle} onChange={e => setCarac(i, { cle: e.target.value })} style={{ flex: 1 }} />
                 <input placeholder="ex: 4,2" value={c.valeur} onChange={e => setCarac(i, { valeur: e.target.value })} style={{ flex: 1 }} />
@@ -586,9 +802,12 @@ export function CataloguePage() {
               <input type="number" step="0.01" value={form.forfait_evacuation_ht} onChange={e => setForm(f => ({ ...f, forfait_evacuation_ht: e.target.value }))} placeholder="0.00" />
             </label>
           </div>
+          <label className="field">
+            <span>Coût des consommables HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
+            <input type="number" min="0" step="0.01" value={form.forfait_consommables_ht} onChange={e => setForm(f => ({ ...f, forfait_consommables_ht: e.target.value }))} placeholder="0.00" />
+          </label>
           <p className="text-xs text-muted mb-2" style={{ marginTop: -8 }}>
-            Si renseignés, ces forfaits sont ajoutés automatiquement en lignes séparées
-            dans le devis dès que ce produit est sélectionné (laisser à 0 si non applicable).
+            Les forfaits de pose, d’évacuation et de consommables renseignés sont ajoutés automatiquement en lignes séparées au devis, sans modifier le prix du matériel.
           </p>
 
           <div className="grid grid-2">
@@ -597,7 +816,7 @@ export function CataloguePage() {
               <span>Éligible MaPrimeRénov'</span>
             </label>
             <label className="checkbox-field">
-              <input type="checkbox" checked={form.eligible_cee} onChange={e => setForm(f => ({ ...f, eligible_cee: e.target.checked }))} />
+              <input type="checkbox" checked={form.eligible_cee} onChange={e => setForm(f => ({ ...f, eligible_cee: e.target.checked, fiche_cee: e.target.checked && !f.fiche_cee ? (FICHE_PAR_CATEGORIE[f.categorie] || '') : f.fiche_cee }))} />
               <span>Éligible CEE</span>
             </label>
           </div>
@@ -605,9 +824,27 @@ export function CataloguePage() {
           {form.eligible_cee && (
             <label className="field">
               <span>Fiche CEE de référence</span>
-              <input value={form.fiche_cee} onChange={e => setForm(f => ({ ...f, fiche_cee: e.target.value }))} placeholder="ex: BAR-TH-104" />
+              <input list="fiches-cee" value={form.fiche_cee} onChange={e => setForm(f => ({ ...f, fiche_cee: e.target.value }))} placeholder="ex: BAR-TH-171" />
+              <datalist id="fiches-cee">{Object.entries(REGLES_FICHES).map(([code, r]) => <option key={code} value={code}>{r.nom}</option>)}</datalist>
             </label>
           )}
+
+          {form.eligible_mpr && !mprPossible && (
+            <div className="status no" style={{ margin: 0 }}>
+              D'après les règles Anah au 01/09/2026, MaPrimeRénov' « par geste » ne concerne plus cette catégorie (seulement PAC air/eau, PAC géothermique, réseau de chaleur, dépose de cuve fioul, audit). Votre barème interne reste appliqué dans les devis ; à confirmer auprès de l'Anah / France Rénov'. Les CEE restent possibles.
+            </div>
+          )}
+
+          {ficheForm && (
+            <div className="panel" style={{ margin: 0 }}>
+              <div className="grp-head"><h3>Contrôle de la fiche {ficheForm}</h3>
+                {regleForm?.verifiee ? <span className={`pill ${blocsForm.length ? 'w' : 'g'}`}>{blocsForm.length ? `${blocsForm.length} à compléter` : 'Conforme'}</span> : <span className="pill">Règles non intégrées</span>}
+              </div>
+              {pointsForm.length === 0 && regleForm?.verifiee && <div className="status ok">Ce produit respecte les critères de la fiche.</div>}
+              {pointsForm.map((x, i) => <div key={i} className="check"><span className={`dot ${x.gravite === 'bloc' ? 'no' : 'inf'}`}>{x.gravite === 'bloc' ? '!' : 'i'}</span><div>{x.message}</div></div>)}
+            </div>
+          )}
+
 
           <div>
             <div className="field-label" style={{ marginBottom: 6 }}>Prix par zone géographique (optionnel)</div>
@@ -646,7 +883,46 @@ export function CataloguePage() {
             <span>Produit actif (visible dans les devis)</span>
           </label>
         </div>
-      </Modal>
+        </section>
+      </Drawer>
+
+      <Drawer
+        open={!!ficheDetail}
+        onClose={() => setFicheDetail(null)}
+        eyebrow="Contrôle de la fiche"
+        title={ficheDetail ? ficheDetail.nom : ''}
+        badges={ficheDetail ? <>{ficheDuProduit(ficheDetail) ? <span className="pill">{ficheDuProduit(ficheDetail)}</span> : <span className="pill n">Hors CEE</span>}</> : undefined}
+        footer={<>
+          {isAdmin && ficheDetail && <Button variant="secondary" onClick={() => { const p = ficheDetail; setFicheDetail(null); openEdit(p) }}><Pencil size={15} /> Compléter le produit</Button>}
+          <Button variant="primary" onClick={() => setFicheDetail(null)}>Fermer</Button>
+        </>}
+      >
+        {ficheDetail && (() => {
+          const fiche = ficheDuProduit(ficheDetail)!
+          const R = REGLES_FICHES[fiche]
+          const pts = pointsProduit({ fiche, marque: ficheDetail.marque, reference: ficheDetail.reference, caracteristiques: ficheDetail.caracteristiques })
+          const blocs = pts.filter(x => x.gravite === 'bloc')
+          return (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {!R?.verifiee
+                ? <div className="status" style={{ background: '#eff6ff', color: '#1e40af' }}>Les règles de {fiche} ne sont pas intégrées à l'outil. Contrôle manuel sur <a href={R?.src || '#'} target="_blank" rel="noopener noreferrer">le texte officiel</a>.</div>
+                : <div className={`status ${blocs.length ? 'no' : 'ok'}`}>{blocs.length ? `${blocs.length} point(s) à compléter avant de pouvoir utiliser ce produit sur un devis aidé` : 'Ce produit respecte les critères de la fiche.'}</div>}
+              {blocs.map((x, i) => <div key={i} className="check"><span className="dot no">!</span><div>{x.message}</div></div>)}
+              {R && (
+                <div className="text-sm" style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div><b>Fiche</b> {fiche} — {R.nom} · version {R.version}</div>
+                  {R.preuve && <div><b>Sur le devis et la facture</b> {R.preuve}</div>}
+                  {R.pieces && <div><b>Pièces à conserver</b> {R.pieces}</div>}
+                  <div><b>Qualification exigée</b> {R.qualif}</div>
+                  {R.cumul.length > 0 && <div><b>Non cumulable avec</b> {R.cumul.join(', ')}</div>}
+                  {R.vie && <div><b>Durée de vie conventionnelle</b> {R.vie} ans</div>}
+                  <div><a href={R.src} target="_blank" rel="noopener noreferrer">Ouvrir la fiche officielle</a> <span className="text-muted">· règles relevées le {DATE_REGLES}</span></div>
+                </div>
+              )}
+            </div>
+          )
+        })()}
+      </Drawer>
     </div>
   )
 }

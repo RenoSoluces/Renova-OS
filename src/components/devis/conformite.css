@@ -1,0 +1,32 @@
+/* Contrôle de conformité, sections fiches : styles du devis (Renova OS) */
+.conf-panel{border:1px solid var(--c-border,#e5e7eb);border-radius:14px;background:var(--c-surface,#fff);padding:16px;margin-bottom:14px}
+.conf-head{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.conf-head h3{margin:0;font-size:15px;font-weight:700}
+.conf-status{margin:12px 0;padding:10px 12px;border-radius:10px;font-size:13px;line-height:1.4}
+.conf-status.ok{background:#ecfdf3;color:#166534}
+.conf-status.no{background:#fef2f2;color:#991b1b}
+.conf-grp{margin-top:10px}
+.conf-grp>b{display:block;font-size:12px;letter-spacing:.02em;text-transform:uppercase;color:var(--c-text-muted,#6b7280);margin-bottom:4px}
+.conf-item{display:flex;gap:8px;align-items:flex-start;font-size:13px;line-height:1.4;padding:3px 0}
+.conf-dot{flex:0 0 18px;height:18px;border-radius:50%;display:inline-grid;place-items:center;font-size:11px;font-weight:700;color:#fff;margin-top:1px}
+.conf-dot.no{background:#dc2626}
+.conf-dot.inf{background:#2563eb}
+.conf-note{font-size:12px;color:var(--c-text-muted,#6b7280);margin:12px 0 0}
+.conf-pill{display:inline-block;font-size:11px;font-weight:600;padding:2px 8px;border-radius:999px;background:#eef2ff;color:#3730a3}
+.conf-pill.w{background:#fef3c7;color:#92400e}
+.conf-pill.g{background:#dcfce7;color:#166534}
+
+.conf-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.conf-checks{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:10px}
+.conf-check{display:flex;gap:8px;align-items:center;font-size:13px}
+.conf-check .hint{color:var(--c-text-muted,#6b7280);font-size:12px}
+.conf-section .field.bad input,.conf-section .field.bad select,
+.conf-fiche .field.bad input,.conf-fiche .field.bad select{border-color:#dc2626;background:#fef2f2}
+.conf-fiche{margin-top:10px;border-top:1px dashed var(--c-border,#e5e7eb);padding-top:8px}
+.conf-fiche summary{cursor:pointer;font-size:13px;font-weight:600;display:flex;gap:8px;align-items:center}
+.conf-fiche .conf-grid{margin-top:10px}
+.conf-fiche .unit{font-weight:400;color:var(--c-text-muted,#6b7280)}
+.devis-paper .ph{color:#b45309;font-style:italic}
+.conf-fiche .field,.conf-section .field{display:flex;flex-direction:column;gap:4px;font-size:12px;color:var(--c-text-muted,#7a7a7a)}
+.conf-fiche .field input,.conf-fiche .field select,.conf-section .field input,.conf-section .field select{height:34px;border:1px solid var(--c-border,#e0ddd5);border-radius:8px;padding:0 10px;font-size:13px;background:#fff;color:var(--c-text,#1a1a1a)}
+.conf-section .section-label{margin-bottom:0}

@@ -26,7 +26,6 @@ export interface Prospect {
   categorie_mpr: string | null
   statut_occupation: string
   fiches_cee: string[]
-  produits_interesses?: string[]
   zone_ile_de_france: boolean
   commercial: string | null
   commercial_id: string | null
@@ -502,6 +501,7 @@ export interface Produit {
   zones_prix: { zone: string; prix_unitaire_ht: number }[]
   forfait_pose_ht: number
   forfait_evacuation_ht: number
+  forfait_consommables_ht?: number
   tva_taux: number
   eligible_mpr: boolean
   eligible_cee: boolean
@@ -563,6 +563,8 @@ export interface Devis {
 }
 
 export interface DevisLigne {
+  /** Catégorie issue du catalogue, enrichie côté client pour le regroupement visuel du devis. */
+  categorie?: string
   id: string
   devis_id: string
   produit_id: string | null

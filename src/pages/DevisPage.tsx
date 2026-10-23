@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus, Sparkles, ImagePlus,
 } from 'lucide-react'
@@ -12,7 +12,7 @@ import { FloatSelect, FloatInput, FloatTextarea } from '../components/ui/FloatIn
 import { SignaturePad } from '../components/shared/SignaturePad'
 import {
   calculMontantLigneHT, calculTotauxDevis, calculResteACharge, type RemiseType,
-  CATEGORIE_VERS_GESTE_MPR, CATEGORIE_VERS_GESTE_CEE,
+  CATEGORIE_VERS_GESTE_MPR, CATEGORIE_VERS_GESTE_CEE, MPR_ISOLATION_PAR_GESTE_ACTIF,
 } from '../lib/devis/calculDevis'
 import { calculAideMPR, determinerProfilMPR, ProfilMPR, LABEL_PROFIL } from '../lib/aides/baremeMaPrimeRenov'
 import { prixProduitPourZone } from '../lib/catalogue/prixParZone'
@@ -21,6 +21,42 @@ import { telechargerDevisPDF } from '../lib/pdf/genererDevisPDF'
 import { useAuth } from '../lib/auth/AuthContext'
 import { numeroDevis } from '../lib/devis/numeroDevis'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { ConformitePanel } from '../components/devis/ConformitePanel'
+import { LigneFicheFields } from '../components/devis/LigneFicheFields'
+import { SectionsConformite } from '../components/devis/SectionsConformite'
+import { Search } from 'lucide-react'
+import '../components/devis/rv.css'
+import {
+  controlerDevis, ficheDuProduit, fusionnerMeta, META_PAR_DEFAUT, categorieRevenusDepuisLabel,
+  estChampDeFiche, libellesFiche, CLES_AUTO_ISOLATION, LABEL_CATEGORIE_REVENUS,
+  type ConformiteMeta, type PointConformite,
+} from '../lib/devis/conformite'
+import { REGLES_FICHES } from '../lib/devis/reglesFichesCEE'
+
+const CLE_PRO_LOCAL = 'renova.devis.pro'
+const pick = (o: any, cles: string[]) => { for (const k of cles) if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return String(o[k]); return '' }
+
+/** Valeurs initiales de la conformité : défauts + infos du prospect + dernières infos « pro » saisies sur ce poste. */
+function metaInitiale(prospect: any): ConformiteMeta {
+  let pro = META_PAR_DEFAUT.pro
+  try {
+    const brut = localStorage.getItem(CLE_PRO_LOCAL)
+    if (brut) pro = { ...pro, ...JSON.parse(brut), couvre: {} }
+  } catch { /* stockage indisponible */ }
+  const type = pick(prospect, ['type_logement', 'type_habitation'])
+  return {
+    ...META_PAR_DEFAUT,
+    pro,
+    logement: {
+      ...META_PAR_DEFAUT.logement,
+      type: /appart/i.test(type) ? 'Appartement' : 'Maison individuelle',
+      annee: pick(prospect, ['annee_construction', 'annee_logement']),
+      zone: pick(prospect, ['zone_climatique', 'zone_cee']).toUpperCase(),
+      surface: pick(prospect, ['surface_habitable', 'surface_chauffee', 'surface']),
+      energie: pick(prospect, ['energie_chauffage', 'chauffage_actuel']),
+    },
+  }
+}
 
 const STATUT_BADGE: Record<string, string> = {
   brouillon: 'badge-neutral', envoye: 'badge-warning',
@@ -28,26 +64,53 @@ const STATUT_BADGE: Record<string, string> = {
 }
 
 const CATEGORIES: { value: string; label: string }[] = [
-  { value: 'combles', label: 'Isolation combles / rampants' },
-  { value: 'murs', label: 'Isolation murs' },
+  { value: 'combles_perdus', label: 'Isolation des combles perdus' },
+  { value: 'rampants', label: 'Isolation des rampants' },
+  { value: 'ite', label: 'Isolation par l’extérieur (ITE)' },
   { value: 'plancher', label: 'Isolation plancher bas' },
-  { value: 'menuiseries', label: 'Menuiseries' },
+  { value: 'menuiseries', label: 'Menuiseries Extérieures - Fenêtres' },
+  { value: 'menuiseries_portes', label: 'Menuiseries Extérieures - Portes' },
   { value: 'pac_air_eau', label: 'PAC Air/Eau' },
   { value: 'pac_air_air', label: 'PAC Air/Air' },
   { value: 'pac_geothermie', label: 'PAC géothermique' },
   { value: 'ballon_thermodynamique', label: 'Ballon thermodynamique' },
   { value: 'vmc', label: 'VMC' },
   { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
+  { value: 'batterie_stockage', label: 'Batterie de stockage' },
   { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
-  { value: 'destratificateur', label: 'Destratificateur' },
+  { value: 'ssc', label: 'Système solaire combiné (SSC) — BAR-TH-143' },
+  { value: 'destratificateur', label: 'Destratificateur d’air' },
   { value: 'hp_flottante', label: 'HP flottante' },
-  { value: 'isolation_toiture_pro', label: 'Isolation de la toiture (pro)' },
+  { value: 'isolation_toiture_pro', label: 'Isolation toiture plate' },
+  { value: 'pro_photovoltaique', label: 'Panneaux photovoltaïques' },
   { value: 'professionnel_cee', label: 'Professionnels — CEE' },
   { value: 'professionnel_hors_cee', label: 'Professionnels — hors CEE' },
   { value: 'autre', label: 'Autre prestation' },
 ]
 
 type AssistantSuggestion = { product_id: string; quantite: number; justification: string }
+
+/** Hiérarchie d’affichage du devis : famille, puis opération, puis lignes chiffrées. */
+function familleCategorie(categorie: string): string {
+  if (['combles_perdus', 'rampants', 'ite', 'plancher', 'isolation_toiture_pro'].includes(categorie)) return 'isolation'
+  if (['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'destratificateur', 'hp_flottante'].includes(categorie)) return 'chauffage'
+  if (['ballon_thermodynamique', 'solaire_thermique', 'ssc'].includes(categorie)) return 'eau_chaude'
+  if (['photovoltaique', 'pro_photovoltaique', 'batterie_stockage'].includes(categorie)) return 'electricite'
+  if (['menuiseries', 'menuiseries_portes'].includes(categorie)) return 'menuiseries'
+  if (categorie === 'vmc') return 'ventilation'
+  if (categorie === 'professionnel_cee' || categorie === 'professionnel_hors_cee') return 'professionnels'
+  return 'autre'
+}
+
+function libelleFamilleCategorie(categorie: string): string {
+  const famille = familleCategorie(categorie)
+  const labels: Record<string, string> = { isolation: 'Isolation', chauffage: 'Système de chauffage', eau_chaude: 'Production d’eau chaude', electricite: 'Production d’électricité', menuiseries: 'Menuiseries extérieures', ventilation: 'Ventilation', professionnels: 'Prestations professionnelles', autre: 'Autres prestations' }
+  return labels[famille] || 'Autres prestations'
+}
+
+function libelleSousCategorie(categorie: string): string {
+  return CATEGORIES.find(c => c.value === categorie)?.label || categorie || 'Autre prestation'
+}
 
 const euro = (n: number | null | undefined) =>
   new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n || 0)
@@ -82,7 +145,7 @@ export function DevisPage({
   const [lignes, setLignes] = useState<DevisLigne[]>([])
   const [aides, setAides] = useState<DevisAide[]>([])
   const [produits, setProduits] = useState<Produit[]>([])
-  const [filtreCategorie, setFiltreCategorie] = useState<string>('combles')
+  const [filtreCategorie, setFiltreCategorie] = useState<string>('combles_perdus')
   const [saving, setSaving] = useState(false)
   const [tauxCEE, setTauxCEE] = useState(6)
   const [entreprise, setEntreprise] = useState<Entreprise | null>(null)
@@ -101,6 +164,8 @@ export function DevisPage({
   const [creatingAvenant, setCreatingAvenant] = useState(false)
   const [remiseType, setRemiseType] = useState<RemiseType>('montant')
   const [remiseValeur, setRemiseValeur] = useState(0)
+  const [conf, setConf] = useState<ConformiteMeta>(META_PAR_DEFAUT)
+  const [rechercheProduit, setRechercheProduit] = useState('')
 
   function fetchListe() {
     setLoading(true)
@@ -253,6 +318,7 @@ export function DevisPage({
 
   async function ouvrirDevis(devis: Devis & { prospect?: Prospect }) {
     setCurrent(devis)
+    setConf(fusionnerMeta((devis as any).conformite_devis, metaInitiale(devis.prospect)))
     setRemiseType((devis.remise_type || 'montant') as RemiseType)
     setRemiseValeur(Number(devis.remise_valeur || 0))
     setNomSignataire(devis.signature_nom_signataire || (devis.prospect ? `${devis.prospect.civilite || ''} ${devis.prospect.prenom} ${devis.prospect.nom}`.trim() : ''))
@@ -297,6 +363,7 @@ export function DevisPage({
       remise_valeur: current.remise_valeur || 0,
       montant_ht_avant_remise: current.montant_ht_avant_remise || current.montant_ht || 0,
       remise_montant_ht: current.remise_montant_ht || 0,
+      conformite_devis: conf,
     }).select('*, prospect:prospects(*)').single()
 
     if (!error && nouveau) {
@@ -368,17 +435,156 @@ export function DevisPage({
     return determinerProfilMPR(p.rfr, p.nombre_personnes_foyer, !!p.zone_ile_de_france)
   }, [current])
 
+  // Prime CEE ITE selon le barème transmis par Reno Soluces :
+  // Bleu = 12 €/m² ; Jaune/Violet/Rose = 8 €/m².
+  // La surface est calculée à partir des seules lignes de produits isolants ITE,
+  // jamais à partir de l'échafaudage ou de l'enduit pour éviter le double comptage.
+  useEffect(() => {
+    if (!current) return
+    const surfaceIte = lignes.reduce((total, ligne) => {
+      if (!ligne.produit_id) return total
+      const produit = produits.find(item => item.id === ligne.produit_id)
+      if (produit?.categorie !== 'ite') return total
+      const reference = String(produit.reference || '').toUpperCase()
+      const designation = String(produit.nom || ligne.designation || '').toLowerCase()
+      if (reference.startsWith('FAC_') || reference.includes('INJECTION') || reference.includes('ECOBILLES') || designation.includes('échafaudage') || designation.includes('enduit') || designation.includes('écobilles')) return total
+      return total + Math.max(0, Number(ligne.quantite) || 0)
+    }, 0)
+    const autoAideId = `cee_ite_surface:${current.id}`
+    const tauxM2 = profilMPR === 'bleu' ? 12 : 8
+    const montant = profilMPR && surfaceIte > 0 ? Math.round(surfaceIte * tauxM2 * 100) / 100 : 0
+
+    setAides(previous => {
+      const existing = previous.find(a => a.devis_id === current.id && (a.details as any)?.calculType === 'ite_surface')
+      if (montant <= 0 || !profilMPR) {
+        return existing ? previous.filter(a => a !== existing) : previous
+      }
+      const libelleProfil: Record<ProfilMPR, string> = {
+        bleu: 'Bleu — très modestes',
+        jaune: 'Jaune — modestes',
+        violet: 'Violet — intermédiaires',
+        rose: 'Rose — supérieurs / aisés',
+      }
+      const next = {
+        id: existing?.id || `tmp_${Date.now()}_cee_ite`,
+        devis_id: current.id,
+        type: 'cee' as const,
+        libelle: `Prime CEE ITE — profil ${libelleProfil[profilMPR]} (${tauxM2} €/m² × ${surfaceIte} m²)`,
+        montant,
+        details: { calculType: 'ite_surface', profil: profilMPR, taux_eur_m2: tauxM2, surface_m2: surfaceIte, formule: `${surfaceIte} × ${tauxM2}`, aide_id: autoAideId },
+        created_at: existing?.created_at || new Date().toISOString(),
+      }
+      if (existing && existing.montant === next.montant && existing.libelle === next.libelle && (existing.details as any)?.surface_m2 === surfaceIte) return previous
+      return existing ? previous.map(a => a === existing ? next : a) : [...previous, next]
+    })
+  }, [current?.id, lignes, produits, profilMPR])
+
+  // CEE rampants/sarking : estimation recalculée sur la surface des seules lignes isolantes
+  // dont la résistance thermique catalogue atteint R ≥ 6. L'aide reste distincte de la CEE ITE.
+  useEffect(() => {
+    if (!current) return
+    const lignesRampants = lignes.filter(ligne => {
+      if (!ligne.produit_id) return false
+      const produit = produits.find(item => item.id === ligne.produit_id)
+      if (!produit || !['rampants', 'combles'].includes(produit.categorie)) return false
+      const ref = String(produit.reference || '').toUpperCase()
+      const nom = String(produit.nom || ligne.designation || '').toLowerCase()
+      const c = produit.caracteristiques || {}
+      const r = Number(c.resistance_thermique_R_m2K_W ?? c.resistance_thermique ?? c.r ?? ligne.caracteristiques?.resistance_thermique ?? 0)
+      return r >= 6 && Number(ligne.quantite) > 0
+    })
+    const surface = lignesRampants.reduce((total, ligne) => total + Math.max(0, Number(ligne.quantite) || 0), 0)
+    const tauxRampantsM2 = profilMPR === 'bleu' ? 13 : 10
+    const montant = surface > 0 ? Math.round(surface * tauxRampantsM2 * 100) / 100 : 0
+    setAides(previous => {
+      const existing = previous.find(a => a.devis_id === current.id && ((a.details as any)?.calculType === 'cee_rampants_surface' || (a.type === 'cee' && ['isolation_combles', 'isolation_rampants'].includes((a.details as any)?.gesteId))))
+      const autres = previous.filter(a => { const details = a.details as any; const estCEEComblesAuto = details?.calculType === 'cee_rampants_surface' || (a.type === 'cee' && ['isolation_combles', 'isolation_rampants'].includes(details?.gesteId)); return !(a.devis_id === current.id && estCEEComblesAuto) })
+      if (!surface || !profilMPR || montant <= 0) return autres
+      const next: DevisAide = {
+        id: existing?.id || `tmp_${current.id}_cee_rampants`,
+        devis_id: current.id,
+        type: 'cee',
+        libelle: `Prime CEE rampants / sarking — ${surface} m² × ${tauxRampantsM2} €/m² (barème Reno Soluces)`,
+        montant,
+        details: { calculType: 'cee_rampants_surface', gesteId: 'isolation_rampants', surface_m2: surface, taux_eur_m2: tauxRampantsM2, fiche: 'BAR-EN-101', estimation: false },
+        created_at: existing?.created_at || new Date().toISOString(),
+      }
+      return [...autres, next]
+    })
+    const tauxMPRRampants = profilMPR === 'bleu' ? 25 : profilMPR === 'jaune' ? 20 : profilMPR === 'violet' ? 15 : 0
+    setAides(previous => {
+      const existing = previous.find(a => a.devis_id === current.id && (a.details as any)?.calculType === 'mpr_rampants_surface')
+      const autres = previous.filter(a => !(a.devis_id === current.id && (a.details as any)?.calculType === 'mpr_rampants_surface'))
+      if (!MPR_ISOLATION_PAR_GESTE_ACTIF || !surface || !profilMPR || tauxMPRRampants <= 0) return autres
+      const next: DevisAide = {
+        id: existing?.id || `tmp_${current.id}_mpr_rampants`,
+        devis_id: current.id,
+        type: 'maprimerenov',
+        libelle: `MaPrimeRénov’ rampants — ${surface} m² × ${tauxMPRRampants} €/m²`,
+        montant: Math.round(surface * tauxMPRRampants * 100) / 100,
+        details: { calculType: 'mpr_rampants_surface', gesteId: 'isolation_combles_amenages', profil: profilMPR, surface_m2: surface, taux_eur_m2: tauxMPRRampants },
+        created_at: existing?.created_at || new Date().toISOString(),
+      }
+      return [...autres, next]
+    })
+  }, [current?.id, lignes, produits, profilMPR])
+
+  // Combles perdus : barème 2026 communiqué par Reno Soluces, distinct des rampants.
+  useEffect(() => {
+    if (!current) return
+    const surface = lignes.reduce((total, ligne) => {
+      if (!ligne.produit_id) return total
+      const produit = produits.find(item => item.id === ligne.produit_id)
+      if (!produit || produit.categorie !== 'combles_perdus') return total
+      const c = produit.caracteristiques || {}
+      const r = Number(c.resistance_thermique_R_m2K_W ?? c.resistance_thermique ?? c.r ?? 0)
+      if (r < 7) return total
+      const nom = String(produit.nom || ligne.designation || '').toLowerCase()
+      if (nom.includes('pose') || nom.includes('déchet') || nom.includes('évacuation')) return total
+      return total + Math.max(0, Number(ligne.quantite) || 0)
+    }, 0)
+    const tauxCEE = profilMPR === 'bleu' ? 13 : 10
+    const montantCEE = surface > 0 ? Math.round(surface * tauxCEE * 100) / 100 : 0
+    setAides(previous => {
+      const existing = previous.find(a => a.devis_id === current.id && (a.details as any)?.calculType === 'cee_combles_perdus_surface')
+      const autres = previous.filter(a => !(a.devis_id === current.id && (a.details as any)?.calculType === 'cee_combles_perdus_surface'))
+      if (!surface || !profilMPR || montantCEE <= 0) return autres
+      const next: DevisAide = { id: existing?.id || `tmp_${current.id}_cee_combles_perdus`, devis_id: current.id, type: 'cee', libelle: `Prime CEE combles perdus — ${surface} m² × ${tauxCEE} €/m²`, montant: montantCEE, details: { calculType: 'cee_combles_perdus_surface', gesteId: 'isolation_combles_perdus', surface_m2: surface, taux_eur_m2: tauxCEE, fiche: 'BAR-EN-101', estimation: false }, created_at: existing?.created_at || new Date().toISOString() }
+      return [...autres, next]
+    })
+    // Le nettoyage de l'aide MPR existante doit toujours s'exécuter (même si la surface retombe à 0).
+    const tauxMPR = profilMPR === 'bleu' ? 25 : profilMPR === 'jaune' ? 20 : profilMPR === 'violet' ? 15 : 0
+    setAides(previous => {
+      const existing = previous.find(a => a.devis_id === current.id && (a.details as any)?.calculType === 'mpr_combles_perdus_surface')
+      const autres = previous.filter(a => !(a.devis_id === current.id && (a.details as any)?.calculType === 'mpr_combles_perdus_surface'))
+      if (!MPR_ISOLATION_PAR_GESTE_ACTIF || surface <= 0 || !profilMPR || tauxMPR <= 0) return autres
+      const next: DevisAide = { id: existing?.id || `tmp_${current.id}_mpr_combles_perdus`, devis_id: current.id, type: 'maprimerenov', libelle: `MaPrimeRénov’ combles perdus — ${surface} m² × ${tauxMPR} €/m²`, montant: Math.round(surface * tauxMPR * 100) / 100, details: { calculType: 'mpr_combles_perdus_surface', gesteId: 'isolation_combles_perdus', profil: profilMPR, surface_m2: surface, taux_eur_m2: tauxMPR }, created_at: existing?.created_at || new Date().toISOString() }
+      return [...autres, next]
+    })
+  }, [current?.id, lignes, produits, profilMPR])
+
   function ajouterProduit(produit: Produit, quantite = 1) {
-    const prixApplicable = prixProduitPourZone(produit, p?.code_postal)
+    const prixApplicable = prixProduitPourZone(produit, current?.prospect?.code_postal)
     const qte = Math.max(1, Math.floor(Number(quantite) || 1))
     const ordreBase = lignes.length
+    const caracteristiquesProduit: Record<string, string | number> = {
+      ...(produit.caracteristiques || {}),
+      ...(produit.marque ? { Marque: produit.marque } : {}),
+      ...(produit.reference ? { Référence: produit.reference } : {}),
+    }
+    if (['combles_perdus', 'rampants', 'combles', 'ite'].includes(produit.categorie)) {
+      caracteristiquesProduit.marque_isolant = caracteristiquesProduit.marque_isolant || [produit.marque, produit.reference].filter(Boolean).join(' ') || produit.description || produit.nom
+      const rCatalogue = caracteristiquesProduit.resistance_thermique_R_m2K_W ?? caracteristiquesProduit.resistance_thermique ?? caracteristiquesProduit.r
+      if (rCatalogue !== undefined && rCatalogue !== null && rCatalogue !== '') caracteristiquesProduit.resistance_thermique = Number(rCatalogue) || String(rCatalogue)
+      caracteristiquesProduit.surface_isolee = qte
+    }
     const ligne: DevisLigne = {
       id: `tmp_${Date.now()}_${Math.random()}`,
       devis_id: current!.id,
       produit_id: produit.id,
       designation: produit.nom,
       description: produit.description,
-      caracteristiques: produit.caracteristiques,
+      caracteristiques: caracteristiquesProduit,
       quantite: qte,
       prix_unitaire_ht: prixApplicable,
       tva_taux: produit.tva_taux,
@@ -425,6 +631,22 @@ export function DevisPage({
         created_at: new Date().toISOString(),
       })
     }
+    if ((produit.forfait_consommables_ht || 0) > 0) {
+      lignesAjoutees.push({
+        id: `tmp_${Date.now()}_${Math.random()}`,
+        devis_id: current!.id,
+        produit_id: null,
+        designation: `Consommables — ${produit.nom}`,
+        description: 'Coût des consommables associé à la fourniture et à la pose du produit.',
+        caracteristiques: {},
+        quantite: qte,
+        prix_unitaire_ht: produit.forfait_consommables_ht || 0,
+        tva_taux: produit.tva_taux,
+        montant_ht: (produit.forfait_consommables_ht || 0) * qte,
+        ordre: ordreBase + 3,
+        created_at: new Date().toISOString(),
+      })
+    }
     setLignes(ls => [...ls, ...lignesAjoutees])
 
     if (produit.eligible_mpr && profilMPR) {
@@ -444,10 +666,10 @@ export function DevisPage({
         }
       }
     }
-    if (produit.eligible_cee) {
+    if (produit.eligible_cee && !['combles', 'combles_perdus', 'rampants'].includes(produit.categorie)) {
       const gesteId = CATEGORIE_VERS_GESTE_CEE[produit.categorie]
       if (gesteId) {
-        const estimation = estimerPrimeCEE(gesteId, 1, tauxCEE)
+        const estimation = estimerPrimeCEE(gesteId, qte, tauxCEE)
         if (estimation.montantEstime > 0 && !aides.some(a => a.type === 'cee' && (a.details as any)?.gesteId === gesteId)) {
           setAides(as => [...as, {
             id: `tmp_${Date.now()}_cee`,
@@ -469,6 +691,9 @@ export function DevisPage({
       const updated = ls.map(l => {
         if (l.id !== id) return l
         const u = { ...l, ...patch }
+        if (patch.quantite !== undefined && (['combles', 'combles_perdus', 'rampants', 'ite'].includes(u.categorie || '') || l.caracteristiques?.surface_isolee !== undefined)) {
+          u.caracteristiques = { ...(u.caracteristiques || {}), surface_isolee: Number(patch.quantite) || 0 }
+        }
         u.montant_ht = calculMontantLigneHT(u)
         return u
       })
@@ -528,14 +753,41 @@ export function DevisPage({
   }
 
   const totaux = useMemo(() => calculTotauxDevis(lignes, remiseValeur, remiseType), [lignes, remiseValeur, remiseType])
+  const lignesAvecCategorie = useMemo(() => {
+    let categorieCourante = 'autre'
+    return lignes.map(l => {
+      const produit = l.produit_id ? produits.find(p => p.id === l.produit_id) : undefined
+      if (produit?.categorie) categorieCourante = produit.categorie
+      return { ...l, categorie: produit?.categorie || categorieCourante }
+    })
+  }, [lignes, produits])
+  const categorieRevenus = useMemo(() => profilMPR ? categorieRevenusDepuisLabel(String(LABEL_PROFIL[profilMPR])) : null, [profilMPR])
+  const fichesDuDevis = useMemo(() => Array.from(new Set(lignes.map(l => ficheDuProduit(l.produit_id ? produits.find(x => x.id === l.produit_id) : null)).filter((f): f is string => !!f))), [lignes, produits])
+  const ficheLigne = (l: { produit_id: string | null }) => ficheDuProduit(l.produit_id ? produits.find(x => x.id === l.produit_id) : null)
+  const pointsConformite: PointConformite[] = useMemo(() => controlerDevis({
+    lignes, produits, aides, meta: conf, totalTTC: totaux.montantTTC, categorieRevenus,
+    societe: { siret: current?.emetteur_siret || entreprise?.siret },
+    client: { nom: current?.prospect ? `${current.prospect.prenom || ''} ${current.prospect.nom || ''}`.trim() : '', adresse: current?.prospect?.adresse_rue || (current?.prospect as any)?.adresse },
+    devis: { dateValidite: current?.date_validite, dateDevis: current?.created_at?.slice(0, 10), dateSignature: current?.signature_date },
+  }), [lignes, produits, aides, conf, totaux.montantTTC, categorieRevenus, current, entreprise])
+  const blocsConformite = pointsConformite.filter(x => x.gravite === 'bloc')
+  const signatureBloquee = blocsConformite.length > 0 && !isAdmin
+  const aMontantCEE = aides.some(a => a.type === 'cee')
+
+  /** Un admin peut passer outre les points bloquants, après confirmation explicite. */
+  function confirmerMalgreBlocs(action: string): boolean {
+    if (blocsConformite.length === 0) return true
+    return window.confirm(`Ce devis présente ${blocsConformite.length} point(s) non conforme(s) aux règles CEE / MaPrimeRénov' intégrées (risque de refus du dossier).\n\n${blocsConformite.slice(0, 6).map(x => '• ' + x.message).join('\n')}\n\n${action} malgré tout ?`)
+  }
+  function ouvrirSignature() { if (confirmerMalgreBlocs('Signer')) setShowSignatureModal(true) }
   const totalAides = useMemo(() => aides.reduce((s, a) => s + (a.montant || 0), 0), [aides])
   const resteACharge = useMemo(() => calculResteACharge(totaux.montantTTC, aides), [totaux, aides])
 
   async function enregistrer() {
-    if (!current) return
+    if (!current) return false
     setSaving(true)
-
-    await supabase.from('devis').update({
+    try {
+    const { error: devisError } = await supabase.from('devis').update({
       montant_ht: totaux.montantHT,
       montant_ht_avant_remise: totaux.montantHTAvantRemise,
       remise_type: remiseType,
@@ -547,11 +799,15 @@ export function DevisPage({
       reste_a_charge: resteACharge,
       date_validite: current.date_validite,
       conditions_paiement: current.conditions_paiement,
+      conformite_devis: conf,
     }).eq('id', current.id)
+    if (devisError) throw devisError
+    try { localStorage.setItem(CLE_PRO_LOCAL, JSON.stringify({ rge: conf.pro.rge, organisme: conf.pro.organisme, validite: conf.pro.validite, assurance: conf.pro.assurance })) } catch { /* ignoré */ }
 
-    await supabase.from('devis_lignes').delete().eq('devis_id', current.id)
+    const { error: deleteLignesError } = await supabase.from('devis_lignes').delete().eq('devis_id', current.id)
+    if (deleteLignesError) throw deleteLignesError
     if (lignes.length > 0) {
-      await supabase.from('devis_lignes').insert(lignes.map((l, i) => ({
+      const { error: lignesError } = await supabase.from('devis_lignes').insert(lignes.map((l, i) => ({
         devis_id: current.id,
         produit_id: l.produit_id,
         designation: l.designation,
@@ -563,17 +819,20 @@ export function DevisPage({
         montant_ht: l.montant_ht,
         ordre: i,
       })))
+      if (lignesError) throw lignesError
     }
 
-    await supabase.from('devis_aides').delete().eq('devis_id', current.id)
+    const { error: deleteAidesError } = await supabase.from('devis_aides').delete().eq('devis_id', current.id)
+    if (deleteAidesError) throw deleteAidesError
     if (aides.length > 0) {
-      await supabase.from('devis_aides').insert(aides.map(a => ({
+      const { error: aidesError } = await supabase.from('devis_aides').insert(aides.map(a => ({
         devis_id: current.id,
         type: a.type,
         libelle: a.libelle,
         montant: a.montant,
         details: a.details,
       })))
+      if (aidesError) throw aidesError
     }
 
     setCurrent(c => c ? {
@@ -588,13 +847,19 @@ export function DevisPage({
       montant_aides: totalAides,
       reste_a_charge: resteACharge,
     } : c)
-    setSaving(false)
     fetchListe()
+    return true
+    } catch (error: any) {
+      window.alert(`Échec de l’enregistrement du devis : ${error?.message || 'erreur inconnue'}`)
+      return false
+    } finally { setSaving(false) }
   }
 
   async function envoyerSignature() {
+    if (!confirmerMalgreBlocs('Envoyer')) return
     if (!current) return
-    await enregistrer()
+    const saved = await enregistrer()
+    if (!saved) return
     await supabase.from('devis').update({ statut: 'envoye', signature_statut: 'envoye' }).eq('id', current.id)
     setCurrent(c => c ? { ...c, statut: 'envoye', signature_statut: 'envoye' } : c)
     fetchListe()
@@ -604,7 +869,7 @@ export function DevisPage({
     if (!current) return
     telechargerDevisPDF(
       { ...current, montant_ht: totaux.montantHT, montant_ht_avant_remise: totaux.montantHTAvantRemise, remise_type: remiseType, remise_valeur: remiseValeur, remise_montant_ht: totaux.remiseHT, montant_tva: totaux.montantTVA, montant_ttc: totaux.montantTTC, montant_aides: totalAides, reste_a_charge: resteACharge },
-      lignes,
+      lignesAvecCategorie,
       aides,
       current.prospect || null,
       entreprise
@@ -617,7 +882,8 @@ export function DevisPage({
 
     // On enregistre d'abord les lignes/aides en l'état, un devis signé ne doit plus être
     // modifiable ensuite (valeur juridique du "bon pour accord")
-    await enregistrer()
+    const saved = await enregistrer()
+    if (!saved) { setSigning(false); return }
 
     const dateSignature = new Date().toISOString()
 
@@ -681,8 +947,10 @@ export function DevisPage({
         // Checklist des pièces administratives usuelles à recueillir pour instruire le dossier
         await supabase.from('documents').insert([
           { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Devis signé', type: 'devis_signe', categorie: 'Contractuel', recu: true },
-          { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: "Avis d'imposition N-2", type: 'avis_imposition', categorie: 'Administratif', recu: false },
-          { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'RIB', type: 'rib', categorie: 'Administratif', recu: false },
+          { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Avis d’impôts (avis d’imposition)', type: 'avis_imposition', categorie: 'Administratif', recu: false },
+          { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Taxe foncière', type: 'taxe_fonciere', categorie: 'Administratif', recu: false },
+          { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Carte nationale d’identité (CNI)', type: 'piece_identite', categorie: 'Administratif', recu: false },
+          { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Justificatif de domicile', type: 'justificatif_domicile', categorie: 'Administratif', recu: false },
           { dossier_id: dossier.id, prospect_id: current.prospect_id, nom: 'Photos avant travaux', type: 'photos', categorie: 'Technique', recu: false },
         ])
       }
@@ -733,21 +1001,23 @@ export function DevisPage({
     fetchListe()
   }
 
-  const categoriesProOnly = ['destratificateur', 'hp_flottante', 'isolation_toiture_pro', 'professionnel_cee', 'professionnel_hors_cee']
+  const categoriesProOnly = ['destratificateur', 'hp_flottante', 'isolation_toiture_pro', 'pro_photovoltaique', 'professionnel_cee', 'professionnel_hors_cee']
   const categoriesDevis = CATEGORIES.filter(c => filtrePublic === 'tous' || (filtrePublic === 'professionnel' ? (categoriesProOnly.includes(c.value) || c.value === 'pac_air_eau' || c.value === 'autre') : !categoriesProOnly.includes(c.value)))
   const sectionsParticuliers = [
-    { label: 'Système de Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
-    { label: "Production d’eau Chaude", values: ['ballon_thermodynamique','solaire_thermique'] },
-    { label: 'Isolation', values: ['combles','murs','plancher','menuiseries'] },
-    { label: 'Production d’électricité', values: ['photovoltaique'] },
-    { label: 'Ventilation', values: ['vmc'] },
+    { label: 'Isolation', values: ['combles_perdus','rampants','ite','plancher'] },
+    { label: 'Menuiseries Extérieures', values: ['menuiseries','menuiseries_portes'] },
+    { label: 'Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
+    { label: "Production d’eau chaude", values: ['ballon_thermodynamique','solaire_thermique','ssc'] },
+    { label: 'Production d’électricité', values: ['photovoltaique','batterie_stockage'] },
+    { label: 'VMC', values: ['vmc'] },
     { label: 'Autres prestations', values: ['autre'] },
   ]
   const sectionsProfessionnels = [
-    { label: 'Système de Chauffage', values: ['pac_air_eau'] },
-    { label: 'Destratificateur', values: ['destratificateur'] },
-    { label: 'HP Flottante', values: ['hp_flottante'] },
+    { label: 'HP flottante', values: ['hp_flottante'] },
+    { label: 'Destratificateur d’air', values: ['destratificateur'] },
+    { label: 'Chauffage', values: ['pac_air_eau'] },
     { label: 'Isolation', values: ['isolation_toiture_pro','professionnel_cee','professionnel_hors_cee'] },
+    { label: 'Production d’électricité', values: ['pro_photovoltaique'] },
     { label: 'Autres prestations', values: ['autre'] },
   ]
   const sectionsCatalogue = (filtrePublic === 'professionnel' ? sectionsProfessionnels : sectionsParticuliers).map(section => ({
@@ -755,9 +1025,10 @@ export function DevisPage({
     categories: section.values.map(value => categoriesDevis.find(c => c.value === value)).filter((c): c is { value: string; label: string } => Boolean(c)),
   })).filter(section => section.categories.length > 0)
   const produitsFiltres = produits.filter(p =>
-    p.categorie === filtreCategorie &&
+    (p.categorie === filtreCategorie || (filtreCategorie === 'rampants' && p.categorie === 'combles')) &&
     p.catalogue_groupe !== 'visite_technique' &&
-    (filtrePublic === 'tous' || p.public_cible === filtrePublic || p.public_cible === 'tous')
+    (filtrePublic === 'tous' || p.public_cible === filtrePublic || p.public_cible === 'tous') &&
+    (!rechercheProduit.trim() || [p.nom, p.marque, p.reference].some(v => String(v || '').toLowerCase().includes(rechercheProduit.trim().toLowerCase())))
   )
 
   if (view === 'list') {
@@ -864,7 +1135,7 @@ export function DevisPage({
   const estSigne = current?.signature_statut === 'signe'
 
   return (
-    <div className="page">
+    <div className="page rv">
       <div className="page-header">
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <button className="btn btn-ghost" onClick={() => setView('list')}><ArrowLeft size={18} /></button>
@@ -896,10 +1167,10 @@ export function DevisPage({
           )}
           {!estSigne && (
             <>
-              <Button variant="primary" onClick={() => setShowSignatureModal(true)} disabled={saving || lignes.length === 0}>
+              <Button variant="primary" onClick={ouvrirSignature} disabled={saving || lignes.length === 0 || signatureBloquee} title={signatureBloquee ? `${blocsConformite.length} point(s) à corriger avant signature` : undefined}>
                 <PenTool size={16} /> Signer sur tablette
               </Button>
-              <Button variant="secondary" onClick={envoyerSignature} disabled={saving || lignes.length === 0}>
+              <Button variant="secondary" onClick={envoyerSignature} disabled={saving || lignes.length === 0 || signatureBloquee} title={signatureBloquee ? `${blocsConformite.length} point(s) à corriger avant envoi` : undefined}>
                 <Send size={16} /> Envoyer pour signature électronique
               </Button>
             </>
@@ -951,185 +1222,260 @@ export function DevisPage({
         </div>
       ) : (
         <div className="card card-pad mb-4 text-sm text-muted">
-          Renseignez le revenu fiscal de référence et la composition du foyer sur la fiche prospect pour calculer automatiquement l'éligibilité MaPrimeRénov'.
+          Renseignez le revenu fiscal de référence et la composition du foyer sur la fiche prospect pour calculer les aides selon le profil de revenus.
         </div>
       )}
 
-      <div style={{ display: 'grid', gridTemplateColumns: '320px 1fr', gap: 24 }}>
-        <div className="card card-pad">
-          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',gap:8,marginBottom:10}}><div className="section-label">Ajouter depuis le catalogue</div><Button size="sm" variant="secondary" onClick={()=>{setAssistantError('');setAssistantSuggestions([]);setAssistantOpen(true)}} disabled={estSigne}><Sparkles size={14}/> Assistant</Button></div>
-          <div style={{ display: 'flex', gap: 6, marginBottom: 10 }}>
-            {([
-              ['particulier', 'Particuliers'],
-              ['professionnel', 'Professionnels'],
-            ] as const).map(([value, label]) => (
-              <button key={value} className={`btn btn-sm ${filtrePublic === value ? 'btn-primary' : 'btn-secondary'}`} onClick={() => { setFiltrePublic(value); setFiltreCategorie(value === 'professionnel' ? 'pac_air_eau' : 'combles') }}>
-                {label}
-              </button>
-            ))}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 12 }}>
-            {sectionsCatalogue.map(section => <div key={section.label}>
-              <div className="section-label" style={{fontSize:11,margin:'6px 0'}}>{section.label}</div>
-              <div style={{display:'flex',flexDirection:'column',gap:4}}>{section.categories.map(c => <button key={c.value} className={`btn btn-sm ${filtreCategorie === c.value ? 'btn-primary' : 'btn-secondary'}`} style={{justifyContent:'flex-start'}} onClick={() => setFiltreCategorie(c.value)}>{c.label}</button>)}</div>
-            </div>)}
-          </div>
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-            {produitsFiltres.length === 0 && (
-              <div className="text-sm text-muted">Aucun produit actif dans cette catégorie. Ajoutez-en depuis le Catalogue.</div>
-            )}
-            {produitsFiltres.map(prod => (
-              <div key={prod.id} className="recap-card" style={{ padding: 10 }}>
-                <div className="font-semibold text-sm">{prod.nom}</div>
-                <div className="text-sm text-muted">{isAdmin ? `${euro(prod.prix_unitaire_ht)} / ${prod.unite}` : prod.unite}</div>
-                <button className="btn btn-sm btn-secondary mt-2" onClick={() => ajouterProduit(prod)} disabled={estSigne}>
-                  <Plus size={14} /> Ajouter
-                </button>
-              </div>
-            ))}
-          </div>
-        </div>
+      <div className="devis">
+        <div className="stack">
+          <section className="panel">
+            <h2 className="rv-h">Client</h2>
+            <div className="grid g2">
+              <label className="lab">Nom du client<input readOnly value={p ? `${p.civilite || ''} ${p.prenom || ''} ${p.nom || ''}`.trim() : ''} /></label>
+              <label className="lab">Téléphone<input readOnly value={p?.telephone || ''} /></label>
+              <label className="lab">Adresse du client<input readOnly value={[p?.adresse_rue || p?.adresse, p?.code_postal, p?.ville].filter(Boolean).join(' ')} /></label>
+              <label className="lab">E-mail<input readOnly value={p?.email || ''} /></label>
+            </div>
+            <p className="note" style={{ margin: '8px 0 0' }}>Ces informations proviennent de la fiche prospect : modifiez-les depuis le prospect.</p>
+          </section>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
-          <div className="card card-pad">
-            <div className="section-label">Lignes du devis</div>
+          <SectionsConformite
+            meta={conf}
+            onChange={maj => setConf(maj)}
+            points={pointsConformite}
+            disabled={estSigne}
+            fichesDuDevis={fichesDuDevis}
+            categorieRevenusLabel={categorieRevenus ? LABEL_CATEGORIE_REVENUS[categorieRevenus] : null}
+          />
+
+          <section className="panel">
+            <h2 className="rv-h">Produits et prestations</h2>
             {lignes.length === 0 ? (
-              <div className="text-sm text-muted">Ajoutez des produits depuis le catalogue à gauche.</div>
+              <p className="note" style={{ margin: '0 0 12px' }}>Aucune ligne. Ajoutez des produits depuis le catalogue ci-dessous.</p>
             ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {lignes.map(l => (
-                  <div key={l.id} className="recap-card">
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
-                      <div style={{ flex: 1 }}>
-                        <div className="font-semibold">{l.designation}</div>
-                        {l.description && <div className="text-sm text-muted">{l.description}</div>}
-                        {Object.keys(l.caracteristiques || {}).length > 0 && (
-                          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>
-                            {Object.entries(l.caracteristiques).map(([k, v]) => (
-                              <span key={k} className="badge badge-neutral" style={{ fontSize: 11 }}>{k} : {v}</span>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                      {!estSigne && <button className="btn-icon" onClick={() => removeLigne(l.id)}><Trash2 size={16} /></button>}
-                    </div>
-                    <div style={{ display: 'flex', gap: 16, marginTop: 10, alignItems: 'center' }}>
-                      <label className="text-sm text-muted">Qté
-                        <input
-                          type="number" min={0} step="0.01" value={l.quantite}
-                          onChange={e => updateLigne(l.id, { quantite: parseFloat(e.target.value) || 0 })}
-                          style={{ width: 70, marginLeft: 6, height: 32 }}
-                          disabled={estSigne}
-                        />
-                      </label>
-                      {isAdmin && <label className="text-sm text-muted">PU HT
-                        <input
-                          type="number" min={0} step="0.01" value={l.prix_unitaire_ht}
-                          onChange={e => updateLigne(l.id, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })}
-                          style={{ width: 90, marginLeft: 6, height: 32 }}
-                          disabled={estSigne}
-                        />
-                      </label>}
-                      <span className="text-sm text-muted">TVA {l.tva_taux}%</span>
-                      <span className="font-semibold" style={{ marginLeft: 'auto' }}>{euro(l.montant_ht)} HT</span>
-                    </div>
+              <div className="scroll">
+                <table className="lines">
+                  <colgroup><col style={{ width: isAdmin ? '27%' : '31%' }} /><col style={{ width: '14%' }} /><col style={{ width: '14%' }} /><col style={{ width: '8%' }} />{isAdmin && <col style={{ width: '10%' }} />}<col style={{ width: '7%' }} /><col style={{ width: '12%' }} /><col style={{ width: '4%' }} /></colgroup>
+                  <thead><tr><th>Produit</th><th>Marque</th><th>Référence</th><th>Qté</th>{isAdmin && <th>PU HT</th>}<th>TVA</th><th>Total HT</th><th></th></tr></thead>
+                  <tbody>
+                    {lignesAvecCategorie.map((l, index) => {
+                      const fiche = l.produit_id ? ficheLigne(l) : null
+                      const marqueBad = pointsConformite.some(x => x.ligneId === l.id && x.champ === 'marque')
+                      const refBad = pointsConformite.some(x => x.ligneId === l.id && x.champ === 'reference')
+                      const visibles = Object.entries(l.caracteristiques || {}).filter(([k]) => !['Marque', 'Référence'].includes(k) && !CLES_AUTO_ISOLATION.includes(k) && !(fiche && REGLES_FICHES[fiche]?.verifiee && estChampDeFiche(fiche, k)))
+                      return (
+                        <Fragment key={l.id}>
+                          {(index === 0 || familleCategorie(l.categorie) !== familleCategorie(lignesAvecCategorie[index - 1]?.categorie || 'autre')) && (
+                            <tr className="famrow"><td colSpan={isAdmin ? 8 : 7}>{libelleFamilleCategorie(l.categorie)}</td></tr>
+                          )}
+                          {(index === 0 || l.categorie !== lignesAvecCategorie[index - 1]?.categorie) && (
+                            <tr className="famrow"><td colSpan={isAdmin ? 8 : 7}>{libelleSousCategorie(l.categorie)}</td></tr>
+                          )}
+                          <tr>
+                            <td>
+                              <div className="pn">{l.designation}
+                                <small>
+                                  {fiche && <><span className="pill">{fiche}</span>{' '}</>}
+                                  {l.produit_id && aides.some(a => a.type === 'maprimerenov') && produits.find(x => x.id === l.produit_id)?.eligible_mpr && <><span className="pill g">MaPrimeRénov’</span>{' '}</>}
+                                  {l.description}
+                                </small>
+                              </div>
+                              {visibles.length > 0 && <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 6 }}>{visibles.map(([k, v]) => <span key={k} className="pill n">{k} : {String(v)}</span>)}</div>}
+                            </td>
+                            <td className={marqueBad ? 'bad' : ''}>{l.produit_id ? <input className="cell" placeholder="Marque" disabled={estSigne} value={String(l.caracteristiques?.Marque || '')} onChange={e => updateLigne(l.id, { caracteristiques: { ...(l.caracteristiques || {}), Marque: e.target.value } })} /> : null}</td>
+                            <td className={refBad ? 'bad' : ''}>{l.produit_id ? <input className="cell" placeholder="Référence" disabled={estSigne} value={String(l.caracteristiques?.Référence || '')} onChange={e => updateLigne(l.id, { caracteristiques: { ...(l.caracteristiques || {}), Référence: e.target.value } })} /> : null}</td>
+                            <td><input className="cell n" type="number" min={0} step="0.01" disabled={estSigne} value={l.quantite} onChange={e => updateLigne(l.id, { quantite: parseFloat(e.target.value) || 0 })} /></td>
+                            {isAdmin && <td><input className="cell n" type="number" min={0} step="0.01" disabled={estSigne} value={l.prix_unitaire_ht} onChange={e => updateLigne(l.id, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })} /></td>}
+                            <td className="nw num">{l.tva_taux} %</td>
+                            <td className="nw num"><strong>{euro(l.montant_ht)}</strong></td>
+                            <td>{!estSigne && <button className="iconbtn" title="Retirer la ligne" onClick={() => removeLigne(l.id)}><Trash2 size={15} /></button>}</td>
+                          </tr>
+                          {fiche && (
+                            <tr><td colSpan={isAdmin ? 8 : 7} style={{ paddingTop: 0 }}>
+                              <LigneFicheFields
+                                fiche={fiche}
+                                caracteristiques={l.caracteristiques}
+                                contexte={{ categorie: l.categorie, description: l.description, quantite: l.quantite }}
+                                disabled={estSigne}
+                                onChange={car => updateLigne(l.id, { caracteristiques: car })}
+                              />
+                            </td></tr>
+                          )}
+                        </Fragment>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {!estSigne && (
+              <div style={{ marginTop: 16, borderTop: '1px solid var(--rv-line)', paddingTop: 14 }}>
+                <div className="toolbar" style={{ marginTop: 0 }}>
+                  <div className="chips">
+                    {([['particulier', 'Particuliers'], ['professionnel', 'Professionnels']] as const).map(([value, label]) => (
+                      <button key={value} className="chip" aria-pressed={filtrePublic === value} onClick={() => { setFiltrePublic(value); setFiltreCategorie(value === 'professionnel' ? 'hp_flottante' : 'combles_perdus'); setRechercheProduit('') }}>{label}</button>
+                    ))}
+                  </div>
+                  <div className="spacer" />
+                  <button className="rbtn sm" onClick={() => { setAssistantError(''); setAssistantSuggestions([]); setAssistantOpen(true) }}><Sparkles size={14} /> Assistant</button>
+                </div>
+                {sectionsCatalogue.map(section => (
+                  <div key={section.label} className="fam">
+                    <b>{section.label}</b>
+                    <div className="chips">{section.categories.map(c => (
+                      <button key={c.value} className="chip" aria-pressed={filtreCategorie === c.value} onClick={() => setFiltreCategorie(c.value)}>
+                        {c.label}<small>{produits.filter(x => (x.categorie === c.value || (c.value === 'rampants' && x.categorie === 'combles')) && x.catalogue_groupe !== 'visite_technique').length}</small>
+                      </button>
+                    ))}</div>
+                  </div>
+                ))}
+                <div className="toolbar">
+                  <span style={{ position: 'relative', display: 'inline-flex', flex: 1, maxWidth: 380 }}>
+                    <Search size={15} style={{ position: 'absolute', left: 11, top: 12, color: 'var(--rv-mute)' }} />
+                    <input className="search" style={{ paddingLeft: 32, width: '100%' }} value={rechercheProduit} onChange={e => setRechercheProduit(e.target.value)} placeholder="Rechercher un produit, une marque, une référence…" />
+                  </span>
+                  <span className="note">{produitsFiltres.length} référence{produitsFiltres.length > 1 ? 's' : ''}</span>
+                </div>
+                <div className="scroll">
+                  <table className="cat">
+                    <thead><tr><th>Produit</th><th>Fiche</th>{isAdmin && <th>Prix HT</th>}<th>TVA</th><th></th></tr></thead>
+                    <tbody>
+                      {produitsFiltres.map(prod => {
+                        const f = ficheDuProduit(prod)
+                        return (
+                          <tr key={prod.id} className="row">
+                            <td><div className="pn">{prod.nom}<small>{[prod.marque, prod.reference].filter(Boolean).join(' · ') || prod.unite}</small></div></td>
+                            <td>{f ? <span className="pill">{f}</span> : <span className="pill n">Hors CEE</span>}{prod.eligible_mpr && <> <span className="pill g">MaPrimeRénov’</span></>}</td>
+                            {isAdmin && <td className="num">{euro(prixProduitPourZone(prod, current?.prospect?.code_postal))} / {prod.unite}</td>}
+                            <td className="num">{prod.tva_taux} %</td>
+                            <td style={{ textAlign: 'right' }}><button className="rbtn sm pri" onClick={() => ajouterProduit(prod)}><Plus size={14} /> Ajouter</button></td>
+                          </tr>
+                        )
+                      })}
+                      {produitsFiltres.length === 0 && <tr><td colSpan={isAdmin ? 5 : 4} className="note" style={{ padding: 22 }}>Aucun produit actif dans cette catégorie. Ajoutez-en depuis le Catalogue.</td></tr>}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </section>
+
+          <section className="panel">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+              <h2 className="rv-h" style={{ margin: 0 }}>Aides</h2>
+              {!estSigne && <div style={{ display: 'flex', gap: 6 }}>
+                <button className="rbtn sm" onClick={() => ajouterAideManuelle('anah_ampleur')}>+ Anah</button>
+                <button className="rbtn sm" onClick={() => ajouterAideManuelle('eco_ptz')}>+ Éco-PTZ</button>
+              </div>}
+            </div>
+            {aides.length === 0 ? (
+              <p className="note" style={{ margin: 0 }}>Aucune aide ajoutée. Les aides éligibles sont proposées automatiquement à l'ajout d'un produit du catalogue.</p>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {aides.map(a => (
+                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <span style={{ flex: 1, fontSize: 13 }}>{a.libelle}</span>
+                    <label className="lab" style={{ width: 130 }}>
+                      <div className="u"><input type="number" value={a.montant} disabled={estSigne} onChange={e => setAides(as => as.map(x => x.id === a.id ? { ...x, montant: parseFloat(e.target.value) || 0 } : x))} /><span>€</span></div>
+                    </label>
+                    {!estSigne && <button className="iconbtn" onClick={() => removeAide(a.id)} title="Retirer l’aide"><Trash2 size={15} /></button>}
                   </div>
                 ))}
               </div>
             )}
-          </div>
+            {aMontantCEE && (
+              <div className="grid g2" style={{ marginTop: 12 }}>
+                <label className={`lab ${pointsConformite.some(x => x.champ === 'oblige') ? 'bad' : ''}`}>Obligé ou délégataire CEE
+                  <input disabled={estSigne} value={conf.oblige} onChange={e => setConf(m => ({ ...m, oblige: e.target.value }))} />
+                </label>
+              </div>
+            )}
+            <p className="note" style={{ margin: '12px 0 0' }}>
+              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — barème Reno Soluces 2026 : MaPrimeRénov’ Bleu 25 €/m², Jaune 20 €/m², Violet 15 €/m², Rose non éligible en geste seul ; CEE BAR-EN-101 : Bleu 13 €/m², autres profils 10 €/m². Les montants sont calculés sur la quantité des lignes de produits combles perdus.' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE Reno Soluces : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
+            </p>
+          </section>
 
-          <div className="card card-pad">
-            <div className="section-label">Remise commerciale</div>
-            <div className="text-sm text-muted" style={{ marginBottom: 10 }}>Accordée au client dans le cadre de la négociation commerciale.</div>
-            <div style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
-              <label className="field" style={{ minWidth: 150, flex: '0 0 150px' }}>
-                <span>Type de remise</span>
+          <section className="panel">
+            <h2 className="rv-h">Remise et conditions de vente</h2>
+            <div className="grid g3">
+              <label className="lab">Type de remise
                 <select value={remiseType} onChange={e => setRemiseType(e.target.value as RemiseType)} disabled={estSigne}>
                   <option value="montant">Montant (€ HT)</option>
                   <option value="pourcentage">Pourcentage (%)</option>
                 </select>
               </label>
-              <label className="field" style={{ minWidth: 150, flex: '0 0 150px' }}>
-                <span>{remiseType === 'montant' ? 'Remise' : 'Remise (%)'}</span>
+              <label className="lab">{remiseType === 'montant' ? 'Remise (€ HT)' : 'Remise (%)'}
                 <input type="number" min={0} max={remiseType === 'pourcentage' ? 100 : undefined} step="0.01" value={remiseValeur || ''} onChange={e => setRemiseValeur(Math.max(0, parseFloat(e.target.value) || 0))} disabled={estSigne} placeholder="0" />
               </label>
-              {totaux.remiseHT > 0 && (
-                <div className="text-sm" style={{ paddingBottom: 9 }}>Soit <strong>-{euro(totaux.remiseHT)} HT</strong></div>
-              )}
+              <label className="lab">Date de validité du devis
+                <input type="date" value={current?.date_validite ? current.date_validite.slice(0, 10) : ''} onChange={e => setCurrent(c => c ? { ...c, date_validite: e.target.value || null } : c)} disabled={estSigne} />
+              </label>
             </div>
-          </div>
+            <label className="lab" style={{ marginTop: 14 }}>Conditions de paiement
+              <textarea rows={2} value={current?.conditions_paiement || ''} onChange={e => setCurrent(c => c ? { ...c, conditions_paiement: e.target.value } : c)} disabled={estSigne} />
+            </label>
+          </section>
+        </div>
 
-          <div className="card card-pad">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <div className="section-label" style={{ marginBottom: 0 }}>Aides mobilisables</div>
-              <div style={{ display: 'flex', gap: 6 }}>
-                {!estSigne && <>
-                <button className="btn btn-sm btn-secondary" onClick={() => ajouterAideManuelle('anah_ampleur')}>+ Anah</button>
-                <button className="btn btn-sm btn-secondary" onClick={() => ajouterAideManuelle('eco_ptz')}>+ Éco-PTZ</button>
-                </>}
+        <div className="side">
+          <ConformitePanel points={pointsConformite} verrouille={estSigne} />
+          <article className="sheet" aria-label="Aperçu du devis">
+            <div className="hd">
+              <div><h3>DEVIS</h3><div className="co">N° {current?.numero || '—'} · {current?.created_at ? new Date(current.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')} · valable jusqu’au {current?.date_validite ? new Date(`${current.date_validite.slice(0, 10)}T12:00:00`).toLocaleDateString('fr-FR') : 'à définir'}</div></div>
+              <div style={{ textAlign: 'right' }}>
+                <b style={{ fontSize: 14 }}>{current?.emetteur_nom_affichage || entreprise?.raison_sociale || 'Reno Soluces'}</b>
+                <div className="co">{(current?.emetteur_siret || entreprise?.siret) ? `SIRET ${current?.emetteur_siret || entreprise?.siret}` : <span className="ph">SIRET à renseigner</span>}<br />
+                  {fichesDuDevis.length > 0 && <>RGE n° {conf.pro.rge ? `${conf.pro.rge} · ${conf.pro.organisme}` : <span className="ph">à renseigner</span>}<br /></>}
+                  {current?.emetteur_telephone || entreprise?.telephone || ''} · {current?.emetteur_email || entreprise?.email || ''}</div>
               </div>
             </div>
-            {aides.length === 0 ? (
-              <div className="text-sm text-muted mt-2">Aucune aide ajoutée. Les aides éligibles sont proposées automatiquement à l'ajout d'un produit du catalogue.</div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 10 }}>
-                {aides.map(a => (
-                  <div key={a.id} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                    <span className="text-sm" style={{ flex: 1 }}>{a.libelle}</span>
-                    <input
-                      type="number" value={a.montant}
-                      onChange={e => setAides(as => as.map(x => x.id === a.id ? { ...x, montant: parseFloat(e.target.value) || 0 } : x))}
-                      style={{ width: 100, height: 32 }}
-                      disabled={estSigne}
-                    />
-                    <span className="text-sm text-muted">€</span>
-                    {!estSigne && <button className="btn-icon" onClick={() => removeAide(a.id)}><Trash2 size={14} /></button>}
-                  </div>
-                ))}
-              </div>
-            )}
-            <p className="text-sm text-muted mt-3">
-              Montants MaPrimeRénov' basés sur le barème 2026 (voir avertissement dans le code source — à vérifier sur
-              france-renov.gouv.fr avant engagement contractuel). Montants CEE estimés selon le taux €/MWh cumac renseigné
-              dans les paramètres de l'entreprise ({tauxCEE} €/MWh) — à confirmer avec votre délégataire.
-            </p>
-          </div>
-
-          <div className="card card-pad">
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">Total HT avant remise</span><span>{euro(totaux.montantHTAvantRemise)}</span></div>
-              {totaux.remiseHT > 0 && <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success-600, #16a34a)' }}><span>Remise commerciale</span><span>-{euro(totaux.remiseHT)}</span></div>}
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">Total HT après remise</span><span>{euro(totaux.montantHT)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between' }}><span className="text-muted">TVA</span><span>{euro(totaux.montantTVA)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 600 }}><span>Total TTC</span><span>{euro(totaux.montantTTC)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--success-600, #16a34a)' }}><span>Aides mobilisées</span><span>-{euro(totalAides)}</span></div>
-              <div style={{ display: 'flex', justifyContent: 'space-between', fontWeight: 700, fontSize: 18, borderTop: '1px solid var(--c-border)', paddingTop: 8, marginTop: 4 }}>
-                <span>Reste à charge</span><span>{euro(resteACharge)}</span>
-              </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
+              <div><b>Client</b><br />{p ? `${p.prenom || ''} ${p.nom || ''}`.trim() : 'Client à renseigner'}<br />{p?.adresse_rue || p?.adresse || ''}<br />{[p?.code_postal, p?.ville].filter(Boolean).join(' ')}<br />{p?.telephone || ''}{p?.email ? ` · ${p.email}` : ''}</div>
+              <div style={{ textAlign: 'right' }}><b>Chantier</b><br />{p?.adresse_rue || p?.adresse || 'Adresse à renseigner'}<br />{conf.logement.type}{conf.logement.annee ? `, construit en ${conf.logement.annee}` : ''}{conf.logement.zone ? `, zone ${conf.logement.zone}` : ''}</div>
             </div>
-          </div>
-
-          <div className="card card-pad">
-            <div className="section-label">Conditions de vente</div>
-            <div className="mt-3">
-              <FloatInput
-                label="Date de validité du devis"
-                type="date"
-                value={current?.date_validite ? current.date_validite.slice(0, 10) : ''}
-                onChange={v => setCurrent(c => c ? { ...c, date_validite: v || null } : c)}
-                disabled={estSigne}
-              />
+            <table><thead><tr><th>Désignation</th><th className="r">Qté</th><th className="r">PU HT</th><th className="r">TVA</th><th className="r">Total HT</th></tr></thead><tbody>
+              {lignesAvecCategorie.map((l, index) => (
+                <Fragment key={l.id}>
+                  {(index === 0 || familleCategorie(l.categorie) !== familleCategorie(lignesAvecCategorie[index - 1]?.categorie || 'autre')) && <tr className="famrow"><td colSpan={5}>{libelleFamilleCategorie(l.categorie)}</td></tr>}
+                  {(index === 0 || l.categorie !== lignesAvecCategorie[index - 1]?.categorie) && <tr className="famrow"><td colSpan={5}>{libelleSousCategorie(l.categorie)}</td></tr>}
+                  <tr>
+                    <td><b>{l.designation}</b>
+                      {l.produit_id && <div className="spec">Marque : {l.caracteristiques?.Marque ? String(l.caracteristiques.Marque) : <span className="ph">à renseigner</span>} · Réf. : {l.caracteristiques?.Référence ? String(l.caracteristiques.Référence) : <span className="ph">à renseigner</span>}</div>}
+                      {(() => {
+                        const f = l.produit_id ? ficheLigne(l) : null
+                        const specs = [
+                          ...libellesFiche(f, l.caracteristiques, { categorie: l.categorie, description: l.description, quantite: l.quantite }),
+                          ...Object.entries(l.caracteristiques || {}).filter(([k]) => !['Marque', 'Référence'].includes(k) && !CLES_AUTO_ISOLATION.includes(k) && !(f && REGLES_FICHES[f]?.verifiee && estChampDeFiche(f, k))).map(([k, v]) => `${k} : ${String(v)}`),
+                        ]
+                        return specs.length > 0 ? <div className="spec">{specs.join(' · ')}</div> : null
+                      })()}
+                      {l.produit_id && ficheLigne(l) && <div className="spec">Opération CEE {ficheLigne(l)}</div>}
+                    </td>
+                    <td className="r">{l.quantite}</td><td className="r">{euro(l.prix_unitaire_ht)}</td><td className="r">{l.tva_taux} %</td><td className="r">{euro(l.montant_ht)}</td>
+                  </tr>
+                </Fragment>
+              ))}
+              {lignes.length === 0 && <tr><td colSpan={5} style={{ textAlign: 'center', color: '#8a97a0', padding: 22 }}>Les produits ajoutés apparaîtront ici.</td></tr>}
+            </tbody></table>
+            <div className="tot">
+              {totaux.remiseHT > 0 && <div><span>Total HT avant remise</span><span className="num">{euro(totaux.montantHTAvantRemise)}</span></div>}
+              {totaux.remiseHT > 0 && <div><span>Remise commerciale</span><span className="num">− {euro(totaux.remiseHT)}</span></div>}
+              <div><span>Total HT</span><span className="num">{euro(totaux.montantHT)}</span></div>
+              <div><span>TVA</span><span className="num">{euro(totaux.montantTVA)}</span></div>
+              <div className="big"><span>Total TTC</span><span className="num">{euro(totaux.montantTTC)}</span></div>
+              {aides.filter(a => a.montant > 0).map(a => <div key={a.id}><span>{a.libelle}</span><span className="num">− {euro(a.montant)}</span></div>)}
+              {totalAides > 0 && <div className="big"><span>Reste à charge</span><span className="num">{euro(resteACharge)}</span></div>}
             </div>
-            <div className="mt-4">
-              <FloatTextarea
-                label="Conditions de paiement"
-                value={current?.conditions_paiement || ''}
-                onChange={v => setCurrent(c => c ? { ...c, conditions_paiement: v } : c)}
-                rows={2}
-                disabled={estSigne}
-              />
+            <div className="leg">
+              Visite préalable le {conf.dates.visite ? new Date(`${conf.dates.visite}T12:00:00`).toLocaleDateString('fr-FR') : '…'}. Début des travaux {conf.dates.debut ? new Date(`${conf.dates.debut}T12:00:00`).toLocaleDateString('fr-FR') : '…'}, durée {conf.dates.duree || '…'}. Acompte de {conf.dates.acompte || '…'} %{conf.venteHorsEtablissement ? ', après expiration du délai de rétractation de 14 jours (formulaire joint)' : ''}. Pénalités de retard et indemnité forfaitaire de 40 €. Garanties légales : parfait achèvement, biennale, décennale ({conf.pro.assurance || <span className="ph">assureur à renseigner</span>}).
+              {current?.conditions_paiement ? <><br />Conditions de paiement : {current.conditions_paiement}</> : null}
+              <div className="sign"><div><b>Bon pour accord</b>, date et signature du client</div><div>Pour l’entreprise</div></div>
             </div>
+          </article>
+          <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
+            <button className="rbtn" onClick={telechargerPDF} disabled={lignes.length === 0}><Download size={15} /> Générer le PDF</button>
+            <button className="rbtn pri" onClick={enregistrer} disabled={saving || estSigne}><Save size={15} />{saving ? 'Enregistrement…' : 'Enregistrer le devis'}</button>
           </div>
         </div>
       </div>

@@ -6,7 +6,7 @@ import {
   Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import type { Prospect, CrmTask, Produit } from '../types'
+import type { Prospect, CrmTask } from '../types'
 import { FloatInput, FloatSelect, FloatTextarea } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
@@ -135,7 +135,7 @@ const EMPTY_FORM = {
   adresse_rue: '', adresse_complement: '', code_postal: '', ville: '',
   statut_occupation: 'propriétaire_occupant', nombre_personnes_foyer: 1,
   rfr: '', prenom_conjoint: '', nom_conjoint: '',
-  source: 'Site web', commentaires: '', fiches_cee: [] as string[], produits_interesses: [] as string[],
+  source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
 
 export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialView = 'liste' }: Props) {
@@ -170,7 +170,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [commerciaux, setCommerciaux] = useState<{ id: string; nom_complet: string; role: string }[]>([])
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<{ id: string; nom_complet: string }[]>([])
   const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
-  const [catalogueProduits, setCatalogueProduits] = useState<Produit[]>([])
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
 
   const extended = (p: Prospect): any => p as any
@@ -200,12 +199,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     await supabase.rpc('actualiser_pot_commun')
   }
 
-  async function fetchCatalogueProduits() {
-    const { data, error } = await supabase.from('catalogue_produits').select('*').eq('actif', true).order('categorie').order('nom')
-    if (error) { console.error('Chargement du catalogue impossible :', error.message); return }
-    setCatalogueProduits((data || []) as Produit[])
-  }
-
   async function fetchInstallateurs() {
     const { data } = await supabase.from('installateurs').select('id, nom, actif').eq('actif', true).order('nom')
     setInstallateurs((data || []) as any)
@@ -223,7 +216,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
   useEffect(() => {
     if (!profile) return
-    Promise.all([fetchProspects(), fetchOpenTasks(), fetchCommerciaux(), fetchInstallateurs(), fetchCatalogueProduits()]).finally(() => setLoading(false))
+    Promise.all([fetchProspects(), fetchOpenTasks(), fetchCommerciaux(), fetchInstallateurs()]).finally(() => setLoading(false))
   }, [profile?.id, profile?.role])
 
   async function fetchProspectDocuments(prospectId: string) {
@@ -362,14 +355,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     }))
   }
 
-  function toggleProduitInteresse(id: string) {
-    setForm(f => ({ ...f, produits_interesses: f.produits_interesses.includes(id) ? f.produits_interesses.filter(x => x !== id) : [...f.produits_interesses, id] }))
-  }
-
-  function toggleEditProduitInteresse(id: string) {
-    setEditForm(f => ({ ...f, produits_interesses: f.produits_interesses.includes(id) ? f.produits_interesses.filter(x => x !== id) : [...f.produits_interesses, id] }))
-  }
-
   const rfrNum = typeof form.rfr === 'string' ? parseFloat(form.rfr) || 0 : form.rfr
   const ileDeFrance = useMemo(() => estIleDeFrance(form.code_postal), [form.code_postal])
 
@@ -414,7 +399,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       source: form.source,
       commentaires: form.commentaires || null,
       fiches_cee: form.fiches_cee,
-      produits_interesses: form.produits_interesses,
       statut: 'Nouveau',
       commercial: profile?.nom_complet || null,
       commercial_id: profile?.id || null,
@@ -447,7 +431,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       source: p.source || 'Site web',
       commentaires: e.commentaires || p.notes || '',
       fiches_cee: e.fiches_cee || [],
-      produits_interesses: e.produits_interesses || [],
     })
     setEditModal(true)
   }
@@ -481,7 +464,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       source: editForm.source,
       commentaires: editForm.commentaires || null,
       fiches_cee: editForm.fiches_cee,
-      produits_interesses: editForm.produits_interesses,
     }
     await supabase.from('prospects').update(payload).eq('id', selected.id)
     setEditModal(false)
@@ -1064,7 +1046,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             </>
           }
         >
-          <EditFormBody form={editForm} set={setEdit} toggleFiche={toggleEditFiche} fichesByGroup={fichesByGroup} produits={catalogueProduits} toggleProduit={toggleEditProduitInteresse} />
+          <EditFormBody form={editForm} set={setEdit} toggleFiche={toggleEditFiche} fichesByGroup={fichesByGroup} />
         </Modal>
 
         {/* Delete confirm */}
@@ -1418,9 +1400,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
         {wizardStep === 2 && (
           <>
-            <div className="pw-heading" style={{ marginBottom: 8 }}>Produits envisagés</div>
-            <p style={{ fontSize: 13, color: 'var(--c-text-muted)', marginBottom: 16, lineHeight: 1.5 }}>Sélectionnez les produits actifs du catalogue correspondant au besoin du prospect. La liste est chargée depuis le catalogue Renova OS.</p>
-            {catalogueProduits.filter(p => { const groupe = (p as any).catalogue_groupe || p.public_cible || 'tous'; return groupe === 'tous' || groupe === form.type_prospect || (form.type_prospect === 'particulier' && groupe === 'particulier') || (form.type_prospect === 'professionnel' && groupe === 'professionnel') }).length === 0 ? <div className="card-pad text-muted">Aucun produit actif disponible pour cette catégorie. Vérifiez le catalogue.</div> : <div className="fiches-grid" style={{ marginBottom: 22 }}>{catalogueProduits.filter(p => { const groupe = (p as any).catalogue_groupe || p.public_cible || 'tous'; return groupe === 'tous' || groupe === form.type_prospect }).map(p => { const checked = form.produits_interesses.includes(p.id); return <div key={p.id} className={`fiche-card ${checked ? 'selected' : ''}`} onClick={() => toggleProduitInteresse(p.id)}><div className="fiche-card-head" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span className="fiche-card-code">{p.categorie || 'Produit'}</span><span style={{ width: 18, height: 18, borderRadius: 4, border: checked ? 'none' : '2px solid var(--c-border-dark)', background: checked ? 'var(--c-primary-400)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{checked && <Check size={12} color="#fff" />}</span></div><div className="fiche-card-title" style={{ fontSize: 14, fontWeight: 500 }}>{p.nom}</div><div style={{ fontSize: 12, color: 'var(--c-text-muted)' }}>{p.marque ? `${p.marque} · ` : ''}{p.fiche_cee || p.description || 'Produit du catalogue'}</div></div> })}</div>}
             <div className="pw-heading" style={{ marginBottom: 8 }}>Fiches CEE — types de rénovation</div>
             <p style={{ fontSize: 13, color: 'var(--c-text-muted)', marginBottom: 16, lineHeight: 1.5 }}>
               Sélectionnez les fiches d'opérations standardisées CEE correspondant aux travaux envisagés par le prospect.
@@ -1482,14 +1461,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
 // ===== Edit form body (shared between edit modal) =====
 function EditFormBody({
-  form, set, toggleFiche, fichesByGroup, produits, toggleProduit,
+  form, set, toggleFiche, fichesByGroup,
 }: {
   form: typeof EMPTY_FORM
   set: <K extends keyof typeof EMPTY_FORM>(key: K, val: (typeof EMPTY_FORM)[K]) => void
   toggleFiche: (code: string) => void
   fichesByGroup: Record<string, typeof FICHES_CEE>
-  produits: Produit[]
-  toggleProduit: (id: string) => void
 }) {
   return (
     <>
@@ -1538,14 +1515,6 @@ function EditFormBody({
       <FloatSelect label="Source" value={form.source} onChange={v => set('source', v)} options={SOURCES.map(s => ({ value: s, label: s }))} />
       <div style={{ marginTop: 16 }}>
         <FloatTextarea label="Commentaires" value={form.commentaires} onChange={v => set('commentaires', v)} rows={3} />
-      </div>
-
-      <div style={{ marginTop: 24, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>Produits envisagés</div>
-      <div className="fiches-grid">
-        {produits.filter(p => { const groupe = (p as any).catalogue_groupe || p.public_cible || 'tous'; return groupe === 'tous' || groupe === form.type_prospect }).map(p => {
-          const checked = form.produits_interesses.includes(p.id)
-          return <div key={p.id} className={`fiche-card ${checked ? 'selected' : ''}`} onClick={() => toggleProduit(p.id)}><div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><span className="fiche-card-code">{p.categorie || 'Produit'}</span><span style={{ width: 18, height: 18, borderRadius: 4, border: checked ? 'none' : '2px solid var(--c-border-dark)', background: checked ? 'var(--c-primary-400)' : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{checked && <Check size={12} color="#fff" />}</span></div><div style={{ fontSize: 14, fontWeight: 500 }}>{p.nom}</div><div style={{ fontSize: 12, color: 'var(--c-text-muted)' }}>{p.marque || p.fiche_cee || p.description || ''}</div></div>
-        })}
       </div>
 
       <div style={{ marginTop: 24, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>

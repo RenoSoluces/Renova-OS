@@ -67,8 +67,8 @@ export function DossiersPage({
   onInitialProspectHandled,
 }: DossiersPageProps = {}) {
   const { profile } = useAuth()
-  const role = String(profile?.role || '').trim().toLowerCase()
-  const isAdmin = role === 'admin' || role === 'manager'
+  const isAdmin =
+    profile?.role === 'admin' || profile?.role === 'manager'
 
   const [rows, setRows] = useState<DossierAvecRelations[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -123,31 +123,31 @@ export function DossiersPage({
 
     // La commission d'un dossier est celle générée automatiquement (barème)
     // au moment de la signature du devis qui lui est associé.
-    // Ne jamais charger le montant société dans la session d'un commercial.
-    const chargerCommissions = async () => {
-      const result = isAdmin
-        ? await supabase.from('commissions').select('reference_id, montant_commercial, montant_societe').eq('reference_type', 'devis')
-        : await supabase.from('commissions').select('reference_id, montant_commercial').eq('reference_type', 'devis')
-      const { data, error } = result
-      if (error) {
-        console.error('Erreur chargement commissions des dossiers:', error)
-        return
-      }
-      const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
-      for (const c of data || []) {
-        if (!c.reference_id) continue
-        map[c.reference_id] = {
-          montant_commercial: Number(c.montant_commercial) || 0,
-          montant_societe: isAdmin && 'montant_societe' in c ? Number(c.montant_societe) || 0 : 0,
+    supabase
+      .from('commissions')
+      .select('reference_id, montant_commercial, montant_societe')
+      .eq('reference_type', 'devis')
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('Erreur chargement commissions des dossiers:', error)
+          return
         }
-      }
-      setCommissionsParDevis(map)
-    }
-    void chargerCommissions()
+
+        const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
+
+        for (const c of data || []) {
+          if (!c.reference_id) continue
+          map[c.reference_id] = {
+            montant_commercial: Number(c.montant_commercial) || 0,
+            montant_societe: Number(c.montant_societe) || 0,
+          }
+        }
+
+        setCommissionsParDevis(map)
+      })
   }
 
   useEffect(() => {
-    if (!profile) return
     fetchListe()
 
     supabase
@@ -157,7 +157,7 @@ export function DossiersPage({
       .then(({ data }) => {
         setProspects((data || []) as Prospect[])
       })
-  }, [profile?.id, profile?.role])
+  }, [])
 
   useEffect(() => {
     if (!newProspectId) {
@@ -225,30 +225,11 @@ export function DossiersPage({
       }
 
       await supabase.from('documents').insert([
-        {
-          dossier_id: data.id,
-          prospect_id: newProspectId,
-          nom: "Avis d'imposition N-2",
-          type: 'avis_imposition',
-          categorie: 'Administratif',
-          recu: false,
-        },
-        {
-          dossier_id: data.id,
-          prospect_id: newProspectId,
-          nom: 'RIB',
-          type: 'rib',
-          categorie: 'Administratif',
-          recu: false,
-        },
-        {
-          dossier_id: data.id,
-          prospect_id: newProspectId,
-          nom: 'Photos avant travaux',
-          type: 'photos',
-          categorie: 'Technique',
-          recu: false,
-        },
+        { dossier_id: data.id, prospect_id: newProspectId, nom: "Avis d’impôts (avis d’imposition)", type: 'avis_imposition', categorie: 'Administratif', recu: false },
+        { dossier_id: data.id, prospect_id: newProspectId, nom: 'Taxe foncière', type: 'taxe_fonciere', categorie: 'Administratif', recu: false },
+        { dossier_id: data.id, prospect_id: newProspectId, nom: 'Carte nationale d’identité (CNI)', type: 'piece_identite', categorie: 'Administratif', recu: false },
+        { dossier_id: data.id, prospect_id: newProspectId, nom: 'Justificatif de domicile', type: 'justificatif_domicile', categorie: 'Administratif', recu: false },
+        { dossier_id: data.id, prospect_id: newProspectId, nom: 'Photos avant travaux', type: 'photos', categorie: 'Technique', recu: false },
       ])
 
       setNewModalOpen(false)
@@ -1049,9 +1030,8 @@ export function DossiersPage({
           )}
 
           <p className="text-sm text-muted">
-            Le dossier ouvre automatiquement une checklist
-            de pièces administratives (avis d'imposition,
-            RIB, photos) à faire compléter par le client.
+            Le dossier ouvre automatiquement la checklist des pièces à recueillir : avis d’impôts,
+            taxe foncière, CNI, justificatif de domicile et photos avant travaux.
           </p>
         </div>
       </Modal>
