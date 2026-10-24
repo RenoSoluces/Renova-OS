@@ -42,8 +42,14 @@ export function ApporteursPage() {
     ])
     if (a.error) setError("Impossible de charger les apporteurs. Vérifiez que la migration multi-entreprise a été appliquée.")
     else setRows((a.data || []) as Apporteur[])
+    if (o.error) setError(current => current || "Impossible de charger la liste des sociétés.")
+    if (e.error) {
+      setError(current => current || "Impossible de charger l’équipe rattachée. Vérifiez les droits de lecture des profils.")
+      setEquipe([])
+    } else {
+      setEquipe((e.data || []) as MembreEquipe[])
+    }
     setOrganisations((o.data || []) as Organisation[])
-    setEquipe((e.data || []) as MembreEquipe[])
     setLoading(false)
   }
   useEffect(() => { if (profile?.id) void load() }, [profile?.id])
@@ -83,13 +89,13 @@ export function ApporteursPage() {
       <div><h1 className="page-title">Mon réseau d’apporteurs</h1><p className="page-subtitle">Identifiez les personnes qui peuvent vous recommander des clients. Ce répertoire est distinct de celui des installateurs.</p></div>
       <div className="page-actions"><Button variant="primary" onClick={() => { reset(); setSuccess('') }}><Plus size={16}/> Nouvel apporteur</Button></div>
     </div>
-    {equipe.length > 0 && <section className="card card-pad" style={{ marginBottom: 16 }}>
+    <section className="card card-pad" style={{ marginBottom: 16 }}>
       <h3 style={{ marginTop: 0 }}>Mon équipe rattachée</h3>
       <p className="text-muted">Membres directement rattachés à votre compte dans l’organigramme. Cette liste est distincte du répertoire des apporteurs externes.</p>
-      <div className="table-wrap"><table><thead><tr><th>Collaborateur</th><th>Rôle</th><th>E-mail</th></tr></thead><tbody>
+      {equipe.length > 0 ? <div className="table-wrap"><table><thead><tr><th>Collaborateur</th><th>Rôle</th><th>E-mail</th></tr></thead><tbody>
         {equipe.map(m => <tr key={m.id}><td><strong>{m.nom_complet || 'Utilisateur sans nom'}</strong></td><td>{({ commercial: 'Commercial', apporteur: 'Apporteur d’affaires', teleconseiller: 'Téléconseiller', commercial_manager: 'Responsable commercial' } as Record<string,string>)[m.role] || m.role}</td><td>{m.email || '—'}</td></tr>)}
-      </tbody></table></div>
-    </section>}
+      </tbody></table></div> : <p className="text-muted">{loading ? 'Chargement de votre équipe…' : 'Aucun collaborateur directement rattaché à votre compte. Si William devrait apparaître ici, vérifiez son rattachement dans l’organigramme et les droits de lecture.'}</p>}
+    </section>
     {error && <div className="status status-error" role="alert">{error}</div>}
     {success && <div className="status status-success" role="status">{success}</div>}
     <div className="toolbar"><div className="search-box"><Search size={16}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un apporteur, une ville…"/></div><span className="text-muted">{filtered.length} apporteur(s)</span></div>
