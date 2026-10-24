@@ -6,7 +6,10 @@ export async function uploadDocument(
   opts: { dossierId?: string | null; prospectId?: string | null; type?: string; categorie?: string; partenaireId?: string | null; produitId?: string | null; nouvelleVersionDe?: Document } = {}
 ) {
   const ext = file.name.split('.').pop() || 'bin'
-  const path = `${opts.dossierId || opts.prospectId || 'divers'}/${crypto.randomUUID()}.${ext}`
+  const versionPrecedente = opts.nouvelleVersionDe
+  const dossierId = opts.dossierId || versionPrecedente?.dossier_id || null
+  const prospectId = opts.prospectId || versionPrecedente?.prospect_id || null
+  const path = `${dossierId || prospectId || 'divers'}/${crypto.randomUUID()}.${ext}`
 
   const { error: uploadError } = await supabase.storage.from('documents').upload(path, file, {
     cacheControl: '3600',
@@ -14,21 +17,18 @@ export async function uploadDocument(
   })
   if (uploadError) return { error: uploadError.message, document: null, path: null }
 
-  const { data: urlData } = supabase.storage.from('documents').getPublicUrl(path)
-
-  const versionPrecedente = opts.nouvelleVersionDe
   const { data, error } = await supabase
     .from('documents')
     .insert({
-      dossier_id: versionPrecedente?.dossier_id ?? opts.dossierId ?? null,
-      prospect_id: opts.prospectId ?? null,
+      dossier_id: dossierId,
+      prospect_id: prospectId,
       categorie: opts.categorie || 'Général',
       partenaire_id: opts.partenaireId ?? null,
       produit_id: opts.produitId ?? versionPrecedente?.produit_id ?? null,
       nom: file.name,
       type: opts.type || (ext.toLowerCase()),
       taille: file.size,
-      url: urlData.publicUrl,
+      url: path,
       recu: true,
       groupe_id: versionPrecedente?.groupe_id, // absent => la colonne prend gen_random_uuid() par défaut (nouveau document)
       version: versionPrecedente ? versionPrecedente.version + 1 : 1,

@@ -19,6 +19,8 @@ import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { resolveDocumentRows } from '../lib/storage/documentUrl'
+import { ProspectShareControl } from '../components/crm/ProspectShareControl'
 
 interface Props {
   onProspectClick?: (p: Prospect) => void
@@ -175,12 +177,21 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const extended = (p: Prospect): any => p as any
 
   async function fetchProspects() {
-    await actualiserPotCommun()
+    if (profile?.role === 'admin') await actualiserPotCommun()
+    let canViewTeam = ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
+    if (!canViewTeam && profile?.id) {
+      const { data: directReports } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('manager_id', profile.id)
+        .limit(1)
+      canViewTeam = Boolean(directReports?.length)
+    }
     let query = supabase
       .from('prospects')
       .select('*')
       .order('created_at', { ascending: false })
-    if (!isAdmin && profile?.id) {
+    if (!canViewTeam && profile?.id) {
       query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true`)
     }
     const { data, error } = await query
@@ -189,7 +200,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   }
 
   async function fetchCommerciaux() {
-    const { data } = await supabase.from('profiles').select('id, nom_complet, role').order('nom_complet')
+    const { data } = await supabase.from('profiles').select('id, nom_complet, role, manager_id, organisation_id').order('nom_complet')
     setCommerciaux((data || []) as any)
     const { data: anciens } = await supabase.from('commerciaux_historique').select('id, nom_complet').order('nom_complet')
     setAnciensCommerciaux((anciens || []) as any)
@@ -200,6 +211,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   }
 
   async function fetchInstallateurs() {
+    if (!['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')) {
+      setInstallateurs([])
+      return
+    }
     const { data } = await supabase.from('installateurs').select('id, nom, actif').eq('actif', true).order('nom')
     setInstallateurs((data || []) as any)
   }
@@ -225,7 +240,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       .select('id, nom, type, taille, url, categorie, partenaire_id, created_at')
       .eq('prospect_id', prospectId)
       .order('created_at', { ascending: false })
-    setProspectDocuments(data || [])
+    setProspectDocuments(await resolveDocumentRows(data || []))
   }
 
   async function ajouterDevisPartenaire(files: FileList | null) {
@@ -923,16 +938,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     <div className="text-xs text-muted" style={{marginTop:6}}>L’Admin peut modifier l’attribution à tout moment.</div>
                   </div>
                 )}
-                <div className="right-mini-section">
-                  <div className="right-mini-section-label">CA potentiel</div>
-                  <input
-                    className="pipeline-inline-input"
-                    type="number"
-                    placeholder="0"
-                    defaultValue={selected.montant_potentiel || ''}
-                    onBlur={ev => updateProspectField('montant_potentiel', ev.target.value ? Number(ev.target.value) : 0)}
-                  />
-                </div>
+                {profile?.role === 'admin' && <ProspectShareControl prospectId={selected.id} />}
                 <div className="right-mini-section">
                   <div className="right-mini-section-label">Température</div>
                   <div className="temp-toggle-row">

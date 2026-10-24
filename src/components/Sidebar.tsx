@@ -1,7 +1,7 @@
 import {
-  LayoutDashboard, Users, ClipboardCheck, Calculator,
+  LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt,
+  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -39,7 +39,9 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
   ] },
   { label: 'Suivi', items: [
     { key: 'commissions', label: 'Commissions', icon: Wallet },
-    { key: 'partenaires', label: 'Mon réseau', icon: Building2 },
+    { key: 'partenaires', label: 'Mon réseau — apporteurs', icon: Users },
+    { key: 'challenges', label: 'Challenges & classements', icon: Trophy },
+    { key: 'installateurs', label: 'Installateurs', icon: Building2 },
     { key: 'performance', label: 'Performances & CA', icon: BarChart3 },
     { key: 'activite', label: 'Historique & activités', icon: History },
     { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
@@ -50,24 +52,31 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
     { key: 'documents', label: 'Documents & archives', icon: FileText },
     { key: 'parametres', label: 'Paramètres', icon: Settings },
     { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
+    { key: 'organisation', label: 'Organigramme', icon: Network },
   ] },
 ]
 
 export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge, prospectsBadge }: SidebarProps) {
   const { profile } = useAuth()
   const [prospectCount, setProspectCount] = useState(prospectsBadge ?? 0)
+  const [hasDirectReports, setHasDirectReports] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     supabase.from('prospects').select('id', { count: 'exact', head: true }).then(({ count }) => {
       if (!cancelled) setProspectCount(count || 0)
     })
+    if (profile?.id) {
+      supabase.from('profiles').select('id').eq('manager_id', profile.id).limit(1).then(({ data }) => {
+        if (!cancelled) setHasDirectReports(Boolean(data?.length))
+      })
+    }
     return () => { cancelled = true }
   }, [prospectsBadge, profile?.id, profile?.role])
 
   const nom = profile?.nom_complet?.trim() || profile?.email || 'Utilisateur'
   const initials = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U'
-  const roleLabel = profile?.role === 'admin' ? 'Administrateur' : profile?.role === 'manager' ? 'Direction' : 'Commercial'
+  const roleLabel = ({ admin: 'Grand Admin', manager: 'Manager', commercial_manager: 'Responsable commercial', partner_admin: 'Dirigeant partenaire', company_admin: 'Direction', commercial: 'Commercial', apporteur: "Apporteur d'affaires", teleconseiller: 'Téléconseiller' } as Record<string, string>)[profile?.role || ''] || (hasDirectReports ? 'Responsable d’équipe' : 'Utilisateur')
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-brand">
@@ -95,7 +104,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').map(item => {
+            {group.items.filter(item => (item.key !== 'performance' && item.key !== 'sante_systeme') || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'installateurs' || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
               const Icon = item.icon
               return (
                 <button

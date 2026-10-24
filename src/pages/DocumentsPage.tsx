@@ -3,6 +3,7 @@ import { Plus, FileText, FileImage, FileSpreadsheet, Upload, Trash2, ExternalLin
 import { supabase } from '../lib/supabase'
 import type { Document, Dossier, Prospect } from '../types'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { removeDocumentStorageObject, resolveDocumentRows } from '../lib/storage/documentUrl'
 import { useAuth } from '../lib/auth/AuthContext'
 import { FloatSelect } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
@@ -64,9 +65,9 @@ export function DocumentsPage() {
       .from('documents')
       .select('*, dossier:dossiers(*, prospect:prospects(*))')
       .order('created_at', { ascending: false })
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) { setDocs([]); setLoading(false); return }
-        setDocs((data || []) as any)
+        setDocs(await resolveDocumentRows((data || []) as any) as any)
         setLoading(false)
       })
   }
@@ -102,6 +103,7 @@ export function DocumentsPage() {
 
   async function removeDoc(d: Document) {
     if (!confirm(`Supprimer "${d.nom}" ?${d.version > 1 || docs.some(x => x.groupe_id === d.groupe_id && x.id !== d.id) ? ' Seule cette version sera supprimée.' : ''}`)) return
+    await removeDocumentStorageObject(d.url)
     await supabase.from('documents').delete().eq('id', d.id)
     load()
   }
@@ -195,9 +197,9 @@ export function DocumentsPage() {
             />
           </div>
           <input ref={inputRef} type="file" multiple hidden onChange={e => handleFiles(e.target.files)} />
-          <button className="btn btn-primary" onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <button className="btn btn-primary" onClick={() => inputRef.current?.click()} disabled={uploading || (!isAdmin && !dossierCible)}>
             {uploading ? <Loader2 size={18} className="spin" /> : <Plus size={18} />}
-            {uploading ? 'Envoi en cours…' : 'Importer un document'}
+            {uploading ? 'Envoi en cours…' : (!isAdmin && !dossierCible) ? 'Choisir un dossier' : 'Importer un document'}
           </button>
         </div>
       </div>

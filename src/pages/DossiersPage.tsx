@@ -23,6 +23,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { removeDocumentStorageObject, resolveDocumentRows, resolveDocumentUrl } from '../lib/storage/documentUrl'
 import { jsPDF } from 'jspdf'
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
@@ -61,6 +62,7 @@ interface DossiersPageProps {
 type DossierAvecRelations = Dossier & {
   prospect?: Prospect
 }
+type OrganisationOption = { id: string; nom: string; type: string }
 
 export function DossiersPage({
   initialProspectId,
@@ -86,6 +88,10 @@ export function DossiersPage({
   const [detailDateInstallation, setDetailDateInstallation] = useState('')
   const [savingStatut, setSavingStatut] = useState(false)
   const [detailMessage, setDetailMessage] = useState('')
+  const [organisations, setOrganisations] = useState<OrganisationOption[]>([])
+  const [detailFacturationOrganisationId, setDetailFacturationOrganisationId] = useState('')
+  const [detailDestinataireOrganisationId, setDetailDestinataireOrganisationId] = useState('')
+  const [savingFacturationConfig, setSavingFacturationConfig] = useState(false)
 
   const [deletingDossier, setDeletingDossier] = useState(false)
   const [facturation, setFacturation] = useState<DossierFacturation[]>([])
@@ -149,6 +155,8 @@ export function DossiersPage({
 
   useEffect(() => {
     fetchListe()
+    supabase.from('organisations').select('id, nom, type').eq('actif', true).order('nom')
+      .then(({ data }) => setOrganisations((data || []) as OrganisationOption[]))
 
     supabase
       .from('prospects')
@@ -245,6 +253,8 @@ export function DossiersPage({
 
   async function ouvrirDetail(d: DossierAvecRelations) {
     setDetail(d)
+    setDetailFacturationOrganisationId(d.facturation_organisation_id || d.organisation_id || profile?.organisation_id || '')
+    setDetailDestinataireOrganisationId(d.destinataire_organisation_id || '')
     setDetailStatut(d.statut || 'creation')
     setDetailDateInstallation(d.date_installation || '')
     setUploadError('')
@@ -255,7 +265,7 @@ export function DossiersPage({
       supabase.from('dossier_facturation').select('*').eq('dossier_id', d.id).order('ordre').order('created_at'),
     ])
 
-    setPieces((data || []) as DocumentPiece[])
+    setPieces(await resolveDocumentRows((data || []) as DocumentPiece[]))
     setFacturation((factures || []) as DossierFacturation[])
     const commission = d.devis_id ? commissionsParDevis[d.devis_id] : undefined
     const totalFactureNonAnnulee = (factures || []).filter((f: any) => f.statut !== 'annulee').reduce((sum: number, f: any) => sum + Number(f.montant_ht || 0), 0)
@@ -266,6 +276,25 @@ export function DossiersPage({
       taux_tva: '20',
       declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
     })
+  }
+
+  async function enregistrerConfigurationFacturation() {
+    if (!detail) return
+    setSavingFacturationConfig(true)
+    setDetailMessage('')
+    const { data, error } = await supabase.from('dossiers').update({
+      facturation_organisation_id: detailFacturationOrganisationId || null,
+      destinataire_organisation_id: detailDestinataireOrganisationId || null,
+    }).eq('id', detail.id).select('*').single()
+    setSavingFacturationConfig(false)
+    if (error || !data) {
+      setDetailMessage(`Impossible d'enregistrer les entreprises de facturation : ${error?.message || 'erreur inconnue'}`)
+      return
+    }
+    const updated = { ...detail, ...(data as Dossier) }
+    setDetail(updated)
+    setRows(prev => prev.map(row => row.id === detail.id ? { ...row, ...(data as Dossier) } : row))
+    setDetailMessage('Entreprises de facturation enregistrées.')
   }
 
   async function ajouterEcheanceFacturation() {
@@ -334,12 +363,15 @@ export function DossiersPage({
     setFactureSaving(true)
     try {
       const { data: linkedInvoice } = await supabase.from('dossier_facturation').select('devis_id').eq('id', ligne.id).maybeSingle()
+      const issuerOrganisationId = detail.facturation_organisation_id || detail.organisation_id || profile?.organisation_id
       const [numeroResult, entrepriseResult] = await Promise.all([
         supabase.rpc('next_facture_number'),
-        supabase.from('entreprises').select('*').limit(1).maybeSingle(),
+        supabase.from('entreprises').select('*').eq('organisation_id', issuerOrganisationId || '').maybeSingle(),
       ])
       const numero = numeroResult.data
       const entreprise = entrepriseResult.data
+      if (entrepriseResult.error) throw new Error(`Informations légales de l’entreprise émettrice indisponibles : ${entrepriseResult.error.message}`)
+      if (!entreprise) throw new Error('Renseignez les informations légales de l’entreprise émettrice dans les paramètres avant de générer la facture.')
       if (numeroResult.error) throw new Error(`Numérotation de facture indisponible : ${numeroResult.error.message}. Vérifiez que la migration de facturation a été appliquée dans Supabase.`)
       if (!numero) throw new Error('La base de données n’a renvoyé aucun numéro de facture. Appliquez la migration de numérotation des factures dans Supabase.')
       const now = new Date()
@@ -349,6 +381,22 @@ export function DossiersPage({
       const { data: partenaire } = partnerId
         ? await supabase.from('installateurs').select('*').eq('id', partnerId).maybeSingle()
         : { data: null as any }
+      const { data: destinataireEntreprise } = detail.destinataire_organisation_id
+        ? await supabase.from('entreprises').select('*').eq('organisation_id', detail.destinataire_organisation_id).maybeSingle()
+        : { data: null as any }
+      if (detail.destinataire_organisation_id && !destinataireEntreprise) {
+        throw new Error('La fiche légale du destinataire est indisponible pour votre compte. Demandez au Grand Admin de vérifier les informations de facturation.')
+      }
+      const destinataireFacture = destinataireEntreprise ? {
+        nom: destinataireEntreprise.raison_sociale,
+        contact: destinataireEntreprise.forme_juridique,
+        adresse: destinataireEntreprise.adresse,
+        code_postal: destinataireEntreprise.code_postal,
+        ville: destinataireEntreprise.ville,
+        siret: destinataireEntreprise.siret,
+        numero_tva: destinataireEntreprise.numero_tva,
+        email: destinataireEntreprise.email,
+      } : partenaire
 
       const ht = Number(ligne.montant_ht) || 0
       const taux = Number(ligne.taux_tva) || 0
@@ -389,13 +437,13 @@ export function DossiersPage({
       doc.setFont('helvetica','normal'); doc.setFontSize(9)
       let py=86
       for (const line of [
-        partenaire?.nom || 'Partenaire non renseigné',
-        partenaire?.contact,
-        partenaire?.adresse,
-        [partenaire?.code_postal,partenaire?.ville].filter(Boolean).join(' '),
-        partenaire?.siret ? `SIREN : ${String(partenaire.siret).replace(/\s/g,'').slice(0,9)}` : '',
-        partenaire?.numero_tva ? `TVA intracommunautaire : ${partenaire.numero_tva}` : '',
-        partenaire?.email,
+        destinataireFacture?.nom || 'Destinataire non renseigné',
+        destinataireFacture?.contact,
+        destinataireFacture?.adresse,
+        [destinataireFacture?.code_postal,destinataireFacture?.ville].filter(Boolean).join(' '),
+        destinataireFacture?.siret ? `SIREN : ${String(destinataireFacture.siret).replace(/\s/g,'').slice(0,9)}` : '',
+        destinataireFacture?.numero_tva ? `TVA intracommunautaire : ${destinataireFacture.numero_tva}` : '',
+        destinataireFacture?.email,
       ].filter(Boolean)) { doc.text(String(line),18,py); py+=5 }
 
       doc.setFont('helvetica','bold'); doc.text('DÉTAIL DE LA PRESTATION',18,128)
@@ -483,12 +531,12 @@ export function DossiersPage({
       if (error) throw new Error(`PDF généré, mais enregistrement impossible : ${error.message}`)
       await logAuditEvent({ action:'dossier_facture', entityType:'facture', entityId:ligne.id, description:`Facture ${numeroFacture} générée avec devis interne ${devisId}`, meta:{facture_numero:numeroFacture,montant_ht:ht,montant_ttc:ttc,devis_id:devisId} })
       setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,statut:'facturee',facturee_at:now.toISOString(),facture_numero:numeroFacture,devis_id:devisId,pdf_storage_path:cheminPdf,email_erreur:null}:x))
-      if (!partenaire?.email) {
+      if (!destinataireFacture?.email) {
         const message = 'Facture générée et archivée, mais aucun e-mail partenaire n’est renseigné.'
         await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
         setDetailMessage(message)
       } else {
-        const { data: envoi, error: envoiError } = await supabase.functions.invoke('send-invoice', { body: { storagePath: cheminPdf, recipient: partenaire.email, invoiceNumber: numeroFacture, partnerName: partenaire.nom, dossierId: detail.id } })
+        const { data: envoi, error: envoiError } = await supabase.functions.invoke('send-invoice', { body: { storagePath: cheminPdf, recipient: destinataireFacture.email, invoiceNumber: numeroFacture, partnerName: destinataireFacture.nom, dossierId: detail.id } })
         if (envoiError || envoi?.error) {
           const message = `Facture ${numeroFacture} créée et archivée, mais l’e-mail n’a pas été envoyé : ${envoiError?.message || envoi?.error}. Configurez la fonction send-invoice et RESEND_API_KEY.`
           await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
@@ -497,7 +545,7 @@ export function DossiersPage({
         } else {
           await supabase.from('dossier_facturation').update({ email_envoye_at: new Date().toISOString(), email_erreur: null }).eq('id', ligne.id)
           setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,email_envoye_at:new Date().toISOString(),email_erreur:null}:x))
-          setDetailMessage(`Facture ${numeroFacture} générée, archivée et envoyée à ${partenaire.email}.`)
+          setDetailMessage(`Facture ${numeroFacture} générée, archivée et envoyée à ${destinataireFacture.email}.`)
         }
       }
     } catch (e:any) {
@@ -604,14 +652,10 @@ export function DossiersPage({
 
       if (uploadErr) throw uploadErr
 
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(path)
-
       const { data, error } = await supabase
         .from('documents')
         .update({
-          url: urlData.publicUrl,
+          url: path,
           taille: file.size,
           recu: true,
           nom: piece.nom,
@@ -623,11 +667,9 @@ export function DossiersPage({
       if (error) throw error
 
       if (data) {
-        setPieces(prev =>
-          prev.map(p =>
-            p.id === piece.id ? (data as DocumentPiece) : p
-          )
-        )
+        const resolvedUrl = await resolveDocumentUrl(data.url)
+        const resolvedPiece = { ...(data as DocumentPiece), url: resolvedUrl }
+        setPieces(prev => prev.map(p => p.id === piece.id ? resolvedPiece : p))
       }
     } catch (e: any) {
       setUploadError(
@@ -640,7 +682,8 @@ export function DossiersPage({
     setUploadingPieceId(null)
   }
 
-  function retirerFichier(piece: DocumentPiece) {
+  async function retirerFichier(piece: DocumentPiece) {
+    await removeDocumentStorageObject(piece.url)
     supabase
       .from('documents')
       .update({ url: '', recu: false })
@@ -1246,6 +1289,33 @@ export function DossiersPage({
                     : "Ce dossier n'est rattaché à aucun devis signé."}
                 </div>
               )}
+            </div>
+
+            <div className="card card-pad" style={{ marginBottom: 14 }}>
+              <div className="font-semibold" style={{ marginBottom: 4 }}>Facturation du dossier</div>
+              <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
+                Choisissez séparément l’entreprise qui émet la facture et l’entreprise destinataire. Les coordonnées légales doivent être renseignées dans les paramètres de chaque entreprise.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, alignItems: 'end' }}>
+                <FloatSelect
+                  label="Entreprise émettrice"
+                  value={detailFacturationOrganisationId}
+                  onChange={setDetailFacturationOrganisationId}
+                  options={organisations.map(org => ({ value: org.id, label: org.nom }))}
+                />
+                <FloatSelect
+                  label="Destinataire de la facture"
+                  value={detailDestinataireOrganisationId}
+                  onChange={setDetailDestinataireOrganisationId}
+                  options={[
+                    { value: '', label: 'Installateur associé au dossier' },
+                    ...organisations.map(org => ({ value: org.id, label: org.nom })),
+                  ]}
+                />
+                <Button variant="secondary" onClick={enregistrerConfigurationFacturation} disabled={savingFacturationConfig || !detailFacturationOrganisationId}>
+                  {savingFacturationConfig ? 'Enregistrement…' : 'Enregistrer la facturation'}
+                </Button>
+              </div>
             </div>
 
             {/* STATUT + DATE D'INSTALLATION */}

@@ -1,6 +1,6 @@
 export type PageKey =
   | 'dashboard' | 'prospects' | 'visites' | 'simulations' | 'resultats_3cl'
-  | 'dossiers' | 'devis' | 'facturation' | 'catalogue' | 'planning' | 'courrier' | 'a_traiter' | 'pipeline' | 'prospection' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'fiches_techniques' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme'
+  | 'dossiers' | 'devis' | 'facturation' | 'catalogue' | 'planning' | 'courrier' | 'a_traiter' | 'pipeline' | 'prospection' | 'suivi_chantier' | 'partenaires' | 'installateurs' | 'challenges' | 'performance' | 'documents' | 'fiches_techniques' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme' | 'organisation'
 
 export type TypeProspect = 'particulier' | 'professionnel'
 
@@ -29,13 +29,14 @@ export interface Prospect {
   zone_ile_de_france: boolean
   commercial: string | null
   commercial_id: string | null
+  // Conservé pour les tableaux de bord et exports historiques ; masqué sur la fiche prospect.
+  montant_potentiel?: number | null
   commercial_historique_id?: string | null
   installateur_id?: string | null
   pot_commun?: boolean
   pot_commun_at?: string | null
   pot_commun_ancien_commercial?: string | null
   tags: string[]
-  montant_potentiel: number | null
   temperature: 'chaud' | 'tiede' | 'froid' | null
   derniere_interaction_at: string | null
   // Prospects professionnels (personne morale) — nom/prenom/email/telephone restent
@@ -304,6 +305,9 @@ export interface Dossier {
   aides_montant: number | null
   reste_a_charge: number | null
   installateur_id?: string | null
+  organisation_id?: string | null
+  facturation_organisation_id?: string | null
+  destinataire_organisation_id?: string | null
   date_installation_prevue?: string | null
   date_installation?: string | null
   garantie_fin?: string | null
@@ -334,6 +338,8 @@ export interface PlanningEvent {
 export interface DossierFacturation {
   id: string
   dossier_id: string
+  organisation_id?: string | null
+  destinataire_organisation_id?: string | null
   libelle: string
   montant_ht: number
   taux_tva: number
