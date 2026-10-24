@@ -532,6 +532,200 @@ using (
   )
 );
 
+
+-- Tenant-scope secondary records too; old permissive policies are OR-combined.
+drop policy if exists notifications_select_scope on public.notifications;
+drop policy if exists notifications_insert_scope on public.notifications;
+drop policy if exists notifications_update_scope on public.notifications;
+drop policy if exists notifications_delete_scope on public.notifications;
+create policy notifications_select_scope on public.notifications
+for select to authenticated
+using (
+  recipient_id = (select auth.uid())
+  or public.is_super_admin()
+  or (recipient_id is null and prospect_id is not null and public.prospect_visible(prospect_id))
+);
+create policy notifications_insert_scope on public.notifications
+for insert to authenticated
+with check (
+  public.is_super_admin()
+  or (
+    (recipient_id is null or recipient_id = (select auth.uid()))
+    and (prospect_id is null or public.prospect_visible(prospect_id))
+  )
+);
+create policy notifications_update_scope on public.notifications
+for update to authenticated
+using (
+  recipient_id = (select auth.uid())
+  or public.is_super_admin()
+  or (recipient_id is null and prospect_id is not null and public.prospect_visible(prospect_id))
+)
+with check (
+  public.is_super_admin()
+  or recipient_id = (select auth.uid())
+  or (recipient_id is null and (prospect_id is null or public.prospect_visible(prospect_id)))
+);
+create policy notifications_delete_scope on public.notifications
+for delete to authenticated
+using (
+  recipient_id = (select auth.uid())
+  or public.is_super_admin()
+  or (recipient_id is null and prospect_id is not null and public.prospect_visible(prospect_id))
+);
+
+drop policy if exists prospect_messages_select on public.prospect_messages;
+drop policy if exists prospect_messages_insert on public.prospect_messages;
+drop policy if exists prospect_messages_update on public.prospect_messages;
+create policy prospect_messages_select_scope on public.prospect_messages
+for select to authenticated using (public.prospect_visible(prospect_id));
+create policy prospect_messages_insert_scope on public.prospect_messages
+for insert to authenticated
+with check (sender_id = (select auth.uid()) and public.prospect_visible(prospect_id));
+create policy prospect_messages_update_scope on public.prospect_messages
+for update to authenticated
+using ((recipient_id = (select auth.uid()) or public.is_super_admin()) and public.prospect_visible(prospect_id))
+with check (public.prospect_visible(prospect_id) and (recipient_id = (select auth.uid()) or public.is_super_admin()));
+
+drop policy if exists factures_clients_lignes_scope on public.factures_clients_lignes;
+create policy factures_clients_lignes_scope on public.factures_clients_lignes
+for all to authenticated
+using (
+  exists (
+    select 1 from public.factures_clients fc
+    where fc.id = facture_id and public.prospect_visible(fc.prospect_id)
+  )
+)
+with check (
+  exists (
+    select 1 from public.factures_clients fc
+    where fc.id = facture_id and public.prospect_visible(fc.prospect_id)
+  )
+);
+
+drop policy if exists commission_echeances_select_scope on public.commission_echeances;
+drop policy if exists commission_echeances_write_admin on public.commission_echeances;
+create policy commission_echeances_select_scope on public.commission_echeances
+for select to authenticated
+using (
+  exists (select 1 from public.commissions c where c.id = commission_id)
+);
+create policy commission_echeances_write_scope on public.commission_echeances
+for all to authenticated
+using (
+  exists (
+    select 1 from public.commissions c
+    where c.id = commission_id
+      and (
+        public.is_super_admin()
+        or exists (
+          select 1 from public.profiles me
+          where me.id = (select auth.uid())
+            and me.role in ('manager', 'partner_admin', 'company_admin')
+            and me.organisation_id = c.organisation_id
+        )
+      )
+  )
+)
+with check (
+  exists (
+    select 1 from public.commissions c
+    where c.id = commission_id
+      and (
+        public.is_super_admin()
+        or exists (
+          select 1 from public.profiles me
+          where me.id = (select auth.uid())
+            and me.role in ('manager', 'partner_admin', 'company_admin')
+            and me.organisation_id = c.organisation_id
+        )
+      )
+  )
+);
+
+drop policy if exists commission_ajustements_select_admin on public.commission_ajustements;
+create policy commission_ajustements_select_scope on public.commission_ajustements
+for select to authenticated
+using (
+  exists (
+    select 1 from public.commissions c
+    where c.id = commission_id
+      and (
+        public.is_super_admin()
+        or c.commercial_id = (select auth.uid())
+        or public.can_manage_profile(c.commercial_id)
+        or exists (
+          select 1 from public.profiles me
+          where me.id = (select auth.uid())
+            and me.role in ('manager', 'partner_admin', 'company_admin')
+            and me.organisation_id = c.organisation_id
+        )
+      )
+  )
+);
+
+drop policy if exists simulations_aides_select_scope on public.simulations_aides;
+drop policy if exists simulations_aides_write_scope on public.simulations_aides;
+create policy simulations_aides_select_scope on public.simulations_aides
+for select to authenticated using (public.prospect_visible(prospect_id));
+create policy simulations_aides_write_scope on public.simulations_aides
+for all to authenticated
+using (public.prospect_visible(prospect_id))
+with check (public.prospect_visible(prospect_id));
+
+drop policy if exists planning_select_scope on public.planning_events;
+drop policy if exists planning_insert_scope on public.planning_events;
+drop policy if exists planning_update_scope on public.planning_events;
+drop policy if exists planning_delete_scope on public.planning_events;
+create policy planning_select_scope on public.planning_events
+for select to authenticated
+using (
+  public.is_super_admin()
+  or (prospect_id is not null and public.prospect_visible(prospect_id))
+  or (prospect_id is null and user_id = (select auth.uid()))
+);
+create policy planning_insert_scope on public.planning_events
+for insert to authenticated
+with check (
+  public.is_super_admin()
+  or (
+    user_id = (select auth.uid())
+    and (prospect_id is null or public.prospect_visible(prospect_id))
+  )
+);
+create policy planning_update_scope on public.planning_events
+for update to authenticated
+using (
+  public.is_super_admin()
+  or (user_id = (select auth.uid()) and (prospect_id is null or public.prospect_visible(prospect_id)))
+)
+with check (
+  public.is_super_admin()
+  or (user_id = (select auth.uid()) and (prospect_id is null or public.prospect_visible(prospect_id)))
+);
+create policy planning_delete_scope on public.planning_events
+for delete to authenticated
+using (
+  public.is_super_admin()
+  or (user_id = (select auth.uid()) and (prospect_id is null or public.prospect_visible(prospect_id)))
+);
+
+drop policy if exists devis_delete_admin on public.devis;
+create policy devis_delete_scope on public.devis
+for delete to authenticated using (public.prospect_visible(prospect_id));
+drop policy if exists visites_delete_admin on public.visites;
+create policy visites_delete_scope on public.visites
+for delete to authenticated using (public.prospect_visible(prospect_id));
+
+drop policy if exists audit_select_admin on public.audit_logs;
+create policy audit_select_admin on public.audit_logs
+for select to authenticated using (public.is_super_admin());
+
+-- Shared commission schedules and audit adjustments are not a partner-facing directory.
+drop policy if exists commission_bareme_select_admin on public.commission_bareme;
+create policy commission_bareme_select_admin on public.commission_bareme
+for select to authenticated using (public.is_super_admin());
+
 comment on table public.organisations is
   'Tenant boundary for Renova OS; the global admin can administer all organisations.';
 comment on table public.prospect_shares is
