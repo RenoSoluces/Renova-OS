@@ -159,7 +159,53 @@ export function OrganisationPage() {
         <button type="button" className="btn btn-outline" onClick={() => void load()} disabled={loading}><RefreshCw size={15} /> Actualiser</button>
       </div>
       {error && <div className="card card-pad" role="alert">{error}</div>}
-      {!loading && <>{`+ui+`}</>}
+      {!loading && (
+        <section className="card card-pad" style={{ marginBottom: 16 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 17 }}>Inviter un membre</h2>
+          <p className="text-muted" style={{ margin: '0 0 14px', fontSize: 13 }}>Le rôle et l'entreprise sont attribués côté serveur ; un membre ne peut pas choisir ses propres droits.</p>
+          <form onSubmit={inviteMember} style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: 10, alignItems: 'end' }}>
+            <label style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+              Nom complet
+              <input className="pipeline-inline-input" value={inviteName} onChange={e => setInviteName(e.target.value)} required maxLength={120} />
+            </label>
+            <label style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+              E-mail professionnel
+              <input className="pipeline-inline-input" type="email" value={inviteEmail} onChange={e => setInviteEmail(e.target.value)} required maxLength={254} />
+            </label>
+            {isGlobalAdmin && (
+              <label style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+                Entreprise
+                <select className="pipeline-inline-input" value={inviteOrganisationId} onChange={e => { setInviteOrganisationId(e.target.value); setInviteManagerId('') }} required>
+                  <option value="">Choisir une entreprise…</option>
+                  {organisations.map(org => <option key={org.id} value={org.id}>{org.nom}</option>)}
+                </select>
+              </label>
+            )}
+            <label style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+              Rôle
+              <select className="pipeline-inline-input" value={inviteRole} onChange={e => setInviteRole(e.target.value)} required>
+                {roleOptions.map(role => <option key={role.value} value={role.value}>{role.label}</option>)}
+              </select>
+            </label>
+            <label style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+              Responsable hiérarchique
+              <select className="pipeline-inline-input" value={inviteManagerId} onChange={e => setInviteManagerId(e.target.value)}>
+                {isGlobalAdmin && <option value="">Aucun (direction)</option>}
+                {members
+                  .filter(member => member.organisation_id === (isGlobalAdmin ? inviteOrganisationId : profile?.organisation_id))
+                  .filter(member => ['admin', 'manager', 'commercial_manager', 'partner_admin', 'company_admin'].includes(member.role))
+                  .map(member => <option key={member.id} value={member.id}>{member.nom_complet} — {ROLE_LABELS[member.role] || member.role}</option>)}
+              </select>
+            </label>
+            <div>
+              <button className="btn btn-primary" type="submit" disabled={inviteLoading || (isGlobalAdmin && !inviteOrganisationId) || !roleOptions.some(role => role.value === inviteRole)}>
+                {inviteLoading ? 'Envoi…' : 'Envoyer l’invitation'}
+              </button>
+            </div>
+          </form>
+          {inviteMessage && <p className="text-muted" role="status" style={{ margin: '10px 0 0', fontSize: 13 }}>{inviteMessage}</p>}
+        </section>
+      )}
       {loading ? <div className="card card-pad">Chargement de l'organigramme…</div> : (
         <div style={{ display: 'grid', gap: 16 }}>
           {organisations.map(org => {
