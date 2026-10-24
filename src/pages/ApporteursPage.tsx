@@ -10,6 +10,7 @@ type Apporteur = {
   statut: 'a_contacter' | 'contacte' | 'actif' | 'inactif'; notes: string | null
 }
 type Organisation = { id: string; nom: string }
+type MembreEquipe = { id: string; nom_complet: string; role: string; email?: string | null }
 const STATUTS = [
   { value: 'a_contacter', label: 'À contacter' },
   { value: 'contacte', label: 'Contacté' },
@@ -21,6 +22,7 @@ export function ApporteursPage() {
   const { profile } = useAuth()
   const [rows, setRows] = useState<Apporteur[]>([])
   const [organisations, setOrganisations] = useState<Organisation[]>([])
+  const [equipe, setEquipe] = useState<MembreEquipe[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -33,13 +35,15 @@ export function ApporteursPage() {
 
   async function load() {
     setLoading(true); setError('')
-    const [a, o] = await Promise.all([
+    const [a, o, e] = await Promise.all([
       supabase.from('apporteurs_affaires').select('*').order('nom'),
       supabase.from('organisations').select('id,nom').eq('actif', true).order('nom'),
+      profile?.id ? supabase.from('profiles').select('id,nom_complet,role,email').eq('manager_id', profile.id).order('nom_complet') : Promise.resolve({ data: [], error: null }),
     ])
     if (a.error) setError("Impossible de charger les apporteurs. Vérifiez que la migration multi-entreprise a été appliquée.")
     else setRows((a.data || []) as Apporteur[])
     setOrganisations((o.data || []) as Organisation[])
+    setEquipe((e.data || []) as MembreEquipe[])
     setLoading(false)
   }
   useEffect(() => { void load() }, [])
@@ -79,6 +83,13 @@ export function ApporteursPage() {
       <div><h1 className="page-title">Mon réseau d’apporteurs</h1><p className="page-subtitle">Identifiez les personnes qui peuvent vous recommander des clients. Ce répertoire est distinct de celui des installateurs.</p></div>
       <div className="page-actions"><Button variant="primary" onClick={() => { reset(); setSuccess('') }}><Plus size={16}/> Nouvel apporteur</Button></div>
     </div>
+    {equipe.length > 0 && <section className="card card-pad" style={{ marginBottom: 16 }}>
+      <h3 style={{ marginTop: 0 }}>Mon équipe rattachée</h3>
+      <p className="text-muted">Membres directement rattachés à votre compte dans l’organigramme. Cette liste est distincte du répertoire des apporteurs externes.</p>
+      <div className="table-wrap"><table><thead><tr><th>Collaborateur</th><th>Rôle</th><th>E-mail</th></tr></thead><tbody>
+        {equipe.map(m => <tr key={m.id}><td><strong>{m.nom_complet || 'Utilisateur sans nom'}</strong></td><td>{({ commercial: 'Commercial', apporteur: 'Apporteur d’affaires', teleconseiller: 'Téléconseiller', commercial_manager: 'Responsable commercial' } as Record<string,string>)[m.role] || m.role}</td><td>{m.email || '—'}</td></tr>)}
+      </tbody></table></div>
+    </section>}
     {error && <div className="status status-error" role="alert">{error}</div>}
     {success && <div className="status status-success" role="status">{success}</div>}
     <div className="toolbar"><div className="search-box"><Search size={16}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Rechercher un apporteur, une ville…"/></div><span className="text-muted">{filtered.length} apporteur(s)</span></div>
