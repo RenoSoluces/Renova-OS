@@ -30,6 +30,7 @@ export function OrganisationPage() {
   const [inviteManagerId, setInviteManagerId] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteMessage, setInviteMessage] = useState('')
+  const [hasDirectReports, setHasDirectReports] = useState(false)
   const isGlobalAdmin = profile?.role === 'admin'
 
   async function load() {
@@ -43,10 +44,13 @@ export function OrganisationPage() {
       setError("Impossible de charger l'organigramme. Vérifiez les droits de votre compte.")
       setOrganisations([])
       setMembers([])
+      setHasDirectReports(false)
     } else {
       const nextOrganisations = (orgResult.data || []) as Organisation[]
       setOrganisations(nextOrganisations)
-      setMembers((memberResult.data || []) as Member[])
+      const nextMembers = (memberResult.data || []) as Member[]
+      setMembers(nextMembers)
+      setHasDirectReports(nextMembers.some(member => member.manager_id === profile?.id))
       if (!inviteOrganisationId && isGlobalAdmin && nextOrganisations.length > 0) {
         setInviteOrganisationId(nextOrganisations[0].id)
       }
@@ -145,7 +149,7 @@ export function OrganisationPage() {
     )
   }
 
-  if (!['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')) {
+  if (!['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') && !hasDirectReports) {
     return <div className="page"><div className="card card-pad">L'organigramme est réservé à la direction et aux managers autorisés.</div></div>
   }
 
