@@ -173,7 +173,6 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<{ id: string; nom_complet: string }[]>([])
   const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
-  const canViewTeam = ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
 
   const extended = (p: Prospect): any => p as any
 
@@ -192,7 +191,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   }
 
   async function fetchCommerciaux() {
-    const { data } = await supabase.from('profiles').select('id, nom_complet, role').order('nom_complet')
+    const { data } = await supabase.from('profiles').select('id, nom_complet, role, manager_id, organisation_id').order('nom_complet')
     setCommerciaux((data || []) as any)
     const { data: anciens } = await supabase.from('commerciaux_historique').select('id, nom_complet').order('nom_complet')
     setAnciensCommerciaux((anciens || []) as any)
