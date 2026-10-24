@@ -549,7 +549,7 @@ begin
       new.organisation_id := (select p.organisation_id from public.prospects p where p.id = new.prospect_id);
     end if;
     if new.facturation_organisation_id is null then
-      new.facturation_organisation_id := coalesce(actor_org, new.organisation_id);
+      new.facturation_organisation_id := case when public.is_super_admin() then new.organisation_id else coalesce(actor_org, new.organisation_id) end;
     end if;
   elsif tg_table_name = 'commissions' then
     if new.organisation_id is null then
