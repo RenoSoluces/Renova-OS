@@ -48,6 +48,7 @@ const EMPTY = {
   actif: true,
   public_cible: 'particulier',
   categorie_produit: '',
+  variante_produit: '',
 }
 
 type PaymentTarget = 'commercial' | 'societe'
@@ -162,7 +163,7 @@ export function CommissionsPage() {
 
     const produitsQuery = supabase
       .from('catalogue_produits')
-      .select('id,nom,categorie,public_cible,catalogue_groupe')
+      .select('id,nom,categorie,public_cible,catalogue_groupe,caracteristiques')
       .eq('actif', true)
       .order('nom')
 
@@ -394,6 +395,7 @@ export function CommissionsPage() {
       actif: r.actif,
       public_cible: r.public_cible || 'tous',
       categorie_produit: r.categorie_produit || produits.find((p: any) => p.id === r.produit_id)?.categorie || '',
+      variante_produit: r.variante_produit || '',
     })
 
     setModal(true)
@@ -438,6 +440,7 @@ export function CommissionsPage() {
       actif: form.actif,
       public_cible: form.public_cible || (baremePublic === 'visite_technique' ? 'tous' : baremePublic),
       categorie_produit: form.categorie_produit || null,
+      variante_produit: form.variante_produit || null,
     }
 
     const q = editing
@@ -747,10 +750,30 @@ export function CommissionsPage() {
       ? p.catalogue_groupe === 'visite_technique'
       : (form.public_cible === 'tous' || p.public_cible === form.public_cible) && p.catalogue_groupe !== 'visite_technique')
     .map((p: any) => p.categorie).filter(Boolean))].sort()
-  const produitsFiltres = produits.filter((p: any) =>
-    p.categorie === form.categorie_produit && (form.type === 'vt'
-      ? p.catalogue_groupe === 'visite_technique'
-      : form.public_cible === 'tous' || p.public_cible === form.public_cible))
+  function produitVariant(p: any): string | null {
+    const a = p.caracteristiques || {}
+    if (p.categorie === 'pac_air_air') {
+      const n = Number(a.puissance_froid_kw ?? a.puissance)
+      return Number.isFinite(n) && n > 0 ? String(n) : null
+    }
+    if (p.categorie === 'photovoltaique') {
+      const n = Number(a.puissance_kwc ?? a.puissance_pv_kWc)
+      return Number.isFinite(n) && n > 0 ? String(n) : null
+    }
+    if (p.categorie === 'batterie_stockage') {
+      if (/additionnelle/i.test(p.nom || '')) return 'additionnelle_5.12'
+      const cap = Number(a.capacite_stockage_kWh ?? a.capacite_kWh)
+      if (!Number.isFinite(cap) || cap <= 0) return null
+      const phase = String(a.phase || p.nom || '').toLowerCase().includes('triphas') ? 'triphase' : String(a.phase || p.nom || '').toLowerCase().includes('monophas') ? 'monophase' : 'inconnu'
+      return `${cap}_${phase}`
+    }
+    return null
+  }
+  const produitsCategorie = produits.filter((p: any) => p.categorie === form.categorie_produit && (form.type === 'vt'
+    ? p.catalogue_groupe === 'visite_technique'
+    : form.public_cible === 'tous' || p.public_cible === form.public_cible))
+  const variantesProduits = [...new Set(produitsCategorie.map((p: any) => produitVariant(p)).filter(Boolean))].sort((a: any, b: any) => String(a).localeCompare(String(b), 'fr', { numeric: true }))
+  const produitsFiltres = produitsCategorie.filter((p: any) => !form.variante_produit || produitVariant(p) === form.variante_produit)
 
   const echeanceTotal = echeances.reduce((sum, e) => sum + amount(e.montant), 0)
   const echeancePaid = echeances.filter(e => !!e.date_paiement).reduce((sum, e) => sum + amount(e.montant), 0)
@@ -1878,8 +1901,15 @@ export function CommissionsPage() {
           <FloatSelect
             label="Type de produit / catégorie"
             value={form.categorie_produit}
-            onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, produit_id: '' }))}
+            onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, variante_produit: '', produit_id: '' }))}
             options={[{ value: '', label: 'Tous les types de produits' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replaceAll('_', ' ').replace(/^./, x => x.toUpperCase()) }))]}
+          />
+
+          <FloatSelect
+            label="Variante rémunérée (facultatif)"
+            value={form.variante_produit}
+            onChange={(v) => setForm((f: any) => ({ ...f, variante_produit: v, produit_id: '' }))}
+            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: String(variante).replaceAll('_', ' ').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé') }))]}
           />
 
           <FloatSelect
