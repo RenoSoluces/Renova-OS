@@ -265,3 +265,27 @@ BEGIN
   END IF;
 END
 $seed$;
+ 
+-- Préserve les montants société connus tout en remplaçant les anciennes règles
+-- commerciales SKU par les règles type/variante de la grille.
+UPDATE public.commission_bareme
+SET montant_societe = 2000, updated_at = now()
+WHERE commercial_id = '288a684c-e306-46b4-9040-2e36e4ea462f'
+  AND type = 'devis_signe' AND categorie_produit = 'pac_air_eau'
+  AND variante_produit IS NULL
+  AND libelle = 'PAC Air/Eau — Particuliers · grille octobre 2026';
+
+UPDATE public.commission_bareme
+SET montant_societe = 592.80, updated_at = now()
+WHERE commercial_id = '288a684c-e306-46b4-9040-2e36e4ea462f'
+  AND type = 'devis_signe' AND categorie_produit = 'pac_air_air'
+  AND variante_produit = '2'
+  AND libelle = 'PAC Air/Air 2 kW — grille octobre 2026';
+
+UPDATE public.commission_bareme
+SET actif = false, updated_at = now()
+WHERE commercial_id = '288a684c-e306-46b4-9040-2e36e4ea462f'
+  AND type = 'devis_signe'
+  AND produit_id IS NOT NULL
+  AND libelle IN ('PAC Air Eau 1 € Moyenne Température', 'Pompe à Chaleur Air Eau 1€', 'Clim 2 kW');
+
