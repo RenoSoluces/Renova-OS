@@ -57,18 +57,24 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
 export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge, prospectsBadge }: SidebarProps) {
   const { profile } = useAuth()
   const [prospectCount, setProspectCount] = useState(prospectsBadge ?? 0)
+  const [hasDirectReports, setHasDirectReports] = useState(false)
 
   useEffect(() => {
     let cancelled = false
     supabase.from('prospects').select('id', { count: 'exact', head: true }).then(({ count }) => {
       if (!cancelled) setProspectCount(count || 0)
     })
+    if (profile?.id) {
+      supabase.from('profiles').select('id').eq('manager_id', profile.id).limit(1).then(({ data }) => {
+        if (!cancelled) setHasDirectReports(Boolean(data?.length))
+      })
+    }
     return () => { cancelled = true }
   }, [prospectsBadge, profile?.id, profile?.role])
 
   const nom = profile?.nom_complet?.trim() || profile?.email || 'Utilisateur'
   const initials = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U'
-  const roleLabel = ({ admin: 'Grand Admin', manager: 'Manager', commercial_manager: 'Responsable commercial', partner_admin: 'Dirigeant partenaire', company_admin: 'Direction', commercial: 'Commercial', apporteur: "Apporteur d'affaires", teleconseiller: 'Téléconseiller' } as Record<string, string>)[profile?.role || ''] || 'Utilisateur'
+  const roleLabel = ({ admin: 'Grand Admin', manager: 'Manager', commercial_manager: 'Responsable commercial', partner_admin: 'Dirigeant partenaire', company_admin: 'Direction', commercial: 'Commercial', apporteur: "Apporteur d'affaires", teleconseiller: 'Téléconseiller' } as Record<string, string>)[profile?.role || ''] || (hasDirectReports ? 'Responsable d’équipe' : 'Utilisateur')
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-brand">
@@ -96,7 +102,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')).map(item => {
+            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
               const Icon = item.icon
               return (
                 <button
