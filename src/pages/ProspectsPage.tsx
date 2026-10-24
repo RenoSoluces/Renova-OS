@@ -172,16 +172,17 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<{ id: string; nom_complet: string }[]>([])
   const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
+  const canViewTeam = ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
 
   const extended = (p: Prospect): any => p as any
 
   async function fetchProspects() {
-    await actualiserPotCommun()
+    if (profile?.role === 'admin') await actualiserPotCommun()
     let query = supabase
       .from('prospects')
       .select('*')
       .order('created_at', { ascending: false })
-    if (!isAdmin && profile?.id) {
+    if (!canViewTeam && profile?.id) {
       query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true`)
     }
     const { data, error } = await query
@@ -201,6 +202,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   }
 
   async function fetchInstallateurs() {
+    if (!['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')) {
+      setInstallateurs([])
+      return
+    }
     const { data } = await supabase.from('installateurs').select('id, nom, actif').eq('actif', true).order('nom')
     setInstallateurs((data || []) as any)
   }
