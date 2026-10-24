@@ -62,6 +62,7 @@ interface DossiersPageProps {
 type DossierAvecRelations = Dossier & {
   prospect?: Prospect
 }
+type OrganisationOption = { id: string; nom: string; type: string }
 
 export function DossiersPage({
   initialProspectId,
@@ -87,6 +88,10 @@ export function DossiersPage({
   const [detailDateInstallation, setDetailDateInstallation] = useState('')
   const [savingStatut, setSavingStatut] = useState(false)
   const [detailMessage, setDetailMessage] = useState('')
+  const [organisations, setOrganisations] = useState<OrganisationOption[]>([])
+  const [detailFacturationOrganisationId, setDetailFacturationOrganisationId] = useState('')
+  const [detailDestinataireOrganisationId, setDetailDestinataireOrganisationId] = useState('')
+  const [savingFacturationConfig, setSavingFacturationConfig] = useState(false)
 
   const [deletingDossier, setDeletingDossier] = useState(false)
   const [facturation, setFacturation] = useState<DossierFacturation[]>([])
@@ -150,6 +155,8 @@ export function DossiersPage({
 
   useEffect(() => {
     fetchListe()
+    supabase.from('organisations').select('id, nom, type').eq('actif', true).order('nom')
+      .then(({ data }) => setOrganisations((data || []) as OrganisationOption[]))
 
     supabase
       .from('prospects')
@@ -246,6 +253,8 @@ export function DossiersPage({
 
   async function ouvrirDetail(d: DossierAvecRelations) {
     setDetail(d)
+    setDetailFacturationOrganisationId(d.facturation_organisation_id || d.organisation_id || profile?.organisation_id || '')
+    setDetailDestinataireOrganisationId(d.destinataire_organisation_id || '')
     setDetailStatut(d.statut || 'creation')
     setDetailDateInstallation(d.date_installation || '')
     setUploadError('')
@@ -267,6 +276,25 @@ export function DossiersPage({
       taux_tva: '20',
       declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
     })
+  }
+
+  async function enregistrerConfigurationFacturation() {
+    if (!detail) return
+    setSavingFacturationConfig(true)
+    setDetailMessage('')
+    const { data, error } = await supabase.from('dossiers').update({
+      facturation_organisation_id: detailFacturationOrganisationId || null,
+      destinataire_organisation_id: detailDestinataireOrganisationId || null,
+    }).eq('id', detail.id).select('*').single()
+    setSavingFacturationConfig(false)
+    if (error || !data) {
+      setDetailMessage(`Impossible d'enregistrer les entreprises de facturation : ${error?.message || 'erreur inconnue'}`)
+      return
+    }
+    const updated = { ...detail, ...(data as Dossier) }
+    setDetail(updated)
+    setRows(prev => prev.map(row => row.id === detail.id ? { ...row, ...(data as Dossier) } : row))
+    setDetailMessage('Entreprises de facturation enregistrées.')
   }
 
   async function ajouterEcheanceFacturation() {
