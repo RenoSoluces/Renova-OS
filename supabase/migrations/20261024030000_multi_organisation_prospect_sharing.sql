@@ -219,7 +219,16 @@ alter table public.prospect_shares enable row level security;
 drop policy if exists organisations_select_scope on public.organisations;
 create policy organisations_select_scope on public.organisations
 for select to authenticated
-using (public.is_super_admin() or id = public.current_organisation_id());
+using (
+  public.is_super_admin()
+  or id = public.current_organisation_id()
+  or exists (
+    select 1 from public.dossiers d
+    where (d.facturation_organisation_id = organisations.id
+      or d.destinataire_organisation_id = organisations.id)
+      and public.prospect_visible(d.prospect_id)
+  )
+);
 
 drop policy if exists organisations_admin_write on public.organisations;
 create policy organisations_admin_write on public.organisations
