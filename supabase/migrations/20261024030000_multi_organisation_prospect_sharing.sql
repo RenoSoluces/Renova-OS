@@ -812,6 +812,77 @@ drop policy if exists commission_bareme_select_admin on public.commission_bareme
 create policy commission_bareme_select_admin on public.commission_bareme
 for select to authenticated using (public.is_super_admin());
 
+
+-- Private document bucket. Object paths start with a dossier UUID, prospect UUID,
+-- or "divers" for unlinked administrative files.
+create or replace function public.document_object_visible(object_name text)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public, storage
+as $function$
+declare
+  folder_name text;
+  folder_id uuid;
+begin
+  if public.is_super_admin() then
+    return true;
+  end if;
+
+  folder_name := (storage.foldername(object_name))[1];
+  if folder_name is null or folder_name !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
+  'Tenant boundary for Renova OS; the global admin can administer all organisations.';
+comment on table public.prospect_shares is
+  'Explicit prospect visibility grants; sharing does not change the original owner organisation.';
+comment on column public.dossiers.facturation_organisation_id is
+  'Organisation that issues invoices for this dossier; independent from original prospect ownership.';
+ then
+    return exists (
+      select 1
+      from public.profiles me
+      join public.organisations o on o.id = me.organisation_id
+      where me.id = (select auth.uid())
+        and me.role = 'manager'
+        and o.type = 'interne'
+    );
+  end if;
+
+  folder_id := folder_name::uuid;
+  return public.dossier_visible(folder_id) or public.prospect_visible(folder_id);
+end;
+$function$;
+
+revoke all on function public.document_object_visible(text) from public, anon;
+grant execute on function public.document_object_visible(text) to authenticated;
+
+drop policy if exists documents_bucket_read on storage.objects;
+drop policy if exists documents_bucket_read_scope on storage.objects;
+create policy documents_bucket_read_scope on storage.objects
+for select to authenticated
+using (bucket_id = 'documents' and public.document_object_visible(name));
+
+drop policy if exists documents_bucket_write on storage.objects;
+drop policy if exists documents_bucket_write_scope on storage.objects;
+create policy documents_bucket_write_scope on storage.objects
+for insert to authenticated
+with check (bucket_id = 'documents' and public.document_object_visible(name));
+
+drop policy if exists documents_bucket_update on storage.objects;
+drop policy if exists documents_bucket_update_scope on storage.objects;
+create policy documents_bucket_update_scope on storage.objects
+for update to authenticated
+using (bucket_id = 'documents' and public.document_object_visible(name))
+with check (bucket_id = 'documents' and public.document_object_visible(name));
+
+drop policy if exists documents_bucket_delete on storage.objects;
+drop policy if exists documents_bucket_delete_scope on storage.objects;
+create policy documents_bucket_delete_scope on storage.objects
+for delete to authenticated
+using (bucket_id = 'documents' and public.document_object_visible(name));
+
+update storage.buckets set public = false where id = 'documents';
+
 comment on table public.organisations is
   'Tenant boundary for Renova OS; the global admin can administer all organisations.';
 comment on table public.prospect_shares is
