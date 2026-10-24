@@ -315,7 +315,9 @@ with check (
   or (commercial_id = (select auth.uid()) and prospects.organisation_id = public.current_organisation_id())
   or exists (
     select 1 from public.profiles assigned
-    where assigned.id = commercial_id and assigned.manager_id = (select auth.uid())
+    where assigned.id = prospects.commercial_id
+      and assigned.manager_id = (select auth.uid())
+      and assigned.organisation_id = prospects.organisation_id
   )
   or exists (
     select 1 from public.profiles me
