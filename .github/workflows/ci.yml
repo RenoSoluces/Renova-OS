@@ -32,4 +32,12 @@ jobs:
       - name: Validate PostgreSQL migration syntax
         run: |
           python -m pip install --disable-pip-version-check pglast
-          python -c "from pglast import parse_sql; parse_sql(open('supabase/migrations/20261024030000_multi_organisation_prospect_sharing.sql', encoding='utf-8').read()); print('Migration SQL syntax OK')"
+          python - <<'PY'
+          from pathlib import Path
+          from pglast import parse_sql
+
+          paths = sorted(Path("supabase/migrations").glob("*.sql"))
+          for path in paths:
+              parse_sql(path.read_text(encoding="utf-8"))
+              print(f"SQL syntax OK: {path}")
+          PY
