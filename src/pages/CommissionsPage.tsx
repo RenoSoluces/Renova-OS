@@ -1739,7 +1739,7 @@ export function CommissionsPage() {
                       <span>
                         {produits.find((p: any) => p.id === r.produit_id)?.nom ||
                           (r.categorie_produit
-                            ? `${String(r.categorie_produit).replaceAll('_', ' ')}${r.variante_produit ? ` · ${r.variante_produit}` : ' · tous les produits du type'}`
+                            ? `${String(r.categorie_produit).replace(/_/g, ' ')}${r.variante_produit ? ` · ${r.variante_produit}` : ' · tous les produits du type'}`
                             : 'Tous les produits')}
                       </span>
 
@@ -1902,14 +1902,14 @@ export function CommissionsPage() {
             label="Type de produit / catégorie"
             value={form.categorie_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, variante_produit: '', produit_id: '' }))}
-            options={[{ value: '', label: 'Tous les types de produits' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replaceAll('_', ' ').replace(/^./, x => x.toUpperCase()) }))]}
+            options={[{ value: '', label: 'Tous les types de produits' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replace(/_/g, ' ').charAt(0).toUpperCase() + categorie.replace(/_/g, ' ').slice(1) }))]}
           />
 
           <FloatSelect
             label="Variante rémunérée (facultatif)"
             value={form.variante_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, variante_produit: v, produit_id: '' }))}
-            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: String(variante).replaceAll('_', ' ').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé') }))]}
+            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: String(variante).replace(/_/g, ' ').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé') }))]}
           />
 
           <FloatSelect
