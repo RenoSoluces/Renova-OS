@@ -23,6 +23,7 @@ import { SuiviChantierPage } from './pages/SuiviChantierPage'
 import { PartenairesPage } from './pages/PartenairesPage'
 import { PerformancePage } from './pages/PerformancePage'
 import { SystemHealthPage } from './pages/SystemHealthPage'
+import { OrganisationPage } from './pages/OrganisationPage'
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
@@ -65,6 +66,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   partenaires: { title: 'Partenaires', subtitle: 'Réseau des installateurs — accès administrateur' },
   performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },
   sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
+  organisation: { title: 'Organigramme', subtitle: 'Structure des entreprises et équipes' },
 }
 
 function pageFromLocation(): PageKey {
@@ -216,6 +218,7 @@ function AppContent() {
           {page === 'partenaires' && (profile?.role === 'admin' || profile?.role === 'manager' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
+          {page === 'organisation' && <OrganisationPage />
         </div>
       </div>
     </div>
