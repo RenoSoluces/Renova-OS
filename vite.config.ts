@@ -9,6 +9,9 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      strategies: 'injectManifest',
+      srcDir: 'src',
+      filename: 'sw.js',
       includeAssets: ['favicon.ico', 'favicon-32.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Renova OS',
