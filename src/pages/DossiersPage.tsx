@@ -363,12 +363,15 @@ export function DossiersPage({
     setFactureSaving(true)
     try {
       const { data: linkedInvoice } = await supabase.from('dossier_facturation').select('devis_id').eq('id', ligne.id).maybeSingle()
+      const issuerOrganisationId = detail.facturation_organisation_id || detail.organisation_id || profile?.organisation_id
       const [numeroResult, entrepriseResult] = await Promise.all([
         supabase.rpc('next_facture_number'),
-        supabase.from('entreprises').select('*').limit(1).maybeSingle(),
+        supabase.from('entreprises').select('*').eq('organisation_id', issuerOrganisationId || '').maybeSingle(),
       ])
       const numero = numeroResult.data
       const entreprise = entrepriseResult.data
+      if (entrepriseResult.error) throw new Error(`Informations légales de l’entreprise émettrice indisponibles : ${entrepriseResult.error.message}`)
+      if (!entreprise) throw new Error('Renseignez les informations légales de l’entreprise émettrice dans les paramètres avant de générer la facture.')
       if (numeroResult.error) throw new Error(`Numérotation de facture indisponible : ${numeroResult.error.message}. Vérifiez que la migration de facturation a été appliquée dans Supabase.`)
       if (!numero) throw new Error('La base de données n’a renvoyé aucun numéro de facture. Appliquez la migration de numérotation des factures dans Supabase.')
       const now = new Date()
@@ -378,6 +381,22 @@ export function DossiersPage({
       const { data: partenaire } = partnerId
         ? await supabase.from('installateurs').select('*').eq('id', partnerId).maybeSingle()
         : { data: null as any }
+      const { data: destinataireEntreprise } = detail.destinataire_organisation_id
+        ? await supabase.from('entreprises').select('*').eq('organisation_id', detail.destinataire_organisation_id).maybeSingle()
+        : { data: null as any }
+      if (detail.destinataire_organisation_id && !destinataireEntreprise) {
+        throw new Error('La fiche légale du destinataire est indisponible pour votre compte. Demandez au Grand Admin de vérifier les informations de facturation.')
+      }
+      const destinataireFacture = destinataireEntreprise ? {
+        nom: destinataireEntreprise.raison_sociale,
+        contact: destinataireEntreprise.forme_juridique,
+        adresse: destinataireEntreprise.adresse,
+        code_postal: destinataireEntreprise.code_postal,
+        ville: destinataireEntreprise.ville,
+        siret: destinataireEntreprise.siret,
+        numero_tva: destinataireEntreprise.numero_tva,
+        email: destinataireEntreprise.email,
+      } : partenaire
 
       const ht = Number(ligne.montant_ht) || 0
       const taux = Number(ligne.taux_tva) || 0
@@ -418,13 +437,13 @@ export function DossiersPage({
       doc.setFont('helvetica','normal'); doc.setFontSize(9)
       let py=86
       for (const line of [
-        partenaire?.nom || 'Partenaire non renseigné',
-        partenaire?.contact,
-        partenaire?.adresse,
-        [partenaire?.code_postal,partenaire?.ville].filter(Boolean).join(' '),
-        partenaire?.siret ? `SIREN : ${String(partenaire.siret).replace(/\s/g,'').slice(0,9)}` : '',
-        partenaire?.numero_tva ? `TVA intracommunautaire : ${partenaire.numero_tva}` : '',
-        partenaire?.email,
+        destinataireFacture?.nom || 'Destinataire non renseigné',
+        destinataireFacture?.contact,
+        destinataireFacture?.adresse,
+        [destinataireFacture?.code_postal,destinataireFacture?.ville].filter(Boolean).join(' '),
+        destinataireFacture?.siret ? `SIREN : ${String(destinataireFacture.siret).replace(/\s/g,'').slice(0,9)}` : '',
+        destinataireFacture?.numero_tva ? `TVA intracommunautaire : ${destinataireFacture.numero_tva}` : '',
+        destinataireFacture?.email,
       ].filter(Boolean)) { doc.text(String(line),18,py); py+=5 }
 
       doc.setFont('helvetica','bold'); doc.text('DÉTAIL DE LA PRESTATION',18,128)
@@ -512,12 +531,12 @@ export function DossiersPage({
       if (error) throw new Error(`PDF généré, mais enregistrement impossible : ${error.message}`)
       await logAuditEvent({ action:'dossier_facture', entityType:'facture', entityId:ligne.id, description:`Facture ${numeroFacture} générée avec devis interne ${devisId}`, meta:{facture_numero:numeroFacture,montant_ht:ht,montant_ttc:ttc,devis_id:devisId} })
       setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,statut:'facturee',facturee_at:now.toISOString(),facture_numero:numeroFacture,devis_id:devisId,pdf_storage_path:cheminPdf,email_erreur:null}:x))
-      if (!partenaire?.email) {
+      if (!destinataireFacture?.email) {
         const message = 'Facture générée et archivée, mais aucun e-mail partenaire n’est renseigné.'
         await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
         setDetailMessage(message)
       } else {
-        const { data: envoi, error: envoiError } = await supabase.functions.invoke('send-invoice', { body: { storagePath: cheminPdf, recipient: partenaire.email, invoiceNumber: numeroFacture, partnerName: partenaire.nom, dossierId: detail.id } })
+        const { data: envoi, error: envoiError } = await supabase.functions.invoke('send-invoice', { body: { storagePath: cheminPdf, recipient: destinataireFacture.email, invoiceNumber: numeroFacture, partnerName: destinataireFacture.nom, dossierId: detail.id } })
         if (envoiError || envoi?.error) {
           const message = `Facture ${numeroFacture} créée et archivée, mais l’e-mail n’a pas été envoyé : ${envoiError?.message || envoi?.error}. Configurez la fonction send-invoice et RESEND_API_KEY.`
           await supabase.from('dossier_facturation').update({ email_erreur: message }).eq('id', ligne.id)
@@ -526,7 +545,7 @@ export function DossiersPage({
         } else {
           await supabase.from('dossier_facturation').update({ email_envoye_at: new Date().toISOString(), email_erreur: null }).eq('id', ligne.id)
           setFacturation(prev=>prev.map(x=>x.id===ligne.id?{...x,email_envoye_at:new Date().toISOString(),email_erreur:null}:x))
-          setDetailMessage(`Facture ${numeroFacture} générée, archivée et envoyée à ${partenaire.email}.`)
+          setDetailMessage(`Facture ${numeroFacture} générée, archivée et envoyée à ${destinataireFacture.email}.`)
         }
       }
     } catch (e:any) {
