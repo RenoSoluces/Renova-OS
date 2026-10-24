@@ -30,6 +30,9 @@ export function OrganisationPage() {
   const [inviteManagerId, setInviteManagerId] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteMessage, setInviteMessage] = useState('')
+  const [newOrganisationName, setNewOrganisationName] = useState('')
+  const [creatingOrganisation, setCreatingOrganisation] = useState(false)
+  const [organisationMessage, setOrganisationMessage] = useState('')
   const [hasDirectReports, setHasDirectReports] = useState(false)
   const isGlobalAdmin = profile?.role === 'admin'
 
@@ -101,6 +104,31 @@ export function OrganisationPage() {
           { value: 'teleconseiller', label: 'Téléconseiller' },
         ]
 
+  async function createOrganisation(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    const nom = newOrganisationName.trim()
+    if (!nom || !isGlobalAdmin) return
+    setCreatingOrganisation(true)
+    setOrganisationMessage('')
+    const { data, error: createError } = await supabase
+      .from('organisations')
+      .insert({ nom, type: 'partenaire', actif: true })
+      .select('id, nom, type')
+      .single()
+    if (createError || !data) {
+      setOrganisationMessage(createError?.code === '23505'
+        ? 'Une organisation porte déjà ce nom.'
+        : 'Impossible de créer le partenaire. Vérifiez les droits administrateur.')
+    } else {
+      setOrganisations(current => [...current, data as Organisation].sort((a, b) => a.nom.localeCompare(b.nom, 'fr')))
+      setInviteOrganisationId(data.id)
+      setInviteRole('partner_admin')
+      setNewOrganisationName('')
+      setOrganisationMessage('Organisation « ' + data.nom + ' » créée. Vous pouvez maintenant inviter son dirigeant.')
+    }
+    setCreatingOrganisation(false)
+  }
+
   async function inviteMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setInviteLoading(true)
@@ -163,6 +191,22 @@ export function OrganisationPage() {
         <button type="button" className="btn btn-outline" onClick={() => void load()} disabled={loading}><RefreshCw size={15} /> Actualiser</button>
       </div>
       {error && <div className="card card-pad" role="alert">{error}</div>}
+      {!loading && isGlobalAdmin && (
+        <section className="card card-pad" style={{ marginBottom: 16 }}>
+          <h2 style={{ margin: '0 0 6px', fontSize: 17 }}>Créer une organisation partenaire</h2>
+          <p className="text-muted" style={{ margin: '0 0 14px', fontSize: 13 }}>Créez d’abord l’entreprise, puis invitez son dirigeant et rattachez ses commerciaux ou apporteurs.</p>
+          <form onSubmit={createOrganisation} style={{ display: 'flex', gap: 10, alignItems: 'end', flexWrap: 'wrap' }}>
+            <label style={{ display: 'grid', gap: 5, fontSize: 12, flex: '1 1 260px' }}>
+              Nom du partenaire
+              <input className="pipeline-inline-input" value={newOrganisationName} onChange={e => setNewOrganisationName(e.target.value)} required maxLength={160} placeholder="Ex. Nom de l’entreprise partenaire" />
+            </label>
+            <button className="btn btn-primary" type="submit" disabled={creatingOrganisation || !newOrganisationName.trim()}>
+              {creatingOrganisation ? 'Création…' : 'Créer le partenaire'}
+            </button>
+          </form>
+          {organisationMessage && <p className="text-muted" role="status" style={{ margin: '10px 0 0', fontSize: 13 }}>{organisationMessage}</p>}
+        </section>
+      )}
       {!loading && (
         <section className="card card-pad" style={{ marginBottom: 16 }}>
           <h2 style={{ margin: '0 0 6px', fontSize: 17 }}>Inviter un membre</h2>
