@@ -929,7 +929,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     <div className="text-xs text-muted" style={{marginTop:6}}>L’Admin peut modifier l’attribution à tout moment.</div>
                   </div>
                 )}
-                {isAdmin && <ProspectShareControl prospectId={selected.id} />}
+                {profile?.role === 'admin' && <ProspectShareControl prospectId={selected.id} />}
                 <div className="right-mini-section">
                   <div className="right-mini-section-label">Température</div>
                   <div className="temp-toggle-row">
