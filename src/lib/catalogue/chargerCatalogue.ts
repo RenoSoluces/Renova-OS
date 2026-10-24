@@ -23,28 +23,47 @@ interface Options {
   tri?: Tri[]
 }
 
+type ErreurPage = { message: string; code?: string } | null
+type LecturePage<T> = (debut: number, fin: number) => PromiseLike<{ data: T[] | null; error: ErreurPage }>
+
 const MAX_PAGES = 50
 const TAILLE_PAGE = 1000
 
-export async function chargerCatalogue<T = any>(options: Options = {}): Promise<{ data: T[]; error: { message: string } | null }> {
-  const { colonnes = '*', actifSeulement = false, exclureNom, categories, tri = [] } = options
+/** PostgREST répond « 416 Requested range not satisfiable » (PGRST103) quand on demande au-delà de la dernière ligne. */
+function estFinDePlage(error: ErreurPage): boolean {
+  return !!error && (error.code === 'PGRST103' || /requested range not satisfiable/i.test(error.message || ''))
+}
+
+/**
+ * Enchaîne les pages jusqu'à la fin. Une plage hors limites, ou une page vide, signifie « fin des données »
+ * et n'est jamais une erreur. Toute autre erreur est renvoyée avec les lignes déjà lues.
+ */
+export async function lirePages<T>(lirePage: LecturePage<T>): Promise<{ data: T[]; error: ErreurPage }> {
   const lignes: T[] = []
   let debut = 0
 
   for (let page = 0; page < MAX_PAGES; page++) {
+    const { data, error } = await lirePage(debut, debut + TAILLE_PAGE - 1)
+    if (estFinDePlage(error)) break
+    if (error) return { data: lignes, error }
+    if (!data || data.length === 0) break
+    lignes.push(...data)
+    debut += data.length
+  }
+
+  return { data: lignes, error: null }
+}
+
+export function chargerCatalogue<T = any>(options: Options = {}): Promise<{ data: T[]; error: ErreurPage }> {
+  const { colonnes = '*', actifSeulement = false, exclureNom, categories, tri = [] } = options
+
+  return lirePages<T>((debut, fin) => {
     let requete = supabase.from('catalogue_produits').select(colonnes)
     if (actifSeulement) requete = requete.eq('actif', true)
     if (exclureNom) requete = requete.neq('nom', exclureNom)
     if (categories?.length) requete = requete.in('categorie', categories)
     for (const t of tri) requete = requete.order(t.colonne, { ascending: t.ascending !== false })
     requete = requete.order('id', { ascending: true })
-
-    const { data, error } = await requete.range(debut, debut + TAILLE_PAGE - 1)
-    if (error) return { data: lignes, error }
-    if (!data || data.length === 0) break
-    lignes.push(...(data as unknown as T[]))
-    debut += data.length
-  }
-
-  return { data: lignes, error: null }
+    return requete.range(debut, fin) as unknown as PromiseLike<{ data: T[] | null; error: ErreurPage }>
+  })
 }
