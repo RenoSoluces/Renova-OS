@@ -285,7 +285,7 @@ create policy prospects_insert_scope on public.prospects
 for insert to authenticated
 with check (
   public.is_super_admin()
-  or (commercial_id = (select auth.uid()) and organisation_id = public.current_organisation_id())
+  or (commercial_id = (select auth.uid()) and prospects.organisation_id = public.current_organisation_id())
   or (
     commercial_id is not null
     and exists (
@@ -294,7 +294,7 @@ with check (
       where me.id = (select auth.uid())
         and me.role in ('partner_admin', 'company_admin')
         and assigned.organisation_id = me.organisation_id
-        and organisation_id = me.organisation_id
+        and prospects.organisation_id = me.organisation_id
     )
   )
 );
@@ -313,7 +313,7 @@ with check (
     select 1 from public.profiles me
     where me.id = (select auth.uid())
       and me.role in ('partner_admin', 'company_admin')
-      and me.organisation_id = organisation_id
+      and me.organisation_id = prospects.organisation_id
   )
   or exists (
     select 1 from public.prospect_shares s
@@ -671,7 +671,7 @@ using (
   or public.is_super_admin()
   or manager_id = (select auth.uid())
   or (
-    organisation_id = public.current_organisation_id()
+    profiles.organisation_id = public.current_organisation_id()
     and exists (
       select 1 from public.profiles me
       where me.id = (select auth.uid())
@@ -893,13 +893,7 @@ begin
   end if;
 
   folder_name := (storage.foldername(object_name))[1];
-  if folder_name is null or folder_name !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}
-  'Tenant boundary for Renova OS; the global admin can administer all organisations.';
-comment on table public.prospect_shares is
-  'Explicit prospect visibility grants; sharing does not change the original owner organisation.';
-comment on column public.dossiers.facturation_organisation_id is
-  'Organisation that issues invoices for this dossier; independent from original prospect ownership.';
- then
+  if folder_name is null or folder_name !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
     return exists (
       select 1
       from public.profiles me
