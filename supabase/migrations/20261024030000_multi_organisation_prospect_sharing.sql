@@ -378,6 +378,43 @@ using (
   )
 );
 
+
+-- Legal/banking details are stored per company, not in a globally readable singleton.
+alter table public.entreprises add column if not exists organisation_id uuid references public.organisations(id);
+update public.entreprises
+set organisation_id = (select id from public.organisations where nom = 'Reno Soluces')
+where organisation_id is null;
+create index if not exists entreprises_organisation_id_idx on public.entreprises (organisation_id);
+
+drop policy if exists entreprises_select_authenticated on public.entreprises;
+drop policy if exists entreprises_admin_write on public.entreprises;
+create policy entreprises_select_scope on public.entreprises
+for select to authenticated
+using (
+  public.is_super_admin()
+  or organisation_id = public.current_organisation_id()
+);
+create policy entreprises_write_scope on public.entreprises
+for all to authenticated
+using (
+  public.is_super_admin()
+  or exists (
+    select 1 from public.profiles me
+    where me.id = (select auth.uid())
+      and me.role in ('manager', 'partner_admin', 'company_admin')
+      and me.organisation_id = entreprises.organisation_id
+  )
+)
+with check (
+  public.is_super_admin()
+  or exists (
+    select 1 from public.profiles me
+    where me.id = (select auth.uid())
+      and me.role in ('manager', 'partner_admin', 'company_admin')
+      and me.organisation_id = entreprises.organisation_id
+  )
+);
+
 -- Installateur directory: no full directory access for commercial/apporteur roles.
 drop policy if exists installateurs_select on public.installateurs;
 create policy installateurs_select on public.installateurs
