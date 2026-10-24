@@ -741,7 +741,7 @@ export function CommissionsPage() {
 
   const displayedRules = rules.filter((r: any) => {
     if (baremePublic === 'visite_technique') {
-      return r.type === 'vt' || produits.some((p: any) => p.id === r.produit_id && p.catalogue_groupe === 'visite_technique') || (r.public_cible || 'tous') === 'tous'
+      return r.type === 'vt' || produits.some((p: any) => p.id === r.produit_id && p.catalogue_groupe === 'visite_technique')
     }
     return (r.public_cible || 'tous') === baremePublic || (r.public_cible || 'tous') === 'tous'
   })
@@ -780,7 +780,7 @@ export function CommissionsPage() {
   const echeanceExpected = echeanceCommission ? (echeanceTarget === 'societe' ? amount(echeanceCommission.montant_societe) : amount(echeanceCommission.montant_commercial)) : 0
 
   return (
-    <div className="page">
+    <div className="page commissions-page">
       <div className="page-header">
         <div>
           <h1 className="page-title">
@@ -1652,18 +1652,10 @@ export function CommissionsPage() {
               <button className={`view-toggle-btn ${baremePublic === 'professionnel' ? 'active' : ''}`} onClick={() => setBaremePublic('professionnel')}>Professionnels</button>
               <button className={`view-toggle-btn ${baremePublic === 'visite_technique' ? 'active' : ''}`} onClick={() => setBaremePublic('visite_technique')}>Visites techniques</button>
             </div>
-            <div className="card">
+            <div className="card commission-matrix">
             <div className="card-pad">
-              <div
-                style={{
-                  display:
-                    'grid',
-                  gridTemplateColumns:
-                    '1fr 1fr 1fr 1fr 140px',
-                  gap: 0,
-                }}
-                className="commission-table-head"
-              >
+              <div className="commission-matrix-intro"><div><h2>Règles de rémunération</h2><p>Barèmes par catégorie, type de produit et variante.</p></div><span>{displayedRules.length} règle(s)</span></div>
+              <div className="commission-table-head commission-rule-row">
                 <b>Règle</b>
                 <b>Commercial</b>
                 <b>Produit</b>
@@ -1693,21 +1685,7 @@ export function CommissionsPage() {
               ) : (
                 displayedRules.map(
                   (r: any) => (
-                    <div
-                      key={r.id}
-                      style={{
-                        display:
-                          'grid',
-                        gridTemplateColumns:
-                          '1fr 1fr 1fr 1fr 140px',
-                        alignItems:
-                          'center',
-                        padding:
-                          '16px 0',
-                        borderTop:
-                          '1px solid var(--c-border)',
-                      }}
-                    >
+                    <div key={r.id} className="commission-rule-row">
                       <div>
                         <strong>
                           {r.libelle}
@@ -1852,7 +1830,7 @@ export function CommissionsPage() {
 
         <div className="grid grid-2 gap-3 mt-4">
           <FloatSelect
-            label="Public cible"
+            label="Catégorie de dossier"
             value={form.public_cible}
             onChange={(v) => setForm((f: any) => ({ ...f, public_cible: v, categorie_produit: '', produit_id: '' }))}
             options={[
@@ -1899,7 +1877,7 @@ export function CommissionsPage() {
           />
 
           <FloatSelect
-            label="Type de produit / catégorie"
+            label="Type de produit"
             value={form.categorie_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, variante_produit: '', produit_id: '' }))}
             options={[{ value: '', label: 'Tous les types de produits' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replace(/_/g, ' ').charAt(0).toUpperCase() + categorie.replace(/_/g, ' ').slice(1) }))]}
