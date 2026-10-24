@@ -23,6 +23,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { removeDocumentStorageObject, resolveDocumentRows, resolveDocumentUrl } from '../lib/storage/documentUrl'
 import { jsPDF } from 'jspdf'
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
@@ -255,7 +256,7 @@ export function DossiersPage({
       supabase.from('dossier_facturation').select('*').eq('dossier_id', d.id).order('ordre').order('created_at'),
     ])
 
-    setPieces((data || []) as DocumentPiece[])
+    setPieces(await resolveDocumentRows((data || []) as DocumentPiece[]))
     setFacturation((factures || []) as DossierFacturation[])
     const commission = d.devis_id ? commissionsParDevis[d.devis_id] : undefined
     const totalFactureNonAnnulee = (factures || []).filter((f: any) => f.statut !== 'annulee').reduce((sum: number, f: any) => sum + Number(f.montant_ht || 0), 0)
@@ -604,14 +605,10 @@ export function DossiersPage({
 
       if (uploadErr) throw uploadErr
 
-      const { data: urlData } = supabase.storage
-        .from('documents')
-        .getPublicUrl(path)
-
       const { data, error } = await supabase
         .from('documents')
         .update({
-          url: urlData.publicUrl,
+          url: path,
           taille: file.size,
           recu: true,
           nom: piece.nom,
@@ -623,11 +620,9 @@ export function DossiersPage({
       if (error) throw error
 
       if (data) {
-        setPieces(prev =>
-          prev.map(p =>
-            p.id === piece.id ? (data as DocumentPiece) : p
-          )
-        )
+        const resolvedUrl = await resolveDocumentUrl(data.url)
+        const resolvedPiece = { ...(data as DocumentPiece), url: resolvedUrl }
+        setPieces(prev => prev.map(p => p.id === piece.id ? resolvedPiece : p))
       }
     } catch (e: any) {
       setUploadError(
@@ -640,7 +635,8 @@ export function DossiersPage({
     setUploadingPieceId(null)
   }
 
-  function retirerFichier(piece: DocumentPiece) {
+  async function retirerFichier(piece: DocumentPiece) {
+    await removeDocumentStorageObject(piece.url)
     supabase
       .from('documents')
       .update({ url: '', recu: false })
