@@ -410,6 +410,128 @@ for all to authenticated
 using (public.prospect_visible(prospect_id))
 with check (public.prospect_visible(prospect_id));
 
+
+-- Populate tenant dimensions server-side so existing UI writes remain compatible.
+create or replace function public.set_multi_org_defaults()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  actor_org uuid;
+begin
+  select p.organisation_id into actor_org
+  from public.profiles p
+  where p.id = (select auth.uid());
+
+  if tg_table_name = 'prospects' then
+    if new.organisation_id is null then
+      new.organisation_id := coalesce(
+        (select p.organisation_id from public.profiles p where p.id = new.commercial_id),
+        actor_org,
+        (select id from public.organisations where nom = 'Reno Soluces')
+      );
+    end if;
+  elsif tg_table_name = 'dossiers' then
+    if new.organisation_id is null then
+      new.organisation_id := (select p.organisation_id from public.prospects p where p.id = new.prospect_id);
+    end if;
+    if new.facturation_organisation_id is null then
+      new.facturation_organisation_id := new.organisation_id;
+    end if;
+  elsif tg_table_name = 'commissions' then
+    if new.organisation_id is null then
+      new.organisation_id := coalesce(
+        (select p.organisation_id from public.profiles p where p.id = new.commercial_id),
+        actor_org,
+        (select id from public.organisations where nom = 'Reno Soluces')
+      );
+    end if;
+  elsif tg_table_name = 'dossier_facturation' then
+    if new.organisation_id is null then
+      new.organisation_id := (
+        select d.facturation_organisation_id from public.dossiers d where d.id = new.dossier_id
+      );
+    end if;
+  elsif tg_table_name = 'factures_clients' then
+    if new.emetteur_organisation_id is null then
+      new.emetteur_organisation_id := (
+        select p.organisation_id from public.prospects p where p.id = new.prospect_id
+      );
+    end if;
+  end if;
+  return new;
+end;
+$function$;
+
+drop trigger if exists prospects_set_multi_org_defaults on public.prospects;
+create trigger prospects_set_multi_org_defaults before insert or update on public.prospects
+for each row execute function public.set_multi_org_defaults();
+drop trigger if exists dossiers_set_multi_org_defaults on public.dossiers;
+create trigger dossiers_set_multi_org_defaults before insert or update on public.dossiers
+for each row execute function public.set_multi_org_defaults();
+drop trigger if exists commissions_set_multi_org_defaults on public.commissions;
+create trigger commissions_set_multi_org_defaults before insert or update on public.commissions
+for each row execute function public.set_multi_org_defaults();
+drop trigger if exists dossier_facturation_set_multi_org_defaults on public.dossier_facturation;
+create trigger dossier_facturation_set_multi_org_defaults before insert or update on public.dossier_facturation
+for each row execute function public.set_multi_org_defaults();
+drop trigger if exists factures_clients_set_multi_org_defaults on public.factures_clients;
+create trigger factures_clients_set_multi_org_defaults before insert or update on public.factures_clients
+for each row execute function public.set_multi_org_defaults();
+
+-- Prevent a signed-in user from promoting themselves or moving themselves to another tenant.
+create or replace function public.guard_multi_org_profile_fields()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+begin
+  if (select auth.uid()) = old.id and not public.is_super_admin() then
+    if new.role is distinct from old.role
+      or new.organisation_id is distinct from old.organisation_id
+      or new.manager_id is distinct from old.manager_id then
+      raise exception 'Vous ne pouvez pas modifier votre rôle, votre entreprise ou votre responsable.';
+    end if;
+  end if;
+  if not public.is_super_admin()
+    and (new.organisation_id is distinct from old.organisation_id
+      or new.manager_id is distinct from old.manager_id)
+    and (select auth.uid()) is not null then
+    raise exception 'Seul le Grand Admin peut modifier le rattachement organisationnel.';
+  end if;
+  return new;
+end;
+$function$;
+
+drop trigger if exists guard_multi_org_profile_fields on public.profiles;
+create trigger guard_multi_org_profile_fields before update on public.profiles
+for each row execute function public.guard_multi_org_profile_fields();
+
+revoke all on function public.set_multi_org_defaults() from public, anon;
+revoke all on function public.guard_multi_org_profile_fields() from public, anon;
+
+-- Rebuild profile visibility after the tenant columns exist; do not leave the previous
+-- admin/manager-wide permissive policy OR-combined with this policy.
+drop policy if exists profiles_select_scoped on public.profiles;
+create policy profiles_select_scoped on public.profiles
+for select to authenticated
+using (
+  id = (select auth.uid())
+  or public.is_super_admin()
+  or manager_id = (select auth.uid())
+  or (
+    organisation_id = public.current_organisation_id()
+    and exists (
+      select 1 from public.profiles me
+      where me.id = (select auth.uid())
+        and me.role in ('partner_admin', 'company_admin')
+    )
+  )
+);
+
 comment on table public.organisations is
   'Tenant boundary for Renova OS; the global admin can administer all organisations.';
 comment on table public.prospect_shares is
