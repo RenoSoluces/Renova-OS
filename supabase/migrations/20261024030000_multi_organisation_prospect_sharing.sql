@@ -468,15 +468,17 @@ with check (
 
 -- Installateur directory: no full directory access for commercial/apporteur roles.
 drop policy if exists installateurs_select on public.installateurs;
-drop policy if exists installateurs_select on public.installateurs;
 create policy installateurs_select on public.installateurs
 for select to authenticated
 using (
   public.is_super_admin()
   or exists (
-    select 1 from public.profiles me
+    select 1
+    from public.profiles me
+    join public.organisations org on org.id = me.organisation_id
     where me.id = (select auth.uid())
-      and me.role in ('manager', 'partner_admin', 'company_admin')
+      and me.role in ('manager', 'commercial_manager')
+      and org.type = 'interne'
   )
 );
 
