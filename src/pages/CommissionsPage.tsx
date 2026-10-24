@@ -824,8 +824,7 @@ export function CommissionsPage() {
         </div>
       )}
 
-      {(tab === 'suivi' ||
-        !admin) && (
+      {(tab === 'suivi' || !canViewBareme) && (
         <>
           <div
             className="kpi-grid page-kpi-strip"
