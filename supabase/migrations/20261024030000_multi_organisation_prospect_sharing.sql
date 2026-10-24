@@ -425,6 +425,43 @@ begin
   from public.profiles p
   where p.id = (select auth.uid());
 
+  -- Authenticated clients cannot transfer original ownership or write another
+  -- company's financial rows. Trusted service-role operations remain possible.
+  if (select auth.uid()) is not null and not public.is_super_admin() then
+    if tg_table_name = 'prospects' and tg_op = 'UPDATE'
+      and new.organisation_id is distinct from old.organisation_id then
+      raise exception 'Le partage ne transfère pas la propriété du prospect.';
+    end if;
+    if tg_table_name = 'prospects' and new.organisation_id is not null
+      and new.organisation_id <> actor_org then
+      raise exception 'Un prospect doit appartenir à votre entreprise.';
+    end if;
+    if tg_table_name = 'dossiers' then
+      if new.organisation_id is not null and new.organisation_id is distinct from
+        (select p.organisation_id from public.prospects p where p.id = new.prospect_id) then
+        raise exception 'L’entreprise propriétaire du dossier suit celle du prospect.';
+      end if;
+      if new.facturation_organisation_id is not null
+        and new.facturation_organisation_id <> actor_org then
+        raise exception 'La facturation doit être portée par votre entreprise.';
+      end if;
+    end if;
+    if tg_table_name = 'commissions' and new.organisation_id is not null
+      and new.organisation_id <> actor_org then
+      raise exception 'Une commission ne peut être rattachée qu’à votre entreprise.';
+    end if;
+    if tg_table_name = 'dossier_facturation' and new.organisation_id is not null
+      and new.organisation_id <> (
+        select d.facturation_organisation_id from public.dossiers d where d.id = new.dossier_id
+      ) then
+      raise exception 'La facture doit suivre l’entreprise de facturation du dossier.';
+    end if;
+    if tg_table_name = 'factures_clients' and new.emetteur_organisation_id is not null
+      and new.emetteur_organisation_id <> actor_org then
+      raise exception 'Vous ne pouvez facturer qu’au nom de votre entreprise.';
+    end if;
+  end if;
+
   if tg_table_name = 'prospects' then
     if new.organisation_id is null then
       new.organisation_id := coalesce(
@@ -456,8 +493,9 @@ begin
     end if;
   elsif tg_table_name = 'factures_clients' then
     if new.emetteur_organisation_id is null then
-      new.emetteur_organisation_id := (
-        select p.organisation_id from public.prospects p where p.id = new.prospect_id
+      new.emetteur_organisation_id := coalesce(
+        actor_org,
+        (select p.organisation_id from public.prospects p where p.id = new.prospect_id)
       );
     end if;
   end if;
