@@ -352,7 +352,7 @@ export function CommissionsPage() {
    */
   function openNew() {
     setEditing(null)
-    setForm({ ...EMPTY, public_cible: baremePublic })
+    setForm({ ...EMPTY, public_cible: baremePublic === 'visite_technique' ? 'tous' : baremePublic, type: baremePublic === 'visite_technique' ? 'vt' : 'devis_signe' })
     setModal(true)
   }
 
@@ -1715,12 +1715,10 @@ export function CommissionsPage() {
                       </span>
 
                       <span>
-                        {produits.find(
-                          (p) =>
-                            p.id ===
-                            r.produit_id,
-                        )?.nom ||
-                          'Tous les produits'}
+                        {produits.find((p: any) => p.id === r.produit_id)?.nom ||
+                          (r.categorie_produit
+                            ? `${String(r.categorie_produit).replaceAll('_', ' ')}${r.variante_produit ? ` · ${r.variante_produit}` : ' · tous les produits du type'}`
+                            : 'Tous les produits')}
                       </span>
 
                       <span>
@@ -1732,10 +1730,7 @@ export function CommissionsPage() {
                           ? ` + ${r.pourcentage_commercial}%`
                           : ''}
 
-                        <div className="text-sm text-muted">
-                          Reno Soluces :{' '}
-                          {admin && <>Reno Soluces : {euro(r.montant_societe)}</>}
-                        </div>
+                        {admin && <div className="text-sm text-muted">Reno Soluces : {euro(r.montant_societe)}</div>}
                       </span>
 
                       <span className="flex items-center gap-1">
@@ -1800,6 +1795,8 @@ export function CommissionsPage() {
               (f: any) => ({
                 ...f,
                 type: v,
+                categorie_produit: '',
+                produit_id: '',
               }),
             )
           }
@@ -1835,7 +1832,7 @@ export function CommissionsPage() {
           <FloatSelect
             label="Public cible"
             value={form.public_cible}
-            onChange={(v) => setForm((f: any) => ({ ...f, public_cible: v }))}
+            onChange={(v) => setForm((f: any) => ({ ...f, public_cible: v, categorie_produit: '', produit_id: '' }))}
             options={[
               { value: 'particulier', label: 'Particulier' },
               { value: 'professionnel', label: 'Professionnel' },
@@ -1999,6 +1996,10 @@ export function CommissionsPage() {
                   'fixe_plus_pourcentage',
                 label:
                   'Fixe + pourcentage',
+              },
+              {
+                value: 'par_m2',
+                label: 'Montant par m²',
               },
             ]}
           />
