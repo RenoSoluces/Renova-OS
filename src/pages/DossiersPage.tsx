@@ -1272,6 +1272,33 @@ export function DossiersPage({
               )}
             </div>
 
+            <div className="card card-pad" style={{ marginBottom: 14 }}>
+              <div className="font-semibold" style={{ marginBottom: 4 }}>Facturation du dossier</div>
+              <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
+                Choisissez séparément l’entreprise qui émet la facture et l’entreprise destinataire. Les coordonnées légales doivent être renseignées dans les paramètres de chaque entreprise.
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, alignItems: 'end' }}>
+                <FloatSelect
+                  label="Entreprise émettrice"
+                  value={detailFacturationOrganisationId}
+                  onChange={setDetailFacturationOrganisationId}
+                  options={organisations.map(org => ({ value: org.id, label: org.nom }))}
+                />
+                <FloatSelect
+                  label="Destinataire de la facture"
+                  value={detailDestinataireOrganisationId}
+                  onChange={setDetailDestinataireOrganisationId}
+                  options={[
+                    { value: '', label: 'Installateur associé au dossier' },
+                    ...organisations.map(org => ({ value: org.id, label: org.nom })),
+                  ]}
+                />
+                <Button variant="secondary" onClick={enregistrerConfigurationFacturation} disabled={savingFacturationConfig || !detailFacturationOrganisationId}>
+                  {savingFacturationConfig ? 'Enregistrement…' : 'Enregistrer la facturation'}
+                </Button>
+              </div>
+            </div>
+
             {/* STATUT + DATE D'INSTALLATION */}
             <div style={{ display:'grid', gridTemplateColumns:'minmax(220px,1fr) minmax(180px,260px) auto', gap:8, alignItems:'end' }}>
               <FloatSelect label="Statut du dossier" value={detailStatut} onChange={setDetailStatut} options={STATUTS_DOSSIER} />
