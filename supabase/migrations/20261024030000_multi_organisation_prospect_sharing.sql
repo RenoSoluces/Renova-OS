@@ -232,6 +232,7 @@ alter table public.organisations enable row level security;
 alter table public.prospect_shares enable row level security;
 
 drop policy if exists organisations_select_scope on public.organisations;
+drop policy if exists organisations_select_scope on public.organisations;
 create policy organisations_select_scope on public.organisations
 for select to authenticated
 using (
@@ -246,11 +247,13 @@ using (
 );
 
 drop policy if exists organisations_admin_write on public.organisations;
+drop policy if exists organisations_admin_write on public.organisations;
 create policy organisations_admin_write on public.organisations
 for all to authenticated
 using (public.is_super_admin())
 with check (public.is_super_admin());
 
+drop policy if exists prospect_shares_select_scope on public.prospect_shares;
 drop policy if exists prospect_shares_select_scope on public.prospect_shares;
 create policy prospect_shares_select_scope on public.prospect_shares
 for select to authenticated
@@ -260,10 +263,12 @@ using (
 );
 
 drop policy if exists prospect_shares_admin_insert on public.prospect_shares;
+drop policy if exists prospect_shares_admin_insert on public.prospect_shares;
 create policy prospect_shares_admin_insert on public.prospect_shares
 for insert to authenticated
 with check (public.is_super_admin() and shared_by = (select auth.uid()));
 
+drop policy if exists prospect_shares_admin_delete on public.prospect_shares;
 drop policy if exists prospect_shares_admin_delete on public.prospect_shares;
 create policy prospect_shares_admin_delete on public.prospect_shares
 for delete to authenticated
@@ -278,9 +283,11 @@ drop policy if exists prospects_insert_policy on public.prospects;
 drop policy if exists prospects_insert_scope on public.prospects;
 drop policy if exists prospects_delete_scope on public.prospects;
 
+drop policy if exists prospects_select_scope on public.prospects;
 create policy prospects_select_scope on public.prospects
 for select to authenticated using (public.prospect_visible(id));
 
+drop policy if exists prospects_insert_scope on public.prospects;
 create policy prospects_insert_scope on public.prospects
 for insert to authenticated
 with check (
@@ -299,12 +306,13 @@ with check (
   )
 );
 
+drop policy if exists prospects_update_scope on public.prospects;
 create policy prospects_update_scope on public.prospects
 for update to authenticated
 using (public.prospect_visible(id))
 with check (
   public.is_super_admin()
-  or (commercial_id = (select auth.uid()) and organisation_id = public.current_organisation_id())
+  or (commercial_id = (select auth.uid()) and prospects.organisation_id = public.current_organisation_id())
   or exists (
     select 1 from public.profiles assigned
     where assigned.id = commercial_id and assigned.manager_id = (select auth.uid())
@@ -322,6 +330,7 @@ with check (
   )
 );
 
+drop policy if exists prospects_delete_scope on public.prospects;
 create policy prospects_delete_scope on public.prospects
 for delete to authenticated using (public.is_super_admin());
 
@@ -332,14 +341,18 @@ drop policy if exists dossiers_insert_scope on public.dossiers;
 drop policy if exists dossiers_update_scope on public.dossiers;
 drop policy if exists dossiers_delete_scope on public.dossiers;
 
+drop policy if exists dossiers_select_scope on public.dossiers;
 create policy dossiers_select_scope on public.dossiers
 for select to authenticated using (public.prospect_visible(prospect_id));
+drop policy if exists dossiers_insert_scope on public.dossiers;
 create policy dossiers_insert_scope on public.dossiers
 for insert to authenticated with check (public.prospect_visible(prospect_id));
+drop policy if exists dossiers_update_scope on public.dossiers;
 create policy dossiers_update_scope on public.dossiers
 for update to authenticated
 using (public.prospect_visible(prospect_id))
 with check (public.prospect_visible(prospect_id));
+drop policy if exists dossiers_delete_scope on public.dossiers;
 create policy dossiers_delete_scope on public.dossiers
 for delete to authenticated using (public.is_super_admin());
 
@@ -349,6 +362,7 @@ drop policy if exists commissions_insert_admin on public.commissions;
 drop policy if exists commissions_update_admin on public.commissions;
 drop policy if exists commissions_delete_admin on public.commissions;
 
+drop policy if exists commissions_select_scope on public.commissions;
 create policy commissions_select_scope on public.commissions
 for select to authenticated
 using (
@@ -367,6 +381,7 @@ using (
     )
   )
 );
+drop policy if exists commissions_insert_admin on public.commissions;
 create policy commissions_insert_admin on public.commissions
 for insert to authenticated
 with check (
@@ -378,6 +393,7 @@ with check (
       and me.organisation_id = commissions.organisation_id
   )
 );
+drop policy if exists commissions_update_admin on public.commissions;
 create policy commissions_update_admin on public.commissions
 for update to authenticated
 using (
@@ -398,6 +414,7 @@ with check (
       and me.organisation_id = commissions.organisation_id
   )
 );
+drop policy if exists commissions_delete_admin on public.commissions;
 create policy commissions_delete_admin on public.commissions
 for delete to authenticated
 using (
@@ -420,12 +437,14 @@ create index if not exists entreprises_organisation_id_idx on public.entreprises
 
 drop policy if exists entreprises_select_authenticated on public.entreprises;
 drop policy if exists entreprises_admin_write on public.entreprises;
+drop policy if exists entreprises_select_scope on public.entreprises;
 create policy entreprises_select_scope on public.entreprises
 for select to authenticated
 using (
   public.is_super_admin()
   or organisation_id = public.current_organisation_id()
 );
+drop policy if exists entreprises_write_scope on public.entreprises;
 create policy entreprises_write_scope on public.entreprises
 for all to authenticated
 using (
@@ -449,6 +468,7 @@ with check (
 
 -- Installateur directory: no full directory access for commercial/apporteur roles.
 drop policy if exists installateurs_select on public.installateurs;
+drop policy if exists installateurs_select on public.installateurs;
 create policy installateurs_select on public.installateurs
 for select to authenticated
 using (
@@ -463,8 +483,10 @@ using (
 -- Keep billing rows tied to the dossier's explicitly selected invoicing organisation.
 drop policy if exists dossier_facturation_select on public.dossier_facturation;
 drop policy if exists dossier_facturation_write on public.dossier_facturation;
+drop policy if exists dossier_facturation_select_scope on public.dossier_facturation;
 create policy dossier_facturation_select_scope on public.dossier_facturation
 for select to authenticated using (public.dossier_visible(dossier_id));
+drop policy if exists dossier_facturation_write_scope on public.dossier_facturation;
 create policy dossier_facturation_write_scope on public.dossier_facturation
 for all to authenticated
 using (public.dossier_visible(dossier_id))
@@ -472,8 +494,10 @@ with check (public.dossier_visible(dossier_id));
 
 drop policy if exists factures_clients_select_scope on public.factures_clients;
 drop policy if exists factures_clients_write_scope on public.factures_clients;
+drop policy if exists factures_clients_select_scope on public.factures_clients;
 create policy factures_clients_select_scope on public.factures_clients
 for select to authenticated using (public.prospect_visible(prospect_id));
+drop policy if exists factures_clients_write_scope on public.factures_clients;
 create policy factures_clients_write_scope on public.factures_clients
 for all to authenticated
 using (public.prospect_visible(prospect_id))
@@ -664,6 +688,7 @@ revoke all on function public.guard_multi_org_profile_fields() from public, anon
 -- Rebuild profile visibility after the tenant columns exist; do not leave the previous
 -- admin/manager-wide permissive policy OR-combined with this policy.
 drop policy if exists profiles_select_scoped on public.profiles;
+drop policy if exists profiles_select_scoped on public.profiles;
 create policy profiles_select_scoped on public.profiles
 for select to authenticated
 using (
@@ -686,6 +711,7 @@ drop policy if exists notifications_select_scope on public.notifications;
 drop policy if exists notifications_insert_scope on public.notifications;
 drop policy if exists notifications_update_scope on public.notifications;
 drop policy if exists notifications_delete_scope on public.notifications;
+drop policy if exists notifications_select_scope on public.notifications;
 create policy notifications_select_scope on public.notifications
 for select to authenticated
 using (
@@ -693,6 +719,7 @@ using (
   or public.is_super_admin()
   or (recipient_id is null and prospect_id is not null and public.prospect_visible(prospect_id))
 );
+drop policy if exists notifications_insert_scope on public.notifications;
 create policy notifications_insert_scope on public.notifications
 for insert to authenticated
 with check (
@@ -702,6 +729,7 @@ with check (
     and (prospect_id is null or public.prospect_visible(prospect_id))
   )
 );
+drop policy if exists notifications_update_scope on public.notifications;
 create policy notifications_update_scope on public.notifications
 for update to authenticated
 using (
@@ -714,6 +742,7 @@ with check (
   or recipient_id = (select auth.uid())
   or (recipient_id is null and (prospect_id is null or public.prospect_visible(prospect_id)))
 );
+drop policy if exists notifications_delete_scope on public.notifications;
 create policy notifications_delete_scope on public.notifications
 for delete to authenticated
 using (
@@ -725,16 +754,20 @@ using (
 drop policy if exists prospect_messages_select on public.prospect_messages;
 drop policy if exists prospect_messages_insert on public.prospect_messages;
 drop policy if exists prospect_messages_update on public.prospect_messages;
+drop policy if exists prospect_messages_select_scope on public.prospect_messages;
 create policy prospect_messages_select_scope on public.prospect_messages
 for select to authenticated using (public.prospect_visible(prospect_id));
+drop policy if exists prospect_messages_insert_scope on public.prospect_messages;
 create policy prospect_messages_insert_scope on public.prospect_messages
 for insert to authenticated
 with check (sender_id = (select auth.uid()) and public.prospect_visible(prospect_id));
+drop policy if exists prospect_messages_update_scope on public.prospect_messages;
 create policy prospect_messages_update_scope on public.prospect_messages
 for update to authenticated
 using ((recipient_id = (select auth.uid()) or public.is_super_admin()) and public.prospect_visible(prospect_id))
 with check (public.prospect_visible(prospect_id) and (recipient_id = (select auth.uid()) or public.is_super_admin()));
 
+drop policy if exists factures_clients_lignes_scope on public.factures_clients_lignes;
 drop policy if exists factures_clients_lignes_scope on public.factures_clients_lignes;
 create policy factures_clients_lignes_scope on public.factures_clients_lignes
 for all to authenticated
@@ -753,11 +786,13 @@ with check (
 
 drop policy if exists commission_echeances_select_scope on public.commission_echeances;
 drop policy if exists commission_echeances_write_admin on public.commission_echeances;
+drop policy if exists commission_echeances_select_scope on public.commission_echeances;
 create policy commission_echeances_select_scope on public.commission_echeances
 for select to authenticated
 using (
   exists (select 1 from public.commissions c where c.id = commission_id)
 );
+drop policy if exists commission_echeances_write_scope on public.commission_echeances;
 create policy commission_echeances_write_scope on public.commission_echeances
 for all to authenticated
 using (
@@ -792,6 +827,7 @@ with check (
 );
 
 drop policy if exists commission_ajustements_select_admin on public.commission_ajustements;
+drop policy if exists commission_ajustements_select_scope on public.commission_ajustements;
 create policy commission_ajustements_select_scope on public.commission_ajustements
 for select to authenticated
 using (
@@ -814,8 +850,10 @@ using (
 
 drop policy if exists simulations_aides_select_scope on public.simulations_aides;
 drop policy if exists simulations_aides_write_scope on public.simulations_aides;
+drop policy if exists simulations_aides_select_scope on public.simulations_aides;
 create policy simulations_aides_select_scope on public.simulations_aides
 for select to authenticated using (public.prospect_visible(prospect_id));
+drop policy if exists simulations_aides_write_scope on public.simulations_aides;
 create policy simulations_aides_write_scope on public.simulations_aides
 for all to authenticated
 using (public.prospect_visible(prospect_id))
@@ -825,6 +863,7 @@ drop policy if exists planning_select_scope on public.planning_events;
 drop policy if exists planning_insert_scope on public.planning_events;
 drop policy if exists planning_update_scope on public.planning_events;
 drop policy if exists planning_delete_scope on public.planning_events;
+drop policy if exists planning_select_scope on public.planning_events;
 create policy planning_select_scope on public.planning_events
 for select to authenticated
 using (
@@ -832,6 +871,7 @@ using (
   or (prospect_id is not null and public.prospect_visible(prospect_id))
   or (prospect_id is null and user_id = (select auth.uid()))
 );
+drop policy if exists planning_insert_scope on public.planning_events;
 create policy planning_insert_scope on public.planning_events
 for insert to authenticated
 with check (
@@ -841,6 +881,7 @@ with check (
     and (prospect_id is null or public.prospect_visible(prospect_id))
   )
 );
+drop policy if exists planning_update_scope on public.planning_events;
 create policy planning_update_scope on public.planning_events
 for update to authenticated
 using (
@@ -851,6 +892,7 @@ with check (
   public.is_super_admin()
   or (user_id = (select auth.uid()) and (prospect_id is null or public.prospect_visible(prospect_id)))
 );
+drop policy if exists planning_delete_scope on public.planning_events;
 create policy planning_delete_scope on public.planning_events
 for delete to authenticated
 using (
@@ -859,17 +901,21 @@ using (
 );
 
 drop policy if exists devis_delete_admin on public.devis;
+drop policy if exists devis_delete_scope on public.devis;
 create policy devis_delete_scope on public.devis
 for delete to authenticated using (public.prospect_visible(prospect_id));
 drop policy if exists visites_delete_admin on public.visites;
+drop policy if exists visites_delete_scope on public.visites;
 create policy visites_delete_scope on public.visites
 for delete to authenticated using (public.prospect_visible(prospect_id));
 
+drop policy if exists audit_select_admin on public.audit_logs;
 drop policy if exists audit_select_admin on public.audit_logs;
 create policy audit_select_admin on public.audit_logs
 for select to authenticated using (public.is_super_admin());
 
 -- Shared commission schedules and audit adjustments are not a partner-facing directory.
+drop policy if exists commission_bareme_select_admin on public.commission_bareme;
 drop policy if exists commission_bareme_select_admin on public.commission_bareme;
 create policy commission_bareme_select_admin on public.commission_bareme
 for select to authenticated using (public.is_super_admin());
@@ -914,11 +960,13 @@ grant execute on function public.document_object_visible(text) to authenticated;
 
 drop policy if exists documents_bucket_read on storage.objects;
 drop policy if exists documents_bucket_read_scope on storage.objects;
+drop policy if exists documents_bucket_read_scope on storage.objects;
 create policy documents_bucket_read_scope on storage.objects
 for select to authenticated
 using (bucket_id = 'documents' and public.document_object_visible(name));
 
 drop policy if exists documents_bucket_write on storage.objects;
+drop policy if exists documents_bucket_write_scope on storage.objects;
 drop policy if exists documents_bucket_write_scope on storage.objects;
 create policy documents_bucket_write_scope on storage.objects
 for insert to authenticated
@@ -926,12 +974,14 @@ with check (bucket_id = 'documents' and public.document_object_visible(name));
 
 drop policy if exists documents_bucket_update on storage.objects;
 drop policy if exists documents_bucket_update_scope on storage.objects;
+drop policy if exists documents_bucket_update_scope on storage.objects;
 create policy documents_bucket_update_scope on storage.objects
 for update to authenticated
 using (bucket_id = 'documents' and public.document_object_visible(name))
 with check (bucket_id = 'documents' and public.document_object_visible(name));
 
 drop policy if exists documents_bucket_delete on storage.objects;
+drop policy if exists documents_bucket_delete_scope on storage.objects;
 drop policy if exists documents_bucket_delete_scope on storage.objects;
 create policy documents_bucket_delete_scope on storage.objects
 for delete to authenticated
@@ -1078,9 +1128,11 @@ create index if not exists apporteurs_affaires_org_idx on public.apporteurs_affa
 
 alter table public.apporteurs_affaires enable row level security;
 drop policy if exists apporteurs_select_scope on public.apporteurs_affaires;
+drop policy if exists apporteurs_select_scope on public.apporteurs_affaires;
 create policy apporteurs_select_scope on public.apporteurs_affaires
 for select to authenticated
 using (public.is_super_admin() or organisation_id = public.current_organisation_id());
+drop policy if exists apporteurs_insert_scope on public.apporteurs_affaires;
 drop policy if exists apporteurs_insert_scope on public.apporteurs_affaires;
 create policy apporteurs_insert_scope on public.apporteurs_affaires
 for insert to authenticated
@@ -1088,6 +1140,7 @@ with check (
   (public.is_super_admin() or organisation_id = public.current_organisation_id())
   and created_by = (select auth.uid())
 );
+drop policy if exists apporteurs_update_scope on public.apporteurs_affaires;
 drop policy if exists apporteurs_update_scope on public.apporteurs_affaires;
 create policy apporteurs_update_scope on public.apporteurs_affaires
 for update to authenticated
@@ -1113,6 +1166,7 @@ with check (
     )
   )
 );
+drop policy if exists apporteurs_delete_scope on public.apporteurs_affaires;
 drop policy if exists apporteurs_delete_scope on public.apporteurs_affaires;
 create policy apporteurs_delete_scope on public.apporteurs_affaires
 for delete to authenticated
@@ -1157,9 +1211,11 @@ create index if not exists challenge_scores_challenge_points_idx on public.chall
 alter table public.challenges enable row level security;
 alter table public.challenge_scores enable row level security;
 drop policy if exists challenges_select_scope on public.challenges;
+drop policy if exists challenges_select_scope on public.challenges;
 create policy challenges_select_scope on public.challenges
 for select to authenticated
 using (public.is_super_admin() or organisation_id = public.current_organisation_id());
+drop policy if exists challenges_manage_scope on public.challenges;
 drop policy if exists challenges_manage_scope on public.challenges;
 create policy challenges_manage_scope on public.challenges
 for all to authenticated
@@ -1172,6 +1228,7 @@ with check (
   and exists (select 1 from public.profiles me where me.id = (select auth.uid()) and me.role in ('admin','manager','partner_admin','company_admin'))
 );
 drop policy if exists challenge_scores_select_scope on public.challenge_scores;
+drop policy if exists challenge_scores_select_scope on public.challenge_scores;
 create policy challenge_scores_select_scope on public.challenge_scores
 for select to authenticated
 using (
@@ -1181,6 +1238,7 @@ using (
     where c.id = challenge_id and c.organisation_id = public.current_organisation_id()
   )
 );
+drop policy if exists challenge_scores_manage_scope on public.challenge_scores;
 drop policy if exists challenge_scores_manage_scope on public.challenge_scores;
 create policy challenge_scores_manage_scope on public.challenge_scores
 for all to authenticated
