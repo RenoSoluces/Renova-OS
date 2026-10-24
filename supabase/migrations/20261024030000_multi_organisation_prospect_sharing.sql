@@ -1092,29 +1092,31 @@ create policy apporteurs_insert_scope on public.apporteurs_affaires
 for insert to authenticated
 with check (
   (public.is_super_admin() or organisation_id = public.current_organisation_id())
-  and exists (
-    select 1 from public.profiles me
-    where me.id = (select auth.uid())
-      and me.role in ('admin','manager','partner_admin','company_admin')
-  )
+  and created_by = (select auth.uid())
 );
 drop policy if exists apporteurs_update_scope on public.apporteurs_affaires;
 create policy apporteurs_update_scope on public.apporteurs_affaires
 for update to authenticated
 using (
   (public.is_super_admin() or organisation_id = public.current_organisation_id())
-  and exists (
-    select 1 from public.profiles me
-    where me.id = (select auth.uid())
-      and me.role in ('admin','manager','partner_admin','company_admin')
+  and (
+    created_by = (select auth.uid())
+    or exists (
+      select 1 from public.profiles me
+      where me.id = (select auth.uid())
+        and me.role in ('admin','manager','partner_admin','company_admin')
+    )
   )
 )
 with check (
   (public.is_super_admin() or organisation_id = public.current_organisation_id())
-  and exists (
-    select 1 from public.profiles me
-    where me.id = (select auth.uid())
-      and me.role in ('admin','manager','partner_admin','company_admin')
+  and (
+    created_by = (select auth.uid())
+    or exists (
+      select 1 from public.profiles me
+      where me.id = (select auth.uid())
+        and me.role in ('admin','manager','partner_admin','company_admin')
+    )
   )
 );
 drop policy if exists apporteurs_delete_scope on public.apporteurs_affaires;
