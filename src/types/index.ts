@@ -29,6 +29,8 @@ export interface Prospect {
   zone_ile_de_france: boolean
   commercial: string | null
   commercial_id: string | null
+  // Conservé pour les tableaux de bord et exports historiques ; masqué sur la fiche prospect.
+  montant_potentiel?: number | null
   commercial_historique_id?: string | null
   installateur_id?: string | null
   pot_commun?: boolean
