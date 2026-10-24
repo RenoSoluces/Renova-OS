@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Building2, Network, UserRound, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -53,7 +53,7 @@ export function OrganisationPage() {
     return result
   }, [members])
 
-  function renderMember(member: Member, seen = new Set<string>()): React.ReactNode {
+  function renderMember(member: Member, seen = new Set<string>()): ReactNode {
     if (seen.has(member.id)) return null
     const nextSeen = new Set(seen)
     nextSeen.add(member.id)
