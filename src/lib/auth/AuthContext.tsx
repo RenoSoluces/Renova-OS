@@ -40,11 +40,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true)
     setProfileError(null)
     try {
-      const { data, error } = await supabase
+      // Keep the app usable against databases that have not yet received
+      // the multi-organisation migration. The fallback is temporary compatibility:
+      // manager/team features remain unavailable until the migration is applied.
+      let { data, error } = await supabase
         .from('profiles')
         .select('id,email,nom_complet,couleur,role,telephone,created_at,objectif_mensuel,organisation_id,manager_id')
         .eq('id', userId)
         .maybeSingle()
+
+      if (error && /organisation_id|manager_id|column .* does not exist|schema cache/i.test(error.message)) {
+        const fallback = await supabase
+          .from('profiles')
+          .select('id,email,nom_complet,couleur,role,telephone,created_at,objectif_mensuel')
+          .eq('id', userId)
+          .maybeSingle()
+        data = fallback.data as (typeof data)
+        error = fallback.error
+      }
 
       if (currentRequest !== requestId.current) return
       if (error) throw error
