@@ -53,7 +53,8 @@ where p.organisation_id is null;
 
 alter table public.dossiers
   add column if not exists organisation_id uuid references public.organisations(id),
-  add column if not exists facturation_organisation_id uuid references public.organisations(id);
+  add column if not exists facturation_organisation_id uuid references public.organisations(id),
+  add column if not exists destinataire_organisation_id uuid references public.organisations(id);
 update public.dossiers d
 set organisation_id = p.organisation_id
 from public.prospects p
@@ -71,7 +72,9 @@ update public.commissions c
 set organisation_id = (select id from public.organisations where nom = 'Reno Soluces')
 where c.organisation_id is null;
 
-alter table public.dossier_facturation add column if not exists organisation_id uuid references public.organisations(id);
+alter table public.dossier_facturation
+  add column if not exists organisation_id uuid references public.organisations(id),
+  add column if not exists destinataire_organisation_id uuid references public.organisations(id);
 update public.dossier_facturation df
 set organisation_id = d.facturation_organisation_id
 from public.dossiers d
@@ -94,6 +97,7 @@ where emetteur_organisation_id is null;
 create index if not exists prospects_organisation_id_idx on public.prospects (organisation_id);
 create index if not exists dossiers_organisation_id_idx on public.dossiers (organisation_id);
 create index if not exists dossiers_facturation_organisation_id_idx on public.dossiers (facturation_organisation_id);
+create index if not exists dossiers_destinataire_organisation_id_idx on public.dossiers (destinataire_organisation_id);
 create index if not exists commissions_organisation_id_idx on public.commissions (organisation_id);
 create index if not exists dossier_facturation_organisation_id_idx on public.dossier_facturation (organisation_id);
 create index if not exists factures_clients_emetteur_organisation_id_idx on public.factures_clients (emetteur_organisation_id);
@@ -491,9 +495,19 @@ begin
         (select p.organisation_id from public.prospects p where p.id = new.prospect_id) then
         raise exception 'L’entreprise propriétaire du dossier suit celle du prospect.';
       end if;
-      if new.facturation_organisation_id is not null
+      if new.facturation_organisation_id is not null and tg_op = 'INSERT'
         and new.facturation_organisation_id <> actor_org then
         raise exception 'La facturation doit être portée par votre entreprise.';
+      end if;
+      if new.facturation_organisation_id is distinct from old.facturation_organisation_id
+        and new.facturation_organisation_id is not null
+        and new.facturation_organisation_id <> actor_org then
+        raise exception 'La facturation doit être portée par votre entreprise.';
+      end if;
+      if new.destinataire_organisation_id is distinct from old.destinataire_organisation_id
+        and new.destinataire_organisation_id is not null
+        and new.destinataire_organisation_id <> actor_org then
+        raise exception 'Vous ne pouvez sélectionner que votre entreprise comme destinataire ; contactez le Grand Admin pour un destinataire externe.';
       end if;
     end if;
     if tg_table_name = 'commissions' and new.organisation_id is not null
@@ -505,6 +519,12 @@ begin
         select d.facturation_organisation_id from public.dossiers d where d.id = new.dossier_id
       ) then
       raise exception 'La facture doit suivre l’entreprise de facturation du dossier.';
+    end if;
+    if tg_table_name = 'dossier_facturation'
+      and new.destinataire_organisation_id is distinct from old.destinataire_organisation_id
+      and new.destinataire_organisation_id is not null
+      and new.destinataire_organisation_id <> actor_org then
+      raise exception 'Vous ne pouvez sélectionner que votre entreprise comme destinataire.';
     end if;
     if tg_table_name = 'factures_clients' and new.emetteur_organisation_id is not null
       and new.emetteur_organisation_id <> actor_org then
@@ -543,6 +563,11 @@ begin
     if new.organisation_id is null then
       new.organisation_id := (
         select d.facturation_organisation_id from public.dossiers d where d.id = new.dossier_id
+      );
+    end if;
+    if new.destinataire_organisation_id is null then
+      new.destinataire_organisation_id := (
+        select d.destinataire_organisation_id from public.dossiers d where d.id = new.dossier_id
       );
     end if;
   elsif tg_table_name = 'entreprises' then
