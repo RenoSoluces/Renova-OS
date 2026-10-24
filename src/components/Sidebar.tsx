@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt,
+  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -50,6 +50,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
     { key: 'documents', label: 'Documents & archives', icon: FileText },
     { key: 'parametres', label: 'Paramètres', icon: Settings },
     { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
+    { key: 'organisation', label: 'Organigramme', icon: Network },
   ] },
 ]
 
@@ -95,7 +96,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').map(item => {
+            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')).map(item => {
               const Icon = item.icon
               return (
                 <button
