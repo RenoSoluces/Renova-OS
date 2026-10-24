@@ -68,7 +68,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
 
   const nom = profile?.nom_complet?.trim() || profile?.email || 'Utilisateur'
   const initials = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U'
-  const roleLabel = profile?.role === 'admin' ? 'Administrateur' : profile?.role === 'manager' ? 'Direction' : 'Commercial'
+  const roleLabel: Record<string, string> = { admin: 'Grand Admin', manager: 'Manager', commercial_manager: 'Responsable commercial', partner_admin: 'Dirigeant partenaire', company_admin: 'Direction', commercial: 'Commercial', apporteur: "Apporteur d'affaires", teleconseiller: 'Téléconseiller' }[profile?.role || ''] || 'Utilisateur'
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-brand">
