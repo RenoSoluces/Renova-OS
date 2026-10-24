@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Flame, Snowflake, Minus, Clock } from 'lucide-react'
+import { Flame, Snowflake, Minus, Clock, CalendarClock, AlertCircle, MapPin, UserRound, Inbox } from 'lucide-react'
 import type { Prospect, CrmTask } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { PIPELINE_STAGES, stageOf, euro, formatDueDate, isOverdue, isProspectTerminal } from '../../lib/crm/constants'
@@ -17,6 +17,7 @@ function initials(prenom: string, nom: string) {
 }
 
 const TEMP_ICON: Record<string, any> = { chaud: Flame, froid: Snowflake, tiede: Minus }
+const TEMP_LABEL: Record<string, string> = { chaud: 'Lead chaud', froid: 'Lead froid', tiede: 'Lead tiède' }
 
 export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChange }: Props) {
   const [dragId, setDragId] = useState<string | null>(null)
@@ -127,118 +128,159 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
     return Math.max(0, diff)
   }
 
+  // Synthèse affichée au-dessus du tableau : mêmes prospects que les colonnes.
+  const summary = useMemo(() => {
+    const all = columns.flatMap(c => c.items)
+    const late = all.filter(p => {
+      const t = (tasksByProspect[p.id] || []).find(x => !x.done)
+      return !!t && isOverdue(t)
+    }).length
+    return {
+      count: all.length,
+      total: columns.reduce((s, c) => s + c.total, 0),
+      hot: all.filter(p => p.temperature === 'chaud').length,
+      late,
+    }
+  }, [columns, tasksByProspect])
+
   return (
-    <div className="kanban-board">
-      {columns.map(col => (
-        <div
-          key={col.stage.value}
-          className={`kanban-column ${overStage === col.stage.value ? 'kanban-column-over' : ''}`}
-          style={{ '--kanban-accent': col.stage.color } as CSSProperties}
-          onDragOver={e => { e.preventDefault(); setOverStage(col.stage.value) }}
-          onDragLeave={() => setOverStage(s => (s === col.stage.value ? null : s))}
-          onDrop={e => {
-            e.preventDefault()
-            const id = e.dataTransfer.getData('text/prospect-id') || dragId
-            if (id) onStageChange(id, col.stage.value)
-            setOverStage(null)
-            setDragId(null)
-          }}
-        >
-          <div className="kanban-col-header">
-            <div className="kanban-col-title-wrap">
-              <span className="kanban-col-dot" style={{ background: col.stage.color }} />
-              <div>
-                <span className="kanban-col-title">{col.stage.label}</span>
-                <span className="kanban-col-description">{col.stage.description}</span>
+    <section className="pl" aria-label="Pipeline commercial">
+      <div className="pl-summary">
+        <div className="pl-stat"><span>Prospects en cours</span><strong>{summary.count}</strong></div>
+        <div className="pl-stat"><span>Valeur potentielle</span><strong>{euro(summary.total)}</strong></div>
+        <div className="pl-stat pl-stat-hot"><span>Leads chauds</span><strong>{summary.hot}</strong></div>
+        <div className={`pl-stat ${summary.late ? 'pl-stat-late' : ''}`}><span>Actions en retard</span><strong>{summary.late}</strong></div>
+      </div>
+
+      <div className="pl-board">
+        {columns.map(col => {
+          const share = summary.total > 0 ? Math.round((col.total / summary.total) * 100) : 0
+          return (
+            <div
+              key={col.stage.value}
+              className={`pl-lane ${overStage === col.stage.value ? 'is-over' : ''}`}
+              style={{ '--stage': col.stage.color } as CSSProperties}
+              role="group"
+              aria-label={`${col.stage.label} : ${col.items.length} prospect${col.items.length > 1 ? 's' : ''}`}
+              onDragOver={e => { e.preventDefault(); setOverStage(col.stage.value) }}
+              onDragLeave={() => setOverStage(s => (s === col.stage.value ? null : s))}
+              onDrop={e => {
+                e.preventDefault()
+                const id = e.dataTransfer.getData('text/prospect-id') || dragId
+                if (id) onStageChange(id, col.stage.value)
+                setOverStage(null)
+                setDragId(null)
+              }}
+            >
+              <header className="pl-lane-head" title={col.stage.description}>
+                <div className="pl-lane-row">
+                  <span className="pl-lane-dot" />
+                  <h3 className="pl-lane-title">{col.stage.label}</h3>
+                  <span className="pl-lane-count">{col.items.length}</span>
+                </div>
+                <div className="pl-lane-row pl-lane-money">
+                  <strong>{euro(col.total)}</strong>
+                  <span>{share}% de la valeur</span>
+                </div>
+                <div className="pl-lane-bar" aria-hidden="true"><i style={{ width: `${share}%` }} /></div>
+              </header>
+
+              <div className="pl-lane-body">
+                {col.items.length === 0 && (
+                  <div className="pl-empty">
+                    <Inbox size={20} />
+                    <span>Aucun prospect</span>
+                    <small>Glissez une carte ici</small>
+                  </div>
+                )}
+                {col.items.map(p => {
+                  const openTasks = (tasksByProspect[p.id] || []).filter(t => !t.done)
+                  const nextTask = openTasks[0]
+                  const late = !!nextTask && isOverdue(nextTask)
+                  const temp = p.temperature || 'tiede'
+                  const TempIcon = TEMP_ICON[temp] || Minus
+                  const days = inactivityDays(p.derniere_interaction_at)
+                  const hot = temp === 'chaud'
+                  const project = p.tags?.[0] || 'Projet énergétique'
+                  const montant = Number(p.montant_potentiel) || 0
+                  const extraTags = (p.tags || []).slice(1)
+                  return (
+                    <article
+                      key={p.id}
+                      className={`pl-card ${dragId === p.id ? 'is-dragging' : ''}`}
+                      draggable
+                      tabIndex={0}
+                      aria-label={`${p.prenom} ${p.nom}, ${col.stage.label}`}
+                      onDragStart={e => { e.dataTransfer.setData('text/prospect-id', p.id); setDragId(p.id) }}
+                      onDragEnd={() => { setDragId(null); setOverStage(null) }}
+                      onClick={() => onOpen(p)}
+                      onKeyDown={e => {
+                        if (e.target !== e.currentTarget) return
+                        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onOpen(p) }
+                      }}
+                    >
+                      <div className="pl-card-head">
+                        <span className="pl-avatar" aria-hidden="true">{initials(p.prenom, p.nom)}</span>
+                        <div className="pl-card-who">
+                          <h4 title={`Dossier #${p.id.slice(0, 6).toUpperCase()}`}>{p.prenom} {p.nom}</h4>
+                          <p>{project}</p>
+                        </div>
+                        <span className={`pl-temp pl-temp-${temp}`} title={TEMP_LABEL[temp]} aria-label={TEMP_LABEL[temp]}>
+                          <TempIcon size={15} />
+                        </span>
+                      </div>
+
+                      <ul className="pl-facts">
+                        <li><MapPin size={13} /><span>{p.ville || 'Ville non renseignée'}</span></li>
+                        <li><UserRound size={13} /><span>{p.commercial || 'Non attribué'}</span></li>
+                      </ul>
+
+                      {(late || (days !== null && days >= 3) || (nextTask && !late) || extraTags.length > 0) && (
+                        <div className="pl-signals">
+                          {late && nextTask && (
+                            <span className="pl-chip pl-chip-danger"><AlertCircle size={12} />{formatDueDate(nextTask.due_at)}</span>
+                          )}
+                          {days !== null && days >= 3 && (
+                            <span className={`pl-chip ${days >= 7 ? 'pl-chip-danger' : 'pl-chip-warn'}`}>
+                              <Clock size={12} />Sans action depuis {days} j
+                            </span>
+                          )}
+                          {nextTask && !late && (
+                            <span className="pl-chip pl-chip-ok"><CalendarClock size={12} />{formatDueDate(nextTask.due_at)}</span>
+                          )}
+                          {extraTags.slice(0, 2).map(t => <span key={t} className="pl-chip pl-chip-tag">{t}</span>)}
+                          {extraTags.length > 2 && <span className="pl-chip pl-chip-tag">+{extraTags.length - 2}</span>}
+                        </div>
+                      )}
+
+                      <footer className="pl-card-foot">
+                        <span className={`pl-amount ${montant > 0 ? '' : 'is-empty'}`}>{montant > 0 ? euro(montant) : 'À estimer'}</span>
+                        <select
+                          className="pl-move"
+                          aria-label={`Déplacer ${p.prenom} ${p.nom} vers une autre étape`}
+                          value={col.stage.value}
+                          draggable={false}
+                          onClick={e => e.stopPropagation()}
+                          onChange={e => { e.stopPropagation(); if (e.target.value !== col.stage.value) onStageChange(p.id, e.target.value) }}
+                        >
+                          {PIPELINE_STAGES.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
+                        </select>
+                        <button
+                          type="button"
+                          className={`pl-btn ${hot ? 'is-hot' : ''}`}
+                          onClick={e => { e.stopPropagation(); onOpen(p) }}
+                        >
+                          Relancer
+                        </button>
+                      </footer>
+                    </article>
+                  )
+                })}
               </div>
             </div>
-            <span className="kanban-col-count">{col.items.length}</span>
-          </div>
-          <div className="kanban-col-total"><span>Valeur du pipeline</span><strong>{euro(col.total)}</strong></div>
-
-          <div className="kanban-col-body">
-            {col.items.length === 0 && (
-              <div className="kanban-empty">
-                <span>Déposez un prospect ici</span>
-                <small>Glissez une carte depuis une autre étape</small>
-              </div>
-            )}
-            {col.items.map(p => {
-              const openTasks = (tasksByProspect[p.id] || []).filter(t => !t.done)
-              const nextTask = openTasks[0]
-              const late = nextTask && isOverdue(nextTask)
-              const TempIcon = TEMP_ICON[p.temperature || 'tiede']
-              const days = inactivityDays(p.derniere_interaction_at)
-              const hot = p.temperature === 'chaud'
-              const project = p.tags?.[0] || 'Projet énergétique'
-              return (
-                <div
-                  key={p.id}
-                  className="kanban-card"
-                  draggable
-                  onDragStart={e => { e.dataTransfer.setData('text/prospect-id', p.id); setDragId(p.id) }}
-                  onDragEnd={() => { setDragId(null); setOverStage(null) }}
-                  onClick={() => onOpen(p)}
-                >
-                  <div className="kanban-card-top">
-                    <span className={`kanban-temp-badge ${p.temperature || 'tiede'}`}>
-                      <TempIcon size={12} /> {p.temperature === 'chaud' ? 'Lead chaud' : p.temperature === 'froid' ? 'Lead froid' : 'Lead tiède'}
-                    </span>
-                    <span className="kanban-card-id">#{p.id.slice(0, 6).toUpperCase()}</span>
-                  </div>
-
-                  <div className="kanban-card-main">
-                    <div className="kanban-card-avatar">{initials(p.prenom, p.nom)}</div>
-                    <div className="kanban-card-title-block">
-                      <h4>{p.prenom} {p.nom}</h4>
-                      <p>{project}</p>
-                    </div>
-                  </div>
-
-                  <div className="kanban-card-meta">
-                    <span>📍 {p.ville || 'Ville non renseignée'}</span>
-                    <span>👤 {p.commercial || 'Non attribué'}</span>
-                  </div>
-
-                  {(days !== null && days >= 3) && (
-                    <div className={`kanban-card-alert ${days >= 7 ? 'danger' : ''}`}>
-                      <Clock size={13} />
-                      <span>Sans action depuis {days} jour{days > 1 ? 's' : ''}</span>
-                    </div>
-                  )}
-                  {nextTask && !late && (
-                    <div className="kanban-card-next-task">
-                      <Clock size={13} /> Prochaine action : {formatDueDate(nextTask.due_at)}
-                    </div>
-                  )}
-                  {nextTask && late && (
-                    <div className="kanban-card-alert danger">
-                      <Clock size={13} /> <span>Action en retard — {formatDueDate(nextTask.due_at)}</span>
-                    </div>
-                  )}
-
-                  {(p.tags || []).length > 0 && (
-                    <div className="kanban-card-tags">
-                      {p.tags.slice(0, 3).map(t => <span key={t} className="kanban-tag">{t}</span>)}
-                    </div>
-                  )}
-
-                  <div className="kanban-card-bottom">
-                    <span />
-                    <button
-                      type="button"
-                      className={`kanban-relance-btn ${hot ? 'hot' : ''}`}
-                      onClick={e => { e.stopPropagation(); onOpen(p) }}
-                    >
-                      Relancer
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-      ))}
-    </div>
+          )
+        })}
+      </div>
+    </section>
   )
 }
