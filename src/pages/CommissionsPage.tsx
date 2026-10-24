@@ -25,6 +25,7 @@ import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { euro } from '../lib/crm/constants'
+import '../styles/commissions.css'
 
 const TYPES: Record<CommissionType, string> = {
   vt: 'Visite technique',
