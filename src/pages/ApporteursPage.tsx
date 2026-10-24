@@ -28,7 +28,7 @@ export function ApporteursPage() {
   const [editing, setEditing] = useState<string | null>(null)
   const [form, setForm] = useState({ nom: '', contact: '', email: '', telephone: '', ville: '', statut: 'a_contacter', notes: '', organisation_id: '' })
   const [saving, setSaving] = useState(false)
-  const canManage = ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
+  const canManage = Boolean(profile?.id)
   const isGlobalAdmin = profile?.role === 'admin'
 
   async function load() {
