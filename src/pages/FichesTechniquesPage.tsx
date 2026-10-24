@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Download, ExternalLink, FileText, Loader2, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import type { Document, Produit } from '../types'
@@ -37,7 +38,7 @@ export function FichesTechniquesPage() {
     const [{ data: documents, error: docError }, { data: catalogue, error: produitError }] = await Promise.all([
       supabase.from('documents').select('*, produit:catalogue_produits(*)')
         .in('categorie', Object.values(CATEGORIE).flat()).order('created_at', { ascending: false }),
-      supabase.from('catalogue_produits').select('*').eq('actif', true).order('nom'),
+      chargerCatalogue({ actifSeulement: true, tri: [{ colonne: 'nom' }] }),
     ])
     if (docError) setError(`Lecture des fiches impossible : ${docError.message}`)
     else setDocs((documents || []) as any)

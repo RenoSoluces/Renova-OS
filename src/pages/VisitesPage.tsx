@@ -18,6 +18,7 @@ import {
   FileText,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
 import { useAuth } from '../lib/auth/AuthContext'
 import { creerDevisDepuisTravaux } from '../lib/devis/creerDevisDepuisTravaux'
 import { creerDevisDepuisPV } from '../lib/devis/creerDevisDepuisPV'
@@ -190,10 +191,7 @@ export function VisitesPage({
         }
       })
 
-    supabase
-      .from('catalogue_produits')
-      .select('*')
-      .eq('actif', true)
+    chargerCatalogue({ actifSeulement: true, tri: [{ colonne: 'categorie' }, { colonne: 'nom' }] })
       .then(({ data }) => {
         setCatalogueProduits((data || []) as Produit[])
       })

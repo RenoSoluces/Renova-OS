@@ -3,6 +3,7 @@ import {
   Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus, Sparkles, ImagePlus,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { logAuditEvent } from '../lib/auditLog'
 import type { Devis, DevisLigne, DevisAide, Prospect, Produit, Entreprise, Installateur } from '../types'
@@ -181,7 +182,7 @@ export function DevisPage({
   useEffect(() => {
     fetchListe()
     supabase.from('prospects').select('*').order('nom').then(({ data }) => setProspects((data || []) as Prospect[]))
-    supabase.from('catalogue_produits').select('*').eq('actif', true).then(({ data }) => setProduits((data || []) as Produit[]))
+    chargerCatalogue({ actifSeulement: true, tri: [{ colonne: 'categorie' }, { colonne: 'nom' }] }).then(({ data }) => setProduits((data || []) as Produit[]))
     supabase.from('installateurs').select('*').eq('devis_autorise', true).eq('actif', true).order('nom')
       .then(({ data }) => setPartenairesDevis((data || []) as Installateur[]))
     supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => {

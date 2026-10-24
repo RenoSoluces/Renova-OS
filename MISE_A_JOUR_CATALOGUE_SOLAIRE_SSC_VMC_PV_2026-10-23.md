@@ -41,3 +41,11 @@ Source : liste de produits du catalogue partenaire fournie le 23/10/2026 (prix H
 ## Vérification effectuée
 
 Les 4 migrations ont été exécutées sur un PostgreSQL 16 de test après rejeu des migrations catalogue des 18 et 20/10/2026 : 105 références rapprochées ou créées, aucune référence en double, prix et fiches CEE existants conservés, second passage sans aucune modification (empreinte de la table identique), exécution correcte également sur une base sans ces produits.
+
+## Correctif — VMC et SSC absents de la page Catalogue (24/10/2026)
+
+**Cause** : Supabase limite chaque requête à 1 000 lignes. Le catalogue dépasse maintenant ce seuil (environ 1 240 références) et la page Catalogue lisait tout en une seule requête triée par catégorie. La fin de la liste, c'est-à-dire `ssc`, `vmc` et les visites techniques, était coupée sans message d'erreur. Les produits étaient bien en base, et la page Devis les affichait car elle ne lisait pas le catalogue dans le même ordre.
+
+**Correction** : nouveau chargeur paginé `src/lib/catalogue/chargerCatalogue.ts` (lit par pages jusqu'à la fin, quel que soit le plafond configuré), utilisé par Catalogue, Devis, Visites, Aides/simulation, Fiches techniques et Commissions. Aucune migration nécessaire pour ce point.
+
+Pensez à reconstruire l'application (`npm run build`) : le correctif est dans l'interface.

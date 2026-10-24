@@ -15,6 +15,7 @@ import {
   RotateCcw,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
 import { useAuth } from '../lib/auth/AuthContext'
 import type {
   Commission,
@@ -157,11 +158,7 @@ export function CommissionsPage() {
         ascending: false,
       })
 
-    const produitsQuery = supabase
-      .from('catalogue_produits')
-      .select('id,nom,categorie,public_cible')
-      .eq('actif', true)
-      .order('nom')
+    const produitsQuery = chargerCatalogue({ colonnes: 'id,nom,categorie,public_cible', actifSeulement: true, tri: [{ colonne: 'nom' }] })
 
     const commerciauxQuery = supabase
       .from('profiles')

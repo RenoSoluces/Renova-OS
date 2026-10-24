@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Calculator, Save, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { Entreprise, Produit, Prospect } from '../types'
 import { Button } from '../components/ui/Button'
@@ -29,7 +30,7 @@ export function AidesSimulationPage({initialProspectId,onInitialProspectHandled}
     setLoading(true)
     const [p,prod,e,h]=await Promise.all([
       supabase.from('prospects').select('*').order('nom'),
-      supabase.from('catalogue_produits').select('*').eq('actif',true).order('nom'),
+      chargerCatalogue({ actifSeulement: true, tri: [{ colonne: 'nom' }] }),
       supabase.from('entreprises').select('*').limit(1).maybeSingle(),
       supabase.from('simulations_aides').select('*').order('created_at',{ascending:false}).limit(50),
     ])
