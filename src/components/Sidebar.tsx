@@ -104,7 +104,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'partenaires' && item.key !== 'performance' && item.key !== 'sante_systeme') || profile?.role === 'admin' || profile?.role === 'manager').filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
+            {group.items.filter(item => (item.key !== 'performance' && item.key !== 'sante_systeme') || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'installateurs' || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
               const Icon = item.icon
               return (
                 <button
