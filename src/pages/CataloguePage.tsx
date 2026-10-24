@@ -43,6 +43,8 @@ const CATEGORIES = [
   { value: 'ballon_thermodynamique', label: 'Ballon thermodynamique' },
   { value: 'vmc', label: 'VMC' },
   { value: 'photovoltaique', label: 'Panneaux photovoltaïques' },
+  { value: 'batterie_stockage', label: 'Batterie de stockage' },
+  { value: 'domotique', label: 'Domotique' },
   { value: 'solaire_thermique', label: 'Solaire thermique — BAR-TH-168' },
   { value: 'ssc', label: 'Système solaire combiné (SSC) — BAR-TH-143' },
   { value: 'professionnel_cee', label: 'Professionnels — CEE', public_cible: 'professionnel' },
@@ -185,7 +187,7 @@ function emptyForm(): FormState {
 }
 
 /** Catégories rangées par marque (filtre « Marque » affiché). */
-const CATEGORIES_FILTRE_MARQUE = ['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'ballon_thermodynamique', 'photovoltaique', 'pro_photovoltaique']
+const CATEGORIES_FILTRE_MARQUE = ['pac_air_eau', 'pac_air_air', 'pac_geothermie', 'ballon_thermodynamique', 'photovoltaique', 'batterie_stockage', 'domotique', 'pro_photovoltaique']
 
 export function CataloguePage() {
   const { profile } = useAuth()
@@ -243,7 +245,7 @@ export function CataloguePage() {
     { label: 'Menuiseries Extérieures', values: ['menuiseries','menuiseries_portes'] },
     { label: 'Chauffage', values: ['pac_air_eau','pac_air_air','pac_geothermie'] },
     { label: 'Production d’eau chaude', values: ['ballon_thermodynamique','solaire_thermique','ssc'] },
-    { label: 'Production d’électricité', values: ['photovoltaique'] },
+    { label: 'Production d’électricité', values: ['photovoltaique','batterie_stockage','domotique'] },
     { label: 'VMC', values: ['vmc'] },
     { label: 'Autres catégories', values: ['autre'] },
   ] : filtrePublic === 'professionnel' ? [
