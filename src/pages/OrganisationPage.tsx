@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from 'react'
 import { Building2, Network, UserRound, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -23,6 +23,14 @@ export function OrganisationPage() {
   const [members, setMembers] = useState<Member[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [inviteName, setInviteName] = useState('')
+  const [inviteEmail, setInviteEmail] = useState('')
+  const [inviteRole, setInviteRole] = useState('commercial')
+  const [inviteOrganisationId, setInviteOrganisationId] = useState('')
+  const [inviteManagerId, setInviteManagerId] = useState('')
+  const [inviteLoading, setInviteLoading] = useState(false)
+  const [inviteMessage, setInviteMessage] = useState('')
+  const isGlobalAdmin = profile?.role === 'admin'
 
   async function load() {
     setLoading(true)
@@ -36,13 +44,20 @@ export function OrganisationPage() {
       setOrganisations([])
       setMembers([])
     } else {
-      setOrganisations((orgResult.data || []) as Organisation[])
+      const nextOrganisations = (orgResult.data || []) as Organisation[]
+      setOrganisations(nextOrganisations)
       setMembers((memberResult.data || []) as Member[])
+      if (!inviteOrganisationId && isGlobalAdmin && nextOrganisations.length > 0) {
+        setInviteOrganisationId(nextOrganisations[0].id)
+      }
     }
     setLoading(false)
   }
 
-  useEffect(() => { void load() }, [profile?.id, profile?.role])
+  useEffect(() => {
+    if (profile?.id && profile.role !== 'admin') setInviteManagerId(profile.id)
+    void load()
+  }, [profile?.id, profile?.role])
 
   const membersByOrg = useMemo(() => {
     const result: Record<string, Member[]> = {}
@@ -52,6 +67,59 @@ export function OrganisationPage() {
     })
     return result
   }, [members])
+
+  const selectedInviteOrganisation = organisations.find(org => org.id === inviteOrganisationId)
+  const isCompanyLeader = ['partner_admin', 'company_admin'].includes(profile?.role || '')
+  const isManager = ['manager', 'commercial_manager'].includes(profile?.role || '')
+  const roleOptions = isGlobalAdmin
+    ? [
+        { value: 'admin', label: 'Grand Admin' },
+        { value: 'manager', label: 'Manager interne' },
+        { value: 'commercial_manager', label: 'Responsable commercial' },
+        { value: 'partner_admin', label: 'Dirigeant partenaire' },
+        { value: 'company_admin', label: 'Direction' },
+        { value: 'commercial', label: 'Commercial' },
+        { value: 'apporteur', label: "Apporteur d'affaires" },
+        { value: 'teleconseiller', label: 'Téléconseiller' },
+      ].filter(role => selectedInviteOrganisation?.type === 'interne'
+        ? !['partner_admin', 'company_admin'].includes(role.value)
+        : !['admin', 'manager'].includes(role.value))
+    : isCompanyLeader
+      ? [
+          { value: 'commercial_manager', label: 'Responsable commercial' },
+          { value: 'commercial', label: 'Commercial' },
+          { value: 'apporteur', label: "Apporteur d'affaires" },
+          { value: 'teleconseiller', label: 'Téléconseiller' },
+        ]
+      : [
+          { value: 'commercial', label: 'Commercial' },
+          { value: 'apporteur', label: "Apporteur d'affaires" },
+          { value: 'teleconseiller', label: 'Téléconseiller' },
+        ]
+
+  async function inviteMember(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault()
+    setInviteLoading(true)
+    setInviteMessage('')
+    const { error: inviteError } = await supabase.functions.invoke('invite-organisation-user', {
+      body: {
+        email: inviteEmail.trim(),
+        nom_complet: inviteName.trim(),
+        role: inviteRole,
+        organisation_id: isGlobalAdmin ? inviteOrganisationId : profile?.organisation_id,
+        manager_id: inviteManagerId || null,
+      },
+    })
+    if (inviteError) {
+      setInviteMessage("Invitation impossible. Vérifiez que la fonction sécurisée est déployée et que l'adresse e-mail est valide.")
+    } else {
+      setInviteMessage("Invitation envoyée. Le membre recevra un e-mail pour activer son compte.")
+      setInviteName('')
+      setInviteEmail('')
+      await load()
+    }
+    setInviteLoading(false)
+  }
 
   function renderMember(member: Member, seen = new Set<string>()): ReactNode {
     if (seen.has(member.id)) return null
@@ -91,6 +159,7 @@ export function OrganisationPage() {
         <button type="button" className="btn btn-outline" onClick={() => void load()} disabled={loading}><RefreshCw size={15} /> Actualiser</button>
       </div>
       {error && <div className="card card-pad" role="alert">{error}</div>}
+      {!loading && <>{`+ui+`}</>}
       {loading ? <div className="card card-pad">Chargement de l'organigramme…</div> : (
         <div style={{ display: 'grid', gap: 16 }}>
           {organisations.map(org => {
