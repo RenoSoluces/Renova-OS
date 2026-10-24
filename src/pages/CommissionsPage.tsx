@@ -47,6 +47,7 @@ const EMPTY = {
   date_fin: '',
   actif: true,
   public_cible: 'particulier',
+  categorie_produit: '',
 }
 
 type PaymentTarget = 'commercial' | 'societe'
@@ -94,13 +95,14 @@ export function CommissionsPage() {
   const { profile } = useAuth()
   const admin =
     profile?.role === 'admin' || profile?.role === 'manager'
+  const canViewBareme = admin || profile?.role === 'apporteur' || profile?.role === 'partner'
 
   const [tab, setTab] = useState<'suivi' | 'bareme'>('suivi')
   const [rows, setRows] = useState<CommissionWithCommercial[]>([])
   const [rules, setRules] = useState<CommissionBareme[]>([])
   const [commerciaux, setCommerciaux] = useState<any[]>([])
   const [produits, setProduits] = useState<any[]>([])
-  const [baremePublic, setBaremePublic] = useState<'particulier' | 'professionnel'>('particulier')
+  const [baremePublic, setBaremePublic] = useState<'particulier' | 'professionnel' | 'visite_technique'>('particulier')
 
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>(EMPTY)
@@ -145,8 +147,11 @@ export function CommissionsPage() {
         ascending: false,
       })
 
+    const baremeSource = profile?.role === 'apporteur' || profile?.role === 'partner'
+      ? 'commission_bareme_apporteurs'
+      : 'commission_bareme'
     const baremeQuery = supabase
-      .from('commission_bareme')
+      .from(baremeSource)
       .select('*')
       .order('priorite', {
         ascending: false,
@@ -157,7 +162,7 @@ export function CommissionsPage() {
 
     const produitsQuery = supabase
       .from('catalogue_produits')
-      .select('id,nom,categorie,public_cible')
+      .select('id,nom,categorie,public_cible,catalogue_groupe')
       .eq('actif', true)
       .order('nom')
 
@@ -388,6 +393,7 @@ export function CommissionsPage() {
         r.date_fin || '',
       actif: r.actif,
       public_cible: r.public_cible || 'tous',
+      categorie_produit: r.categorie_produit || produits.find((p: any) => p.id === r.produit_id)?.categorie || '',
     })
 
     setModal(true)
@@ -430,7 +436,8 @@ export function CommissionsPage() {
       date_fin:
         form.date_fin || null,
       actif: form.actif,
-      public_cible: form.public_cible || baremePublic,
+      public_cible: form.public_cible || (baremePublic === 'visite_technique' ? 'tous' : baremePublic),
+      categorie_produit: form.categorie_produit || null,
     }
 
     const q = editing
@@ -729,7 +736,21 @@ export function CommissionsPage() {
     load()
   }
 
-  const displayedRules = rules.filter((r: any) => (r.public_cible || 'tous') === baremePublic || (r.public_cible || 'tous') === 'tous')
+  const displayedRules = rules.filter((r: any) => {
+    if (baremePublic === 'visite_technique') {
+      return r.type === 'vt' || produits.some((p: any) => p.id === r.produit_id && p.catalogue_groupe === 'visite_technique') || (r.public_cible || 'tous') === 'tous'
+    }
+    return (r.public_cible || 'tous') === baremePublic || (r.public_cible || 'tous') === 'tous'
+  })
+  const categoriesProduits = [...new Set(produits
+    .filter((p: any) => form.type === 'vt'
+      ? p.catalogue_groupe === 'visite_technique'
+      : (form.public_cible === 'tous' || p.public_cible === form.public_cible) && p.catalogue_groupe !== 'visite_technique')
+    .map((p: any) => p.categorie).filter(Boolean))].sort()
+  const produitsFiltres = produits.filter((p: any) =>
+    p.categorie === form.categorie_produit && (form.type === 'vt'
+      ? p.catalogue_groupe === 'visite_technique'
+      : form.public_cible === 'tous' || p.public_cible === form.public_cible))
 
   const echeanceTotal = echeances.reduce((sum, e) => sum + amount(e.montant), 0)
   const echeancePaid = echeances.filter(e => !!e.date_paiement).reduce((sum, e) => sum + amount(e.montant), 0)
@@ -766,7 +787,7 @@ export function CommissionsPage() {
           )}
       </div>
 
-      {admin && (
+      {canViewBareme && (
         <div
           className="view-toggle"
           style={{
@@ -1601,12 +1622,13 @@ export function CommissionsPage() {
         </>
       )}
 
-      {admin &&
+      {canViewBareme &&
         tab === 'bareme' && (
           <>
             <div className="view-toggle" style={{ marginBottom: 16 }}>
               <button className={`view-toggle-btn ${baremePublic === 'particulier' ? 'active' : ''}`} onClick={() => setBaremePublic('particulier')}>Particuliers</button>
               <button className={`view-toggle-btn ${baremePublic === 'professionnel' ? 'active' : ''}`} onClick={() => setBaremePublic('professionnel')}>Professionnels</button>
+              <button className={`view-toggle-btn ${baremePublic === 'visite_technique' ? 'active' : ''}`} onClick={() => setBaremePublic('visite_technique')}>Visites techniques</button>
             </div>
             <div className="card">
             <div className="card-pad">
@@ -1712,9 +1734,7 @@ export function CommissionsPage() {
 
                         <div className="text-sm text-muted">
                           Reno Soluces :{' '}
-                          {euro(
-                            r.montant_societe,
-                          )}
+                          {admin && <>Reno Soluces : {euro(r.montant_societe)}</>}
                         </div>
                       </span>
 
@@ -1725,37 +1745,10 @@ export function CommissionsPage() {
                           }
                         </b>
 
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            openEdit(
-                              r,
-                            )
-                          }
-                        >
-                          <Pencil
-                            size={
-                              14
-                            }
-                          />
-                        </Button>
-
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() =>
-                            remove(
-                              r.id,
-                            )
-                          }
-                        >
-                          <Trash2
-                            size={
-                              14
-                            }
-                          />
-                        </Button>
+                        {admin && <>
+                          <Button variant="ghost" size="sm" onClick={() => openEdit(r)}><Pencil size={14} /></Button>
+                          <Button variant="ghost" size="sm" onClick={() => remove(r.id)}><Trash2 size={14} /></Button>
+                        </>}
                       </span>
                     </div>
                   ),
@@ -1887,7 +1880,14 @@ export function CommissionsPage() {
           />
 
           <FloatSelect
-            label="Produit"
+            label="Type de produit / catégorie"
+            value={form.categorie_produit}
+            onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, produit_id: '' }))}
+            options={[{ value: '', label: 'Tous les types de produits' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replaceAll('_', ' ').replace(/^./, x => x.toUpperCase()) }))]}
+          />
+
+          <FloatSelect
+            label="Produit (facultatif si règle par type)"
             value={
               form.produit_id
             }
@@ -1905,8 +1905,8 @@ export function CommissionsPage() {
                 label:
                   'Tous les produits',
               },
-              ...produits.map(
-                (p) => ({
+              ...produitsFiltres.map(
+                (p: any) => ({
                   value: p.id,
                   label: p.nom,
                 }),
