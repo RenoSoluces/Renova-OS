@@ -19,6 +19,7 @@ import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { resolveDocumentRows } from '../lib/storage/documentUrl'
 import { ProspectShareControl } from '../components/crm/ProspectShareControl'
 
 interface Props {
@@ -231,7 +232,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       .select('id, nom, type, taille, url, categorie, partenaire_id, created_at')
       .eq('prospect_id', prospectId)
       .order('created_at', { ascending: false })
-    setProspectDocuments(data || [])
+    setProspectDocuments(await resolveDocumentRows(data || []))
   }
 
   async function ajouterDevisPartenaire(files: FileList | null) {
