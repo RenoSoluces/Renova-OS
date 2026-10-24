@@ -374,6 +374,8 @@ export interface CommissionBareme {
   actif: boolean
   commercial_id?: string | null
   produit_id?: string | null
+  categorie_produit?: string | null
+  variante_produit?: string | null
   mode?: string
   base_pourcentage?: string
   priorite?: number
