@@ -685,26 +685,22 @@ for each row execute function public.guard_multi_org_profile_fields();
 revoke all on function public.set_multi_org_defaults() from public, anon;
 revoke all on function public.guard_multi_org_profile_fields() from public, anon;
 
--- Rebuild profile visibility after the tenant columns exist; do not leave the previous
--- admin/manager-wide permissive policy OR-combined with this policy.
-drop policy if exists profiles_select_scoped on public.profiles;
+-- Rebuild profile visibility without self-referencing profiles policies.
+-- can_manage_profile is SECURITY DEFINER and applies team/organisation scoping.
 drop policy if exists profiles_select_scoped on public.profiles;
 create policy profiles_select_scoped on public.profiles
 for select to authenticated
 using (
   id = (select auth.uid())
   or public.is_super_admin()
-  or manager_id = (select auth.uid())
-  or (
-    profiles.organisation_id = public.current_organisation_id()
-    and exists (
-      select 1 from public.profiles me
-      where me.id = (select auth.uid())
-        and me.role in ('partner_admin', 'company_admin')
-    )
-  )
+  or public.can_manage_profile(id)
 );
 
+drop policy if exists profiles_update_objectifs_admin on public.profiles;
+create policy profiles_update_objectifs_admin on public.profiles
+for update to authenticated
+using (public.is_super_admin() or public.can_manage_profile(id))
+with check (public.is_super_admin() or public.can_manage_profile(id));
 
 -- Tenant-scope secondary records too; old permissive policies are OR-combined.
 drop policy if exists notifications_select_scope on public.notifications;
