@@ -1,10 +1,12 @@
-import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
+import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from 'workbox-precaching'
+import { NavigationRoute, registerRoute } from 'workbox-routing'
 import { clientsClaim } from 'workbox-core'
 
 self.skipWaiting()
 clientsClaim()
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
+registerRoute(new NavigationRoute(createHandlerBoundToURL('index.html'), { denylist: [/^\\/api\\//] }))
 
 self.addEventListener('push', (event) => {
   let payload = {}
