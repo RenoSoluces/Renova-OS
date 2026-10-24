@@ -1048,3 +1048,149 @@ comment on table public.prospect_shares is
   'Explicit prospect visibility grants; sharing does not change the original owner organisation.';
 comment on column public.dossiers.facturation_organisation_id is
   'Organisation that issues invoices for this dossier; independent from original prospect ownership.';
+
+
+-- Business network: introducers are not installers and are scoped to one company.
+create table if not exists public.apporteurs_affaires (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null references public.organisations(id) on delete restrict,
+  nom text not null,
+  contact text,
+  email text,
+  telephone text,
+  ville text,
+  statut text not null default 'a_contacter' check (statut in ('a_contacter','contacte','actif','inactif')),
+  notes text,
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+create index if not exists apporteurs_affaires_org_idx on public.apporteurs_affaires(organisation_id, nom);
+
+alter table public.apporteurs_affaires enable row level security;
+drop policy if exists apporteurs_select_scope on public.apporteurs_affaires;
+create policy apporteurs_select_scope on public.apporteurs_affaires
+for select to authenticated
+using (public.is_super_admin() or organisation_id = public.current_organisation_id());
+drop policy if exists apporteurs_insert_scope on public.apporteurs_affaires;
+create policy apporteurs_insert_scope on public.apporteurs_affaires
+for insert to authenticated
+with check (
+  (public.is_super_admin() or organisation_id = public.current_organisation_id())
+  and exists (
+    select 1 from public.profiles me
+    where me.id = (select auth.uid())
+      and me.role in ('admin','manager','partner_admin','company_admin')
+  )
+);
+drop policy if exists apporteurs_update_scope on public.apporteurs_affaires;
+create policy apporteurs_update_scope on public.apporteurs_affaires
+for update to authenticated
+using (
+  (public.is_super_admin() or organisation_id = public.current_organisation_id())
+  and exists (
+    select 1 from public.profiles me
+    where me.id = (select auth.uid())
+      and me.role in ('admin','manager','partner_admin','company_admin')
+  )
+)
+with check (
+  (public.is_super_admin() or organisation_id = public.current_organisation_id())
+  and exists (
+    select 1 from public.profiles me
+    where me.id = (select auth.uid())
+      and me.role in ('admin','manager','partner_admin','company_admin')
+  )
+);
+drop policy if exists apporteurs_delete_scope on public.apporteurs_affaires;
+create policy apporteurs_delete_scope on public.apporteurs_affaires
+for delete to authenticated
+using (
+  (public.is_super_admin() or organisation_id = public.current_organisation_id())
+  and exists (
+    select 1 from public.profiles me
+    where me.id = (select auth.uid())
+      and me.role in ('admin','manager','partner_admin','company_admin')
+  )
+);
+
+-- Company-specific challenges. Scores are entered by authorized managers and
+-- ranked inside each challenge; a company cannot read another company's scores.
+create table if not exists public.challenges (
+  id uuid primary key default gen_random_uuid(),
+  organisation_id uuid not null references public.organisations(id) on delete restrict,
+  nom text not null,
+  description text,
+  date_debut date not null,
+  date_fin date not null,
+  objectif text,
+  statut text not null default 'a_venir' check (statut in ('a_venir','en_cours','termine','archive')),
+  created_by uuid references public.profiles(id) on delete set null,
+  created_at timestamptz not null default now(),
+  check (date_fin >= date_debut)
+);
+create index if not exists challenges_org_dates_idx on public.challenges(organisation_id, date_debut, date_fin);
+
+create table if not exists public.challenge_scores (
+  id uuid primary key default gen_random_uuid(),
+  challenge_id uuid not null references public.challenges(id) on delete cascade,
+  participant_id uuid not null references public.profiles(id) on delete cascade,
+  points numeric(12,2) not null default 0 check (points >= 0),
+  commentaire text,
+  updated_by uuid references public.profiles(id) on delete set null,
+  updated_at timestamptz not null default now(),
+  unique (challenge_id, participant_id)
+);
+create index if not exists challenge_scores_challenge_points_idx on public.challenge_scores(challenge_id, points desc);
+
+alter table public.challenges enable row level security;
+alter table public.challenge_scores enable row level security;
+drop policy if exists challenges_select_scope on public.challenges;
+create policy challenges_select_scope on public.challenges
+for select to authenticated
+using (public.is_super_admin() or organisation_id = public.current_organisation_id());
+drop policy if exists challenges_manage_scope on public.challenges;
+create policy challenges_manage_scope on public.challenges
+for all to authenticated
+using (
+  (public.is_super_admin() or organisation_id = public.current_organisation_id())
+  and exists (select 1 from public.profiles me where me.id = (select auth.uid()) and me.role in ('admin','manager','partner_admin','company_admin'))
+)
+with check (
+  (public.is_super_admin() or organisation_id = public.current_organisation_id())
+  and exists (select 1 from public.profiles me where me.id = (select auth.uid()) and me.role in ('admin','manager','partner_admin','company_admin'))
+);
+drop policy if exists challenge_scores_select_scope on public.challenge_scores;
+create policy challenge_scores_select_scope on public.challenge_scores
+for select to authenticated
+using (
+  public.is_super_admin()
+  or exists (
+    select 1 from public.challenges c
+    where c.id = challenge_id and c.organisation_id = public.current_organisation_id()
+  )
+);
+drop policy if exists challenge_scores_manage_scope on public.challenge_scores;
+create policy challenge_scores_manage_scope on public.challenge_scores
+for all to authenticated
+using (
+  exists (
+    select 1 from public.challenges c
+    where c.id = challenge_id
+      and (public.is_super_admin() or c.organisation_id = public.current_organisation_id())
+  )
+  and exists (select 1 from public.profiles me where me.id = (select auth.uid()) and me.role in ('admin','manager','partner_admin','company_admin'))
+)
+with check (
+  exists (
+    select 1 from public.challenges c
+    where c.id = challenge_id
+      and (public.is_super_admin() or c.organisation_id = public.current_organisation_id())
+  )
+  and exists (
+    select 1 from public.profiles participant
+    join public.challenges c on c.id = challenge_id
+    where participant.id = participant_id and participant.organisation_id = c.organisation_id
+  )
+  and exists (select 1 from public.profiles me where me.id = (select auth.uid()) and me.role in ('admin','manager','partner_admin','company_admin'))
+);
