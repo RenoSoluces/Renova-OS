@@ -181,7 +181,29 @@ export function DevisPage({
   useEffect(() => {
     fetchListe()
     supabase.from('prospects').select('*').order('nom').then(({ data }) => setProspects((data || []) as Prospect[]))
-    supabase.from('catalogue_produits').select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht').eq('actif', true).then(({ data }) => setProduits((data || []) as Produit[]))
+    void (async () => {
+      // Supabase REST peut limiter une réponse à 1 000 lignes. Charger toutes les pages
+      // pour ne pas masquer les catégories situées en fin de catalogue (SSC, VMC, etc.).
+      const pageSize = 1000
+      const all: Produit[] = []
+      for (let from = 0; ; from += pageSize) {
+        const { data, error } = await supabase
+          .from('catalogue_produits')
+          .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
+          .eq('actif', true)
+          .order('id', { ascending: true })
+          .range(from, from + pageSize - 1)
+        if (error) {
+          console.error('Impossible de charger le catalogue pour les devis', error)
+          setProduits([])
+          return
+        }
+        const batch = (data || []) as Produit[]
+        all.push(...batch)
+        if (batch.length < pageSize) break
+      }
+      setProduits(all)
+    })()
     supabase.from('installateurs').select('*').eq('devis_autorise', true).eq('actif', true).order('nom')
       .then(({ data }) => setPartenairesDevis((data || []) as Installateur[]))
     supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => {
