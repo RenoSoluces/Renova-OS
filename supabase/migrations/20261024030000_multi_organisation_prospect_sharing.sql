@@ -883,6 +883,118 @@ using (bucket_id = 'documents' and public.document_object_visible(name));
 
 update storage.buckets set public = false where id = 'documents';
 
+
+-- Notify direct managers from the database so the behavior does not depend on a
+-- particular frontend screen or email invocation.
+create or replace function public.notify_manager_of_prospect_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  owner_id uuid;
+  manager_id uuid;
+  notification_title text;
+  notification_message text;
+begin
+  owner_id := new.commercial_id;
+  if owner_id is null and tg_op = 'UPDATE' then
+    owner_id := old.commercial_id;
+  end if;
+  if owner_id is null then
+    return new;
+  end if;
+
+  select p.manager_id into manager_id
+  from public.profiles p
+  where p.id = owner_id;
+
+  if manager_id is null or manager_id = owner_id then
+    return new;
+  end if;
+
+  if tg_op = 'INSERT' then
+    notification_title := 'Nouveau prospect dans votre équipe';
+    notification_message := concat_ws(' ', coalesce(new.prenom, ''), coalesce(new.nom, ''), 'a été créé ou attribué à votre équipe.');
+  elsif old.commercial_id is distinct from new.commercial_id then
+    notification_title := 'Prospect attribué à votre équipe';
+    notification_message := concat_ws(' ', coalesce(new.prenom, ''), coalesce(new.nom, ''), 'a été réattribué dans votre équipe.');
+  else
+    notification_title := 'Mise à jour d’un prospect de votre équipe';
+    notification_message := concat_ws(' ', coalesce(new.prenom, ''), coalesce(new.nom, ''), ' : statut', coalesce(new.statut, 'mis à jour'));
+  end if;
+
+  insert into public.notifications (type, titre, message, prospect_id, recipient_id, lue, meta)
+  values (
+    'nouveau_prospect',
+    notification_title,
+    notification_message,
+    new.id,
+    manager_id,
+    false,
+    jsonb_build_object('source', 'manager_trigger', 'organisation_id', new.organisation_id)
+  );
+  return new;
+end;
+$function$;
+
+drop trigger if exists prospects_notify_direct_manager on public.prospects;
+create trigger prospects_notify_direct_manager
+after insert or update of commercial_id, statut on public.prospects
+for each row execute function public.notify_manager_of_prospect_change();
+
+create or replace function public.notify_manager_of_dossier_change()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $function$
+declare
+  prospect_owner_id uuid;
+  manager_id uuid;
+  prospect_name text;
+begin
+  select p.commercial_id, concat_ws(' ', coalesce(p.prenom, ''), coalesce(p.nom, ''))
+    into prospect_owner_id, prospect_name
+  from public.prospects p
+  where p.id = new.prospect_id;
+
+  if prospect_owner_id is null then
+    return new;
+  end if;
+
+  select p.manager_id into manager_id
+  from public.profiles p
+  where p.id = prospect_owner_id;
+
+  if manager_id is null or manager_id = prospect_owner_id then
+    return new;
+  end if;
+
+  insert into public.notifications (type, titre, message, prospect_id, dossier_id, recipient_id, lue, meta)
+  values (
+    'evolution_dossier',
+    case when tg_op = 'INSERT' then 'Nouveau dossier dans votre équipe' else 'Évolution d’un dossier de votre équipe' end,
+    concat_ws(' ', prospect_name, '— dossier', new.reference, '— statut :', new.statut),
+    new.prospect_id,
+    new.id,
+    manager_id,
+    false,
+    jsonb_build_object('source', 'manager_trigger', 'organisation_id', new.organisation_id)
+  );
+  return new;
+end;
+$function$;
+
+drop trigger if exists dossiers_notify_direct_manager on public.dossiers;
+create trigger dossiers_notify_direct_manager
+after insert or update of statut, date_installation, installateur_id on public.dossiers
+for each row execute function public.notify_manager_of_dossier_change();
+
+revoke all on function public.notify_manager_of_prospect_change() from public, anon;
+revoke all on function public.notify_manager_of_dossier_change() from public, anon;
+
 comment on table public.organisations is
   'Tenant boundary for Renova OS; the global admin can administer all organisations.';
 comment on table public.prospect_shares is
