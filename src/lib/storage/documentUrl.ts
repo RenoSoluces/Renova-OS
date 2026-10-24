@@ -20,14 +20,14 @@ export function getDocumentStoragePath(value: string | null | undefined): string
   return null
 }
 
-export async function resolveDocumentUrl(value: string | null | undefined): Promise<string | null> {
-  if (!value) return null
+export async function resolveDocumentUrl(value: string | null | undefined): Promise<string> {
+  if (!value) return ''
   const path = getDocumentStoragePath(value)
   if (!path) return value
   const { data, error } = await supabase.storage.from('documents').createSignedUrl(path, 60 * 60)
   if (error || !data?.signedUrl) {
     console.error('[RENOVA OS] URL signée indisponible pour un document.')
-    return null
+    return ''
   }
   return data.signedUrl
 }
