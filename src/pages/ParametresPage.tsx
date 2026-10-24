@@ -55,11 +55,92 @@ export function ParametresPage() {
   const [savingEntreprise, setSavingEntreprise] = useState(false)
   const [entrepriseSaved, setEntrepriseSaved] = useState(false)
   const [integrations, setIntegrations] = useState({ mpr: '', apiAdresse: '' })
-  const [notif, setNotif] = useState({ email: true, push: false, sms: false })
+  const [notif, setNotif] = useState({ email: true, sms: false })
+  const [pushEnabled, setPushEnabled] = useState(false)
+  const [pushBusy, setPushBusy] = useState(false)
+  const [pushMessage, setPushMessage] = useState('')
+  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || ''
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<any[]>([])
   const [ancienCommercialForm, setAncienCommercialForm] = useState({ nom_complet: '', email: '', telephone: '', notes: '' })
   const [savingAncienCommercial, setSavingAncienCommercial] = useState(false)
+
+  function decodeVapidKey(value: string): Uint8Array {
+    const padding = '='.repeat((4 - value.length % 4) % 4)
+    const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
+    const raw = window.atob(base64)
+    return Uint8Array.from([...raw].map(char => char.charCodeAt(0)))
+  }
+
+  async function actualiserEtatPush() {
+    if (!('serviceWorker' in navigator) || !('PushManager' in window)) return
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.getSubscription()
+      setPushEnabled(Boolean(subscription))
+    } catch {
+      setPushEnabled(false)
+    }
+  }
+
+  useEffect(() => {
+    if (tab === 'notifications') void actualiserEtatPush()
+  }, [tab])
+
+  async function activerPush() {
+    setPushBusy(true)
+    setPushMessage('')
+    try {
+      if (!profile?.id) throw new Error('Votre profil Renova OS est introuvable.')
+      if (!vapidPublicKey) throw new Error('La clé publique VAPID n’est pas encore configurée sur le déploiement. L’administrateur doit définir VITE_VAPID_PUBLIC_KEY.')
+      if (!('serviceWorker' in navigator) || !('PushManager' in window)) throw new Error('Ce navigateur ne prend pas en charge les notifications push.')
+      if (!window.isSecureContext) throw new Error('Les notifications push nécessitent une connexion HTTPS.')
+      const permission = await Notification.requestPermission()
+      if (permission !== 'granted') throw new Error('Autorisation de notifications refusée dans le navigateur.')
+      const registration = await navigator.serviceWorker.ready
+      let subscription = await registration.pushManager.getSubscription()
+      if (!subscription) {
+        subscription = await registration.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: decodeVapidKey(vapidPublicKey),
+        })
+      }
+      const { error } = await supabase.from('push_subscriptions').upsert({
+        user_id: profile.id,
+        endpoint: subscription.endpoint,
+        subscription: subscription.toJSON(),
+        user_agent: navigator.userAgent,
+        updated_at: new Date().toISOString(),
+      }, { onConflict: 'endpoint' })
+      if (error) throw error
+      setPushEnabled(true)
+      setPushMessage('Ce navigateur est enregistré pour recevoir les notifications Renova OS. L’envoi côté serveur reste à configurer.')
+    } catch (error) {
+      setPushMessage(error instanceof Error ? error.message : 'Impossible d’activer les notifications push.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
+
+  async function desactiverPush() {
+    setPushBusy(true)
+    setPushMessage('')
+    try {
+      const registration = await navigator.serviceWorker.ready
+      const subscription = await registration.pushManager.getSubscription()
+      if (subscription) {
+        const { error } = await supabase.from('push_subscriptions').delete().eq('endpoint', subscription.endpoint)
+        if (error) throw error
+        await subscription.unsubscribe()
+      }
+      setPushEnabled(false)
+      setPushMessage('Les notifications push sont désactivées sur ce navigateur.')
+    } catch (error) {
+      setPushMessage(error instanceof Error ? error.message : 'Impossible de désactiver les notifications push.')
+    } finally {
+      setPushBusy(false)
+    }
+  }
 
   async function fetchAnciensCommerciaux() {
     const { data } = await supabase.from('commerciaux_historique').select('*').order('nom_complet')
@@ -508,7 +589,6 @@ export function ParametresPage() {
             <div className="flex-col gap-4">
               {[
                 { key: 'email', label: 'Notifications par email', desc: 'Recevoir les alertes par email' },
-                { key: 'push', label: 'Notifications push', desc: 'Alertes navigateur en temps réel' },
                 { key: 'sms', label: 'Notifications SMS', desc: 'Rappels de rendez-vous par SMS' },
               ].map(n => (
                 <label key={n.key} className="flex items-center justify-between" style={{ padding: '12px 0', borderBottom: '1px solid var(--c-border)' }}>
@@ -532,6 +612,20 @@ export function ParametresPage() {
                   </button>
                 </label>
               ))}
+              <div style={{ paddingTop: 18, borderTop: '1px solid var(--c-border)', marginTop: 8 }}>
+                <div className="font-semibold">Notifications push sur ce navigateur</div>
+                <p className="text-sm text-muted" style={{ marginTop: 6 }}>
+                  Autorisez Renova OS à afficher des alertes même lorsque l’onglet n’est pas ouvert. L’autorisation du navigateur et la clé publique VAPID sont nécessaires.
+                </p>
+                <div className="flex items-center gap-3" style={{ flexWrap: 'wrap', marginTop: 12 }}>
+                  <span className="badge">{pushEnabled ? 'Navigateur enregistré' : 'Non activées'}</span>
+                  {pushEnabled
+                    ? <Button variant="secondary" onClick={() => void desactiverPush()} disabled={pushBusy}>{pushBusy ? 'Mise à jour…' : 'Désactiver sur ce navigateur'}</Button>
+                    : <Button variant="primary" onClick={() => void activerPush()} disabled={pushBusy}>{pushBusy ? 'Activation…' : 'Activer les notifications push'}</Button>}
+                </div>
+                {pushMessage && <p className="text-sm" role="status" style={{ marginTop: 10 }}>{pushMessage}</p>}
+                {!vapidPublicKey && <p className="text-xs text-muted" style={{ marginTop: 8 }}>Configuration administrateur requise : VITE_VAPID_PUBLIC_KEY dans les variables d’environnement du déploiement.</p>}
+              </div>
             </div>
           )}
         </div>
