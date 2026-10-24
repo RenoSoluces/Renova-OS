@@ -1,6 +1,6 @@
 export type PageKey =
   | 'dashboard' | 'prospects' | 'visites' | 'simulations' | 'resultats_3cl'
-  | 'dossiers' | 'devis' | 'facturation' | 'catalogue' | 'planning' | 'courrier' | 'a_traiter' | 'pipeline' | 'prospection' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'fiches_techniques' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme'
+  | 'dossiers' | 'devis' | 'facturation' | 'catalogue' | 'planning' | 'courrier' | 'a_traiter' | 'pipeline' | 'prospection' | 'suivi_chantier' | 'partenaires' | 'performance' | 'documents' | 'fiches_techniques' | 'parametres' | 'activite' | 'commissions' | 'sante_systeme' | 'organisation'
 
 export type TypeProspect = 'particulier' | 'professionnel'
 
