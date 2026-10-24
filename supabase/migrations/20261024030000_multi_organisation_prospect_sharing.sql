@@ -25,18 +25,33 @@ where organisation_id is null;
 update public.profiles p
 set manager_id = m.id
 from public.profiles m
-where lower(p.nom_complet) like '%william ochou%'
-  and lower(m.nom_complet) like '%mickael brahimi%'
+where lower(p.nom_complet) like '%william%'
+  and lower(p.nom_complet) like '%ochou%'
+  and lower(m.nom_complet) like '%mickael%'
+  and lower(m.nom_complet) like '%brahimi%'
   and p.organisation_id = m.organisation_id
   and p.id <> m.id;
 
 update public.profiles p
 set manager_id = m.id
 from public.profiles m
-where lower(p.nom_complet) like '%maxime capello%'
-  and lower(m.nom_complet) like '%melissa benhaddouche%'
+where lower(p.nom_complet) like '%maxime%'
+  and lower(p.nom_complet) like '%capello%'
+  and lower(m.nom_complet) like '%melissa%'
+  and lower(m.nom_complet) like '%benhaddouche%'
   and p.organisation_id = m.organisation_id
   and p.id <> m.id;
+
+-- These two existing accounts become team managers; no duplicate Auth accounts are created.
+update public.profiles
+set role = 'manager'
+where lower(nom_complet) like '%mickael%'
+  and lower(nom_complet) like '%brahimi%';
+
+update public.profiles
+set role = 'manager'
+where lower(nom_complet) like '%melissa%'
+  and lower(nom_complet) like '%benhaddouche%';
 
 create index if not exists profiles_organisation_id_idx on public.profiles (organisation_id);
 create index if not exists profiles_manager_id_idx on public.profiles (manager_id);
