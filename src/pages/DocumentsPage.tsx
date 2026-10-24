@@ -197,9 +197,9 @@ export function DocumentsPage() {
             />
           </div>
           <input ref={inputRef} type="file" multiple hidden onChange={e => handleFiles(e.target.files)} />
-          <button className="btn btn-primary" onClick={() => inputRef.current?.click()} disabled={uploading}>
+          <button className="btn btn-primary" onClick={() => inputRef.current?.click()} disabled={uploading || (!isAdmin && !dossierCible)}>
             {uploading ? <Loader2 size={18} className="spin" /> : <Plus size={18} />}
-            {uploading ? 'Envoi en cours…' : 'Importer un document'}
+            {uploading ? 'Envoi en cours…' : (!isAdmin && !dossierCible) ? 'Choisir un dossier' : 'Importer un document'}
           </button>
         </div>
       </div>
