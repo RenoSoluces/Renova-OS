@@ -178,6 +178,15 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
   async function fetchProspects() {
     if (profile?.role === 'admin') await actualiserPotCommun()
+    let canViewTeam = ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
+    if (!canViewTeam && profile?.id) {
+      const { data: directReports } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('manager_id', profile.id)
+        .limit(1)
+      canViewTeam = Boolean(directReports?.length)
+    }
     let query = supabase
       .from('prospects')
       .select('*')
