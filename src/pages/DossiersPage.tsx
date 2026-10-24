@@ -130,7 +130,7 @@ export function DossiersPage({
     // La commission d'un dossier est celle générée automatiquement (barème)
     // au moment de la signature du devis qui lui est associé.
     supabase
-      .from('commissions')
+      .from('commissions_safe')
       .select('reference_id, montant_commercial, montant_societe')
       .eq('reference_type', 'devis')
       .then(({ data, error }) => {
