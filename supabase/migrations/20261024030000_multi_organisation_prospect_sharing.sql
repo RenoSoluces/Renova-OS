@@ -229,7 +229,6 @@ for select to authenticated
 using (
   public.is_super_admin()
   or organisation_id = public.current_organisation_id()
-  or public.prospect_visible(prospect_id)
 );
 
 drop policy if exists prospect_shares_admin_insert on public.prospect_shares;
@@ -287,6 +286,11 @@ with check (
     where me.id = (select auth.uid())
       and me.role in ('partner_admin', 'company_admin')
       and me.organisation_id = organisation_id
+  )
+  or exists (
+    select 1 from public.prospect_shares s
+    where s.prospect_id = prospects.id
+      and s.organisation_id = public.current_organisation_id()
   )
 );
 
@@ -468,6 +472,15 @@ begin
     if tg_table_name = 'prospects' and tg_op = 'UPDATE'
       and new.organisation_id is distinct from old.organisation_id then
       raise exception 'Le partage ne transfère pas la propriété du prospect.';
+    end if;
+    if tg_table_name = 'prospects' and tg_op = 'UPDATE'
+      and old.organisation_id is distinct from actor_org
+      and new.commercial_id is distinct from old.commercial_id
+      and exists (
+        select 1 from public.prospect_shares s
+        where s.prospect_id = old.id and s.organisation_id = actor_org
+      ) then
+      raise exception 'Un prospect partagé conserve son attribution d’origine ; demandez au Grand Admin un changement de propriétaire.';
     end if;
     if tg_table_name = 'prospects' and new.organisation_id is not null
       and new.organisation_id <> actor_org then
