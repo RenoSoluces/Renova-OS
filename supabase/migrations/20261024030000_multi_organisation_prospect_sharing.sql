@@ -497,6 +497,10 @@ begin
       and new.emetteur_organisation_id <> actor_org then
       raise exception 'Vous ne pouvez facturer qu’au nom de votre entreprise.';
     end if;
+    if tg_table_name = 'entreprises' and new.organisation_id is not null
+      and new.organisation_id <> actor_org then
+      raise exception 'Vous ne pouvez modifier que les informations de votre entreprise.';
+    end if;
   end if;
 
   if tg_table_name = 'prospects' then
@@ -528,6 +532,10 @@ begin
         select d.facturation_organisation_id from public.dossiers d where d.id = new.dossier_id
       );
     end if;
+  elsif tg_table_name = 'entreprises' then
+    if new.organisation_id is null then
+      new.organisation_id := coalesce(actor_org, (select id from public.organisations where nom = 'Reno Soluces'));
+    end if;
   elsif tg_table_name = 'factures_clients' then
     if new.emetteur_organisation_id is null then
       new.emetteur_organisation_id := coalesce(
@@ -554,6 +562,9 @@ create trigger dossier_facturation_set_multi_org_defaults before insert or updat
 for each row execute function public.set_multi_org_defaults();
 drop trigger if exists factures_clients_set_multi_org_defaults on public.factures_clients;
 create trigger factures_clients_set_multi_org_defaults before insert or update on public.factures_clients
+for each row execute function public.set_multi_org_defaults();
+drop trigger if exists entreprises_set_multi_org_defaults on public.entreprises;
+create trigger entreprises_set_multi_org_defaults before insert or update on public.entreprises
 for each row execute function public.set_multi_org_defaults();
 
 -- Prevent a signed-in user from promoting themselves or moving themselves to another tenant.
