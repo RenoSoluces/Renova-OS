@@ -305,6 +305,9 @@ export interface Dossier {
   aides_montant: number | null
   reste_a_charge: number | null
   installateur_id?: string | null
+  organisation_id?: string | null
+  facturation_organisation_id?: string | null
+  destinataire_organisation_id?: string | null
   date_installation_prevue?: string | null
   date_installation?: string | null
   garantie_fin?: string | null
@@ -335,6 +338,8 @@ export interface PlanningEvent {
 export interface DossierFacturation {
   id: string
   dossier_id: string
+  organisation_id?: string | null
+  destinataire_organisation_id?: string | null
   libelle: string
   montant_ht: number
   taux_tva: number
