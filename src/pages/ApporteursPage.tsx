@@ -46,7 +46,7 @@ export function ApporteursPage() {
     setEquipe((e.data || []) as MembreEquipe[])
     setLoading(false)
   }
-  useEffect(() => { void load() }, [])
+  useEffect(() => { if (profile?.id) void load() }, [profile?.id])
   const filtered = useMemo(() => rows.filter(r => `${r.nom} ${r.contact || ''} ${r.email || ''} ${r.ville || ''}`.toLowerCase().includes(search.toLowerCase())), [rows, search])
   function edit(row: Apporteur) {
     setEditing(row.id)
