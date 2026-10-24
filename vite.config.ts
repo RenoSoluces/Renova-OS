@@ -31,15 +31,9 @@ export default defineConfig({
           { src: '/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
-        // On ne met en cache que les fichiers statiques (JS/CSS/images).
-        // Les appels Supabase (API/data) ne sont jamais mis en cache : on veut
-        // toujours des données fraîches, jamais une version périmée des dossiers clients.
+      injectManifest: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,woff2}'],
-        navigateFallbackDenylist: [/^\/api\//],
+        maximumFileSizeToCacheInBytes: 3000000,
       },
       devOptions: {
         enabled: false,
