@@ -3,6 +3,7 @@ import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText, ShieldCheck }
 import { jsPDF } from 'jspdf'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
+import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
 import type { Produit } from '../types'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
@@ -210,13 +211,9 @@ export function CataloguePage() {
 
   function fetchProduits() {
     setLoading(true)
-    supabase
-      .from('catalogue_produits')
-      .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
-      // Le produit générique « Isolation » est remplacé par les produits détaillés.
-      .neq('nom', 'Isolation')
-      .order('categorie', { ascending: true })
-      .order('nom', { ascending: true })
+    // Lecture paginée (une requête simple est plafonnée à 1 000 lignes et coupait SSC, VMC, visites techniques…)
+    // sur les seules colonnes autorisées. Le produit générique « Isolation » est remplacé par les produits détaillés.
+    chargerCatalogue({ exclureNom: 'Isolation', tri: [{ colonne: 'categorie' }, { colonne: 'nom' }] })
       .then(({ data, error }) => {
         if (error) { setRows([]); setLoading(false); return }
         setRows((data || []) as Produit[])
