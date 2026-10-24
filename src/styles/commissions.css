@@ -1,0 +1,44 @@
+.commissions-page { display:flex; flex-direction:column; gap:18px; }
+.commissions-page .page-header { align-items:flex-end; }
+.commissions-page .page-subtitle { max-width:680px; line-height:1.55; }
+.commissions-page .view-toggle { display:flex; flex-wrap:wrap; gap:6px; padding:5px; width:max-content; max-width:100%; background:var(--c-bg-soft); border:1px solid var(--c-border-light); border-radius:var(--r-md); }
+.commissions-page .view-toggle-btn { display:inline-flex; align-items:center; gap:7px; padding:9px 13px; border:1px solid transparent; border-radius:var(--r-sm); color:var(--c-text-secondary); background:transparent; font-size:13px; font-weight:600; }
+.commissions-page .view-toggle-btn.active { color:var(--c-primary); background:var(--c-bg-alt); border-color:var(--c-border-light); box-shadow:var(--sh-sm); }
+.commission-matrix { overflow:hidden; }
+.commission-matrix .card-pad { padding:20px; }
+.commission-matrix-intro { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:17px; }
+.commission-matrix-intro h2 { margin:0; color:var(--c-text); font-size:17px; font-weight:700; }
+.commission-matrix-intro p { margin:4px 0 0; color:var(--c-text-muted); font-size:12px; }
+.commission-matrix-intro > span { flex-shrink:0; padding:5px 9px; color:var(--c-text-secondary); background:var(--c-bg-soft); border:1px solid var(--c-border-light); border-radius:999px; font-size:11px; font-weight:700; }
+.commission-rule-row { display:grid; grid-template-columns:minmax(180px,1.25fr) minmax(130px,.9fr) minmax(180px,1.2fr) minmax(150px,1fr) 145px; align-items:center; gap:15px; }
+.commission-table-head { padding:11px 13px; color:var(--c-text-muted); background:var(--c-bg-soft); border:1px solid var(--c-border-light); border-radius:var(--r-sm); font-size:11px; text-transform:uppercase; letter-spacing:.04em; }
+.commission-rule-row:not(.commission-table-head) { padding:15px 13px; border-bottom:1px solid var(--c-border-light); transition:background var(--tr-fast); }
+.commission-rule-row:not(.commission-table-head):hover { background:var(--c-bg-soft); }
+.commission-rule-row > * { min-width:0; overflow-wrap:anywhere; }
+.commission-rule-row strong { color:var(--c-text); }
+.commission-rule-row .text-sm { line-height:1.45; }
+.commission-rule-row .text-muted { color:var(--c-text-muted); }
+.commission-rule-row .flex { flex-wrap:wrap; }
+.commission-matrix .empty-state { padding:40px 20px; }
+.commissions-page .kpi-tile { border-radius:var(--r-lg); }
+.commissions-page .kpi-tile-value { font-variant-numeric:tabular-nums; }
+@media (max-width:1050px) {
+  .commission-rule-row { grid-template-columns:minmax(150px,1.2fr) minmax(110px,.8fr) minmax(140px,1fr) minmax(130px,1fr) 125px; gap:10px; }
+  .commission-matrix .card-pad { padding:14px; }
+}
+@media (max-width:780px) {
+  .commissions-page .view-toggle { width:100%; }
+  .commissions-page .view-toggle-btn { flex:1; justify-content:center; }
+  .commission-table-head { display:none; }
+  .commission-rule-row:not(.commission-table-head) { grid-template-columns:1fr; gap:9px; margin-top:10px; padding:14px; border:1px solid var(--c-border-light); border-radius:var(--r-md); background:var(--c-bg-alt); }
+  .commission-rule-row:not(.commission-table-head) > span:nth-child(2)::before { content:'Commercial : '; color:var(--c-text-muted); font-size:11px; }
+  .commission-rule-row:not(.commission-table-head) > span:nth-child(3)::before { content:'Type / produit : '; color:var(--c-text-muted); font-size:11px; }
+  .commission-rule-row:not(.commission-table-head) > span:nth-child(4)::before { content:'Rémunération : '; color:var(--c-text-muted); font-size:11px; }
+  .commission-rule-row:not(.commission-table-head) > span:nth-child(5) { display:flex; align-items:center; justify-content:space-between; }
+  .commission-matrix-intro { align-items:flex-start; }
+}
+@media (max-width:480px) {
+  .commission-matrix-intro { flex-direction:column; }
+  .commission-matrix .card-pad { padding:11px; }
+}
+@media (prefers-reduced-motion:reduce) { .commission-rule-row { transition:none; } }
