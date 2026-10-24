@@ -218,7 +218,7 @@ function AppContent() {
           {page === 'partenaires' && (profile?.role === 'admin' || profile?.role === 'manager' ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
-          {page === 'organisation' && <OrganisationPage />
+          {page === 'organisation' && <OrganisationPage />}
         </div>
       </div>
     </div>
