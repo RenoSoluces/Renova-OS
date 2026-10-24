@@ -25,16 +25,16 @@ where organisation_id is null;
 update public.profiles p
 set manager_id = m.id
 from public.profiles m
-where lower(p.nom_complet) like '%william%'
-  and lower(m.nom_complet) like '%mickael%'
+where lower(p.nom_complet) like '%william ochou%'
+  and lower(m.nom_complet) like '%mickael brahimi%'
   and p.organisation_id = m.organisation_id
   and p.id <> m.id;
 
 update public.profiles p
 set manager_id = m.id
 from public.profiles m
-where lower(p.nom_complet) like '%maxime%'
-  and lower(m.nom_complet) like '%melissa%'
+where lower(p.nom_complet) like '%maxime capello%'
+  and lower(m.nom_complet) like '%melissa benhaddouche%'
   and p.organisation_id = m.organisation_id
   and p.id <> m.id;
 
