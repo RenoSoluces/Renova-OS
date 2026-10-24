@@ -65,11 +65,11 @@ export function ParametresPage() {
   const [ancienCommercialForm, setAncienCommercialForm] = useState({ nom_complet: '', email: '', telephone: '', notes: '' })
   const [savingAncienCommercial, setSavingAncienCommercial] = useState(false)
 
-  function decodeVapidKey(value: string): Uint8Array {
+  function decodeVapidKey(value: string): ArrayBuffer {
     const padding = '='.repeat((4 - value.length % 4) % 4)
     const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/')
     const raw = window.atob(base64)
-    return Uint8Array.from([...raw].map(char => char.charCodeAt(0)))
+    return Uint8Array.from([...raw].map(char => char.charCodeAt(0))).buffer as ArrayBuffer
   }
 
   async function actualiserEtatPush() {
