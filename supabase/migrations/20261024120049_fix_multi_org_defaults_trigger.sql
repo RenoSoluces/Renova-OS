@@ -72,9 +72,17 @@ BEGIN
       ) THEN
         RAISE EXCEPTION 'La facture doit suivre l’entreprise de facturation du dossier.';
       END IF;
-      IF NEW.destinataire_organisation_id IS NOT NULL
-        AND NEW.destinataire_organisation_id <> actor_org THEN
-        RAISE EXCEPTION 'Vous ne pouvez sélectionner que votre entreprise comme destinataire.';
+      IF TG_OP = 'INSERT' THEN
+        IF NEW.destinataire_organisation_id IS NOT NULL
+          AND NEW.destinataire_organisation_id <> actor_org THEN
+          RAISE EXCEPTION 'Vous ne pouvez sélectionner que votre entreprise comme destinataire.';
+        END IF;
+      ELSIF TG_OP = 'UPDATE' THEN
+        IF NEW.destinataire_organisation_id IS DISTINCT FROM OLD.destinataire_organisation_id
+          AND NEW.destinataire_organisation_id IS NOT NULL
+          AND NEW.destinataire_organisation_id <> actor_org THEN
+          RAISE EXCEPTION 'Vous ne pouvez sélectionner que votre entreprise comme destinataire.';
+        END IF;
       END IF;
 
     ELSIF TG_TABLE_NAME = 'factures_clients' THEN
