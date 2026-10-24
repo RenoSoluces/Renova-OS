@@ -208,20 +208,30 @@ export function CataloguePage() {
   const [ficheDetail, setFicheDetail] = useState<Produit | null>(null)
   const [filtreAudit, setFiltreAudit] = useState<'aucun' | 'conformite' | 'commercial'>('aucun')
 
-  function fetchProduits() {
+  async function fetchProduits() {
     setLoading(true)
-    supabase
-      .from('catalogue_produits')
-      .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
-      // Le produit générique « Isolation » est remplacé par les produits détaillés.
-      .neq('nom', 'Isolation')
-      .order('categorie', { ascending: true })
-      .order('nom', { ascending: true })
-      .then(({ data, error }) => {
-        if (error) { setRows([]); setLoading(false); return }
-        setRows((data || []) as Produit[])
+    const pageSize = 1000
+    const all: Produit[] = []
+    for (let from = 0; ; from += pageSize) {
+      const { data, error } = await supabase
+        .from('catalogue_produits')
+        .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
+        // Le produit générique « Isolation » est remplacé par les produits détaillés.
+        .neq('nom', 'Isolation')
+        .order('categorie', { ascending: true })
+        .order('nom', { ascending: true })
+        .range(from, from + pageSize - 1)
+      if (error) {
+        setRows([])
         setLoading(false)
-      })
+        return
+      }
+      const batch = (data || []) as Produit[]
+      all.push(...batch)
+      if (batch.length < pageSize) break
+    }
+    setRows(all)
+    setLoading(false)
   }
 
   useEffect(() => { fetchProduits(); void chargerCategories() }, [])
