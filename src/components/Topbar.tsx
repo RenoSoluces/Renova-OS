@@ -1,4 +1,4 @@
-import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download, Users, FolderOpen } from 'lucide-react'
+import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download, Users, FolderOpen, MessageCircle } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -20,6 +20,7 @@ const ICONS: Record<string, any> = {
   nouveau_prospect: Users,
   evolution_dossier: FolderOpen,
   info: Info,
+  message_prospect: MessageCircle,
 }
 
 function tempsEcoule(iso: string): string {
@@ -38,6 +39,7 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
   const [notifOpen, setNotifOpen] = useState(false)
   const [notifs, setNotifs] = useState<Notification[]>([])
   const [installPrompt, setInstallPrompt] = useState<any>(null)
+  const [installHelpOpen, setInstallHelpOpen] = useState(false)
   const [search, setSearch] = useState('')
   const [searchOpen, setSearchOpen] = useState(false)
   const [searchResults, setSearchResults] = useState<{type:'prospect'|'devis'|'dossier';id:string;label:string;sub:string}[]>([])
@@ -82,10 +84,11 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
   }, [])
 
   async function installerApplication() {
-    if (!installPrompt) return
+    if (!installPrompt) { setInstallHelpOpen(v => !v); return }
     installPrompt.prompt()
     await installPrompt.userChoice
     setInstallPrompt(null)
+    setInstallHelpOpen(false)
   }
 
   const nonLues = notifs.filter(n => !n.lue).length
@@ -126,11 +129,23 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
       </div>
       <div className="topbar-spacer" />
       {actions}
-      {installPrompt && (
+      <div style={{ position: 'relative' }}>
         <button className="btn btn-sm btn-secondary" onClick={installerApplication} title="Installer Renova OS comme application">
           <Download size={15} /> Installer l'application
         </button>
-      )}
+        {installHelpOpen && (
+          <>
+            <button aria-label="Fermer les instructions d’installation" onClick={() => setInstallHelpOpen(false)} style={{ position: 'fixed', inset: 0, background: 'transparent', border: 0, zIndex: 40 }} />
+            <div className="card card-pad" style={{ position: 'absolute', right: 0, top: 'calc(100% + 8px)', width: 300, zIndex: 41, boxShadow: '0 8px 28px rgba(0,0,0,.15)' }}>
+              <strong>Installer Renova OS</strong>
+              <p className="text-sm text-muted" style={{ margin: '8px 0' }}>Sur ordinateur (Chrome ou Edge) : ouvrez le menu du navigateur et choisissez « Installer Renova OS » ou « Installer cette application ».</p>
+              <p className="text-sm text-muted" style={{ margin: '8px 0' }}>Sur iPhone/iPad : dans Safari, touchez Partager puis « Sur l’écran d’accueil ».</p>
+              <p className="text-sm text-muted" style={{ margin: '8px 0' }}>Sur Android : dans Chrome, ouvrez le menu ⋮ puis « Installer l’application » ou « Ajouter à l’écran d’accueil ».</p>
+              <button className="btn btn-sm btn-secondary" onClick={() => setInstallHelpOpen(false)}>Fermer</button>
+            </div>
+          </>
+        )}
+      </div>
       <div className="topbar-search">
         <Search />
         <input placeholder="Rechercher un prospect, dossier..." value={search} onChange={e => setSearch(e.target.value)} onFocus={() => search.trim().length >= 2 && setSearchOpen(true)} />
