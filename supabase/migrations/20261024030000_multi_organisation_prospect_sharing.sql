@@ -142,7 +142,7 @@ as $function$
         and me.id <> target.id
         and (
           (me.role in ('partner_admin', 'company_admin') and target.organisation_id = me.organisation_id)
-          or (me.role in ('manager', 'commercial_manager') and target.manager_id = me.id)
+          or target.manager_id = me.id
         )
     );
 $function$;
