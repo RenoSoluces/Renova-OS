@@ -1,5 +1,5 @@
 import {
-  LayoutDashboard, Users, ClipboardCheck, Calculator,
+  LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network,
 } from 'lucide-react'
@@ -39,7 +39,9 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
   ] },
   { label: 'Suivi', items: [
     { key: 'commissions', label: 'Commissions', icon: Wallet },
-    { key: 'partenaires', label: 'Mon réseau', icon: Building2 },
+    { key: 'partenaires', label: 'Mon réseau — apporteurs', icon: Users },
+    { key: 'challenges', label: 'Challenges & classements', icon: Trophy },
+    { key: 'installateurs', label: 'Installateurs', icon: Building2 },
     { key: 'performance', label: 'Performances & CA', icon: BarChart3 },
     { key: 'activite', label: 'Historique & activités', icon: History },
     { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
