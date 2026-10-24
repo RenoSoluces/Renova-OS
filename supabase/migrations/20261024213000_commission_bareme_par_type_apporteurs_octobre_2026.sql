@@ -35,7 +35,7 @@ AS $function$
   END
   FROM public.catalogue_produits cp
   WHERE cp.id = p_produit;
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.fn_commission_rule(p_type text, p_commercial uuid, p_produit uuid, p_date date)
@@ -68,7 +68,7 @@ AS $function$
     cb.priorite DESC NULLS LAST,
     cb.created_at DESC
   LIMIT 1
-$function$
+$function$;
 
 
 CREATE OR REPLACE FUNCTION public.fn_sync_commission_devis_signe()
@@ -191,7 +191,7 @@ BEGIN
 
   RETURN NEW;
 END;
-$function$
+$function$;
 
 
 
