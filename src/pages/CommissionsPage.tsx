@@ -1055,7 +1055,8 @@ export function CommissionsPage() {
                         <span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'refusee' ? 'badge-danger' : 'badge-warning'}`}>
                           {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
                         </span>
-                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && <Button size="sm" variant="primary" onClick={async () => {
+                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && (!f.numero_facture_emise || !f.date_emission || !f.pdf_storage_path) && <span className="text-sm text-muted">Numéro, date et PDF requis avant soumission</span>}
+                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && f.numero_facture_emise && f.date_emission && f.pdf_storage_path && <Button size="sm" variant="primary" onClick={async () => {
                           const { error } = await supabase.rpc('soumettre_facture_commission', { p_facture_id: f.id })
                           if (error) { alert(`Soumission impossible : ${error.message}`); return }
                           await chargerFacturesCommission()
