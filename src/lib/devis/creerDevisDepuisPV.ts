@@ -1,6 +1,8 @@
 import { supabase } from '../supabase'
 import { numeroDevis } from './numeroDevis'
 import { prixProduitPourZone } from '../catalogue/prixParZone'
+import { COLONNES_CATALOGUE } from '../catalogue/chargerCatalogue'
+import type { Produit } from '../../types'
 import type { ResultatSimulationPV } from '../photovoltaique/calculProduction'
 
 export interface CreerDevisDepuisPVParams {
@@ -31,12 +33,12 @@ export async function creerDevisDepuisPV(params: CreerDevisDepuisPVParams): Prom
 
   const { data: produitsCatalogue } = await supabase
     .from('catalogue_produits')
-    .select('*')
+    .select(COLONNES_CATALOGUE)
     .eq('actif', true)
     .eq('categorie', 'photovoltaique')
     .order('prix_unitaire_ht')
 
-  const produit = (produitsCatalogue || [])[0] || null
+  const produit = ((produitsCatalogue as unknown as Produit[] | null) || [])[0] || null
 
   const dureeValidite = entreprise?.devis_duree_validite_jours ?? 30
   const dateValidite = new Date(Date.now() + dureeValidite * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
