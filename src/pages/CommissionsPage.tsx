@@ -131,6 +131,8 @@ export function CommissionsPage() {
   const [editAmounts, setEditAmounts] = useState({ montant_commercial: '', montant_societe: '' })
   const [editReason, setEditReason] = useState('')
   const [editSaving, setEditSaving] = useState(false)
+  const [commissionFactures, setCommissionFactures] = useState<any[]>([])
+  const [facturesLoading, setFacturesLoading] = useState(false)
 
   const [search, setSearch] = useState('')
   const [commercialFilter, setCommercialFilter] =
@@ -344,6 +346,29 @@ export function CommissionsPage() {
     [filteredRows],
   )
 
+  const chargerFacturesCommission = useCallback(async () => {
+    if (!profile?.id || admin) {
+      setCommissionFactures([])
+      return
+    }
+    setFacturesLoading(true)
+    const { data, error } = await supabase
+      .from('commission_factures')
+      .select('id,commission_id,montant_ht,taux_tva,numero_facture_emise,date_emission,pdf_storage_path,statut,email_envoye_at,email_erreur,created_at')
+      .eq('commercial_id', profile.id)
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error('[RENOVA OS] Chargement factures de commissions:', error)
+    } else {
+      setCommissionFactures(data || [])
+    }
+    setFacturesLoading(false)
+  }, [profile?.id, admin])
+
+  useEffect(() => {
+    void chargerFacturesCommission()
+  }, [chargerFacturesCommission])
+
   async function preparerFactureCommission(c: CommissionWithCommercial) {
     if (!profile?.id || !profile.organisation_id) {
       alert("Impossible de préparer cette facture : organisation ou profil manquant.");
@@ -366,6 +391,7 @@ export function CommissionsPage() {
         : `Préparation impossible : ${error.message}`);
       return;
     }
+    await chargerFacturesCommission()
     alert("La préparation de facture est créée. Le numéro, le PDF et l'envoi restent à compléter.");
   }
 
@@ -888,6 +914,42 @@ export function CommissionsPage() {
 
       {(tab === 'suivi' || !canViewBareme) && (
         <>
+          {!admin && (
+            <section className="card card-pad" style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <div>
+                  <h2 style={{ margin: 0 }}>Mes factures de commissions</h2>
+                  <p className="text-sm text-muted" style={{ margin: '5px 0 0' }}>Préparations enregistrées pour vos commissions.</p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => void chargerFacturesCommission()} disabled={facturesLoading}>
+                  <RotateCcw size={14} /> Actualiser
+                </Button>
+              </div>
+              {facturesLoading ? (
+                <p className="text-sm text-muted">Chargement des factures…</p>
+              ) : commissionFactures.length === 0 ? (
+                <p className="text-sm text-muted">Aucune facture préparée pour le moment. Utilisez « Préparer ma facture » sur une commission éligible.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 10 }}>
+                  {commissionFactures.map((f) => (
+                    <div key={f.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) auto auto', gap: 12, alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--c-border)' }}>
+                      <div>
+                        <strong>{rows.find((c) => c.id === f.commission_id)?.libelle || 'Commission'}</strong>
+                        <div className="text-sm text-muted">
+                          {f.numero_facture_emise || 'Numéro à renseigner'} · Créée le {formatDate(f.created_at)}
+                        </div>
+                        {f.email_erreur && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>E-mail : {f.email_erreur}</div>}
+                      </div>
+                      <strong>{euro(amount(f.montant_ht))} HT</strong>
+                      <span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'refusee' ? 'badge-danger' : 'badge-warning'}`}>
+                        {({ a_preparer: 'À préparer', deposee: 'Déposée', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
           <div
             className="kpi-grid page-kpi-strip"
             style={{
