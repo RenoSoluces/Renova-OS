@@ -441,6 +441,7 @@ export function CommissionsPage() {
   }
 
   async function preparerFactureCommission(c: CommissionWithCommercial) {
+    if (profile?.role !== 'apporteur') { alert('Seuls les apporteurs d’affaires peuvent préparer une facture de commission.'); return; }
     if (!profile?.id || !profile.organisation_id) {
       alert("Impossible de préparer cette facture : organisation ou profil manquant.");
       return;
