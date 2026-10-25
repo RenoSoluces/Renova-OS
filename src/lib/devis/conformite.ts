@@ -144,6 +144,15 @@ export const CHAMPS_FICHE: Record<string, ChampFiche[]> = {
     { k: 'regulateur', l: 'Classe du régulateur', type: 'choix', options: ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'] },
     { k: 'note', l: 'Note de dimensionnement jointe', type: 'case' },
   ],
+  'BAR-TH-172': [
+    { k: 'usage', l: 'Usage de la PAC', type: 'choix', options: ['Chauffage seul', 'Chauffage + eau chaude sanitaire'] },
+    { k: 'temp', l: 'Type d’application', type: 'choix', options: ['Basse température', 'Moyenne ou haute température'] },
+    { k: 'captage', l: 'Type d’eau du captage', type: 'choix', options: ['Eau de nappe (eau/eau)', 'Eau glycolée (eau glycolée/eau)'] },
+    { k: 'etas', l: 'Efficacité énergétique saisonnière ηs', u: '%', type: 'nombre' },
+    { k: 'regulateur', l: 'Classe du régulateur', type: 'choix', options: ['IV', 'V', 'VI', 'VII', 'VIII'] },
+    { k: 'note', l: 'Note de dimensionnement conforme à l’installation', type: 'case' },
+    { k: 'systeme_ecs_marque_identique', l: 'Système ECS déporté de même marque que la PAC (si présent)', type: 'choix', options: ['Oui', 'Non', 'Sans objet'] },
+  ],
   'BAR-TH-129': [
     { k: 'puissance', l: 'Puissance calorifique', u: 'kW', type: 'nombre' },
     { k: 'scop', l: 'SCOP', type: 'nombre' },
@@ -197,8 +206,12 @@ export const CHAMPS_FICHE: Record<string, ChampFiche[]> = {
   ],
   'BAR-TH-143': [
     { k: 'type_ssc', l: 'Configuration du système solaire combiné', type: 'choix', options: ['Chauffage + eau chaude sanitaire'] },
-    { k: 'surface_capteurs', l: 'Surface de capteurs solaires', u: 'm²', type: 'nombre', alias: ['surface_capteurs_m2'] },
-    { k: 'volume_balloon', l: 'Volume du ballon de stockage', u: 'L', type: 'nombre', alias: ['volume_balloon_l', 'volume_balllon_l'] },
+    { k: 'surface_capteurs', l: 'Surface hors-tout des capteurs solaires', u: 'm²', type: 'nombre', alias: ['surface_capteurs_m2'] },
+    { k: 'volume_balloon', l: 'Capacité totale de stockage solaire', u: 'L', type: 'nombre', alias: ['volume_balloon_l', 'volume_balllon_l', 'volume_l', 'volume_total_l'] },
+    { k: 'productivite', l: 'Productivité des capteurs solaires', u: 'W/m²', type: 'nombre', alias: ['productivite_capteurs_w_m2', 'productivite_w_m2'] },
+    { k: 'certification', l: 'Certification des capteurs solaires', type: 'texte', alias: ['certification_capteurs', 'certif'] },
+    { k: 'emetteurs', l: 'Émetteurs de chauffage central basse température', type: 'choix', options: ['Oui', 'Non'] },
+    { k: 'capteurs_hybrides', l: 'Capteurs hybrides photovoltaïques-thermiques', type: 'choix', options: ['Oui', 'Non'] },
   ],
 }
 
@@ -428,6 +441,26 @@ export function verifierFiche(fiche: string | null, v: Record<string, string>, s
       if (surLigne && !/oui|true/i.test(v.note || '')) bloc('Note de dimensionnement à joindre', 'note')
       break
     }
+    case 'BAR-TH-172': {
+      besoin('usage')
+      if (besoin('temp')) {
+        const t = norm(v.temp)
+        min('etas', t.includes('basse') && !t.includes('moy') ? 126 : 111, '%')
+      }
+      if (besoin('captage')) {
+        const captage = norm(v.captage)
+        if (!captage.includes('nappe') && !captage.includes('glycole')) bloc('Type de captage eau de nappe ou eau glycolée à préciser', 'captage')
+      }
+      if (besoin('regulateur')) {
+        const m = v.regulateur.toUpperCase().match(/\\b(VIII|VII|VI|IV|V|III|II|I)\\b/)
+        if (!m || !['IV', 'V', 'VI', 'VII', 'VIII'].includes(m[1])) bloc('Régulateur de classe IV à VIII exigé', 'regulateur')
+      }
+      if (surLigne && !/oui|true/i.test(v.note || '')) bloc('Note de dimensionnement à joindre et respecter', 'note')
+      if (norm(v.usage).includes('eau chaude') && rempli(v.systeme_ecs_marque_identique) && /non/i.test(norm(v.systeme_ecs_marque_identique))) {
+        bloc('Le système ECS déporté doit être de la même marque que la PAC', 'systeme_ecs_marque_identique')
+      }
+      break
+    }
     case 'BAR-TH-129':
       max('puissance', 12, 'kW')
       min('scop', 3.9)
@@ -487,6 +520,18 @@ export function verifierFiche(fiche: string | null, v: Record<string, string>, s
         if (!ok) bloc(`Uw ${v.uw} / Sw ${v.sw} hors critères de la fiche pour ce type`, 'uw')
       } else { besoin('uw'); besoin('sw') }
       if (surLigne) besoin('surface')
+      break
+    }
+    case 'BAR-TH-143': {
+      besoin('type_ssc')
+      min('surface_capteurs', 8, 'm²')
+      if (besoin('volume_balloon') && (nombre(v.volume_balloon) ?? 0) <= 400) bloc('Capacité totale de stockage strictement supérieure à 400 L exigée', 'volume_balloon')
+      min('productivite', 600, 'W/m²')
+      if (besoin('certification') && !/cstbat|solar.?keymark|equivalent|équivalent/i.test(norm(v.certification))) {
+        bloc('Certification CSTBat, Solar Keymark ou équivalente à justifier', 'certification')
+      }
+      if (besoin('emetteurs') && !/oui/i.test(norm(v.emetteurs))) bloc('Émetteurs de chauffage central basse température exigés', 'emetteurs')
+      if (besoin('capteurs_hybrides') && /oui/i.test(norm(v.capteurs_hybrides))) bloc('Les capteurs hybrides photovoltaïques-thermiques sont exclus de BAR-TH-143', 'capteurs_hybrides')
       break
     }
     case 'BAR-TH-127':
