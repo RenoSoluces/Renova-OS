@@ -133,6 +133,8 @@ export function CommissionsPage() {
   const [editSaving, setEditSaving] = useState(false)
   const [commissionFactures, setCommissionFactures] = useState<any[]>([])
   const [facturesLoading, setFacturesLoading] = useState(false)
+  const [facturesAdmin, setFacturesAdmin] = useState<any[]>([])
+  const [facturesAdminLoading, setFacturesAdminLoading] = useState(false)
 
   const [search, setSearch] = useState('')
   const [commercialFilter, setCommercialFilter] =
@@ -354,7 +356,7 @@ export function CommissionsPage() {
     setFacturesLoading(true)
     const { data, error } = await supabase
       .from('commission_factures')
-      .select('id,commission_id,montant_ht,taux_tva,numero_facture_emise,date_emission,pdf_storage_path,statut,email_envoye_at,email_erreur,created_at')
+      .select('id,commission_id,montant_ht,taux_tva,numero_facture_emise,date_emission,pdf_storage_path,statut,email_envoye_at,email_erreur,created_at,date_validation,date_paiement,motif_refus')
       .eq('commercial_id', profile.id)
       .order('created_at', { ascending: false })
     if (error) {
@@ -368,6 +370,75 @@ export function CommissionsPage() {
   useEffect(() => {
     void chargerFacturesCommission()
   }, [chargerFacturesCommission])
+
+  const chargerFacturesAdmin = useCallback(async () => {
+    if (!admin) {
+      setFacturesAdmin([])
+      return
+    }
+    setFacturesAdminLoading(true)
+    const { data, error } = await supabase
+      .from('commission_factures')
+      .select('id,commission_id,commercial_id,organisation_id,numero_facture_emise,montant_ht,taux_tva,date_emission,pdf_storage_path,statut,email_envoye_at,email_erreur,created_at,date_validation,validee_par,date_paiement,motif_refus')
+      .order('created_at', { ascending: false })
+    if (error) {
+      console.error('[RENOVA OS] Chargement factures de commissions à traiter:', error)
+      alert(`Impossible de charger les factures de commissions : ${error.message}`)
+      setFacturesAdmin([])
+    } else {
+      const list = data || []
+      const ids = [...new Set(list.map((f: any) => f.commercial_id).filter(Boolean))]
+      let names: Record<string, string> = {}
+      if (ids.length) {
+        const { data: profilesData, error: profilesError } = await supabase
+          .from('profiles')
+          .select('id,nom_complet')
+          .in('id', ids)
+        if (profilesError) console.error('[RENOVA OS] Chargement noms des émetteurs:', profilesError)
+        for (const p of profilesData || []) names[p.id] = p.nom_complet || p.id
+      }
+      setFacturesAdmin(list.map((f: any) => ({ ...f, commercial_nom: names[f.commercial_id] || f.commercial_id })))
+    }
+    setFacturesAdminLoading(false)
+  }, [admin])
+
+  useEffect(() => {
+    void chargerFacturesAdmin()
+  }, [chargerFacturesAdmin])
+
+  async function traiterFactureCommission(f: any, nextStatus: 'validee' | 'refusee' | 'payee') {
+    if (!admin || !profile?.id) return
+    if (nextStatus === 'payee' && f.statut !== 'validee') {
+      alert('Une facture doit être validée avant de pouvoir être marquée payée.')
+      return
+    }
+    let motifRefus: string | null = null
+    if (nextStatus === 'refusee') {
+      motifRefus = prompt('Motif du refus (obligatoire) :')?.trim() || null
+      if (!motifRefus) return
+    } else if (!confirm(nextStatus === 'validee' ? 'Valider cette facture de commission ?' : 'Confirmer le paiement effectif de cette facture ?')) {
+      return
+    }
+    const now = new Date().toISOString()
+    const patch: Record<string, any> = {
+      statut: nextStatus,
+      updated_at: now,
+      ...(nextStatus === 'validee' || nextStatus === 'refusee'
+        ? { date_validation: now, validee_par: profile.id }
+        : {}),
+      ...(nextStatus === 'payee' ? { date_paiement: now } : {}),
+      ...(nextStatus === 'refusee' ? { motif_refus: motifRefus } : { motif_refus: null }),
+    }
+    const { error } = await supabase
+      .from('commission_factures')
+      .update(patch)
+      .eq('id', f.id)
+    if (error) {
+      alert(`Traitement impossible : ${error.message}`)
+      return
+    }
+    await chargerFacturesAdmin()
+  }
 
   async function preparerFactureCommission(c: CommissionWithCommercial) {
     if (!profile?.id || !profile.organisation_id) {
@@ -914,6 +985,45 @@ export function CommissionsPage() {
 
       {(tab === 'suivi' || !canViewBareme) && (
         <>
+          {admin && (
+            <section className="card card-pad" style={{ marginBottom: 20 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
+                <div>
+                  <h2 style={{ margin: 0 }}>Factures de commissions à traiter</h2>
+                  <p className="text-sm text-muted" style={{ margin: '5px 0 0' }}>Validation, refus motivé et suivi des paiements. La génération PDF et l’envoi restent séparés.</p>
+                </div>
+                <Button variant="secondary" size="sm" onClick={() => void chargerFacturesAdmin()} disabled={facturesAdminLoading}>
+                  <RotateCcw size={14} /> Actualiser
+                </Button>
+              </div>
+              {facturesAdminLoading ? <p className="text-sm text-muted">Chargement des factures…</p> : facturesAdmin.length === 0 ? (
+                <p className="text-sm text-muted">Aucune facture de commission enregistrée dans votre organisation.</p>
+              ) : (
+                <div style={{ display: 'grid', gap: 12 }}>
+                  {facturesAdmin.map((f: any) => (
+                    <div key={f.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--c-border)' }}>
+                      <div>
+                        <strong>{f.commercial_nom}</strong>
+                        <div className="text-sm text-muted">{rows.find(c => c.id === f.commission_id)?.libelle || 'Commission'} · {euro(amount(f.montant_ht))} HT · Créée le {formatDate(f.created_at)}</div>
+                        <div className="text-sm text-muted">Statut : {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string,string>)[f.statut] || f.statut}</div>
+                        {f.motif_refus && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>Motif du refus : {f.motif_refus}</div>}
+                        {f.email_erreur && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>Erreur e-mail : {f.email_erreur}</div>}
+                      </div>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {f.statut === 'deposee' && <>
+                          <Button size="sm" variant="primary" onClick={() => void traiterFactureCommission(f, 'validee')}>Valider</Button>
+                          <Button size="sm" variant="secondary" onClick={() => void traiterFactureCommission(f, 'refusee')}>Refuser</Button>
+                        </>}
+                        {f.statut === 'validee' && <Button size="sm" variant="primary" onClick={() => void traiterFactureCommission(f, 'payee')}>Marquer payée</Button>}
+                        {f.statut === 'payee' && <span className="text-sm text-muted">Payée le {formatDate(f.date_paiement)}</span>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
+
           {!admin && (
             <section className="card card-pad" style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
@@ -940,10 +1050,18 @@ export function CommissionsPage() {
                         </div>
                         {f.email_erreur && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>E-mail : {f.email_erreur}</div>}
                       </div>
-                      <strong>{euro(amount(f.montant_ht))} HT</strong>
-                      <span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'refusee' ? 'badge-danger' : 'badge-warning'}`}>
-                        {({ a_preparer: 'À préparer', deposee: 'Déposée', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                        <strong>{euro(amount(f.montant_ht))} HT</strong>
+                        <span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'refusee' ? 'badge-danger' : 'badge-warning'}`}>
+                          {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
+                        </span>
+                        {f.statut === 'a_preparer' && <Button size="sm" variant="primary" onClick={async () => {
+                          const { error } = await supabase.rpc('soumettre_facture_commission', { p_facture_id: f.id })
+                          if (error) { alert(`Soumission impossible : ${error.message}`); return }
+                          await chargerFacturesCommission()
+                          alert('Facture soumise à validation administrative. Le PDF et l’envoi restent à réaliser.')
+                        }}>Soumettre</Button>}
+                      </div>
                     </div>
                   ))}
                 </div>
