@@ -492,6 +492,18 @@ export function CommissionsPage() {
     void chargerFacturesAdmin()
   }, [chargerFacturesAdmin])
 
+  async function ouvrirPdfFactureCommission(f: any) {
+    if (!f.pdf_storage_path) return
+    const { data, error } = await supabase.storage
+      .from('commission-factures')
+      .createSignedUrl(f.pdf_storage_path, 60)
+    if (error || !data?.signedUrl) {
+      alert(`Ouverture du PDF impossible : ${error?.message || 'lien indisponible'}`)
+      return
+    }
+    window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  }
+
   async function traiterFactureCommission(f: any, nextStatus: 'validee' | 'refusee' | 'payee') {
     if (!admin || !profile?.id) return
     if (nextStatus === 'payee' && f.statut !== 'validee') {
@@ -1231,6 +1243,7 @@ export function CommissionsPage() {
                         {f.email_erreur && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>Erreur e-mail : {f.email_erreur}</div>}
                       </div>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                        {f.pdf_storage_path && <Button size="sm" variant="secondary" onClick={() => void ouvrirPdfFactureCommission(f)}>Voir PDF</Button>}
                         {f.statut === 'deposee' && <>
                           <Button size="sm" variant="primary" onClick={() => void traiterFactureCommission(f, 'validee')}>Valider</Button>
                           <Button size="sm" variant="secondary" onClick={() => void traiterFactureCommission(f, 'refusee')}>Refuser</Button>
