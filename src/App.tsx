@@ -12,7 +12,7 @@ import { DocumentsPage } from './pages/DocumentsPage'
 import { FacturationPage } from './pages/FacturationPage'
 import { CourrierPage } from './pages/CourrierPage'
 import { TasksPage } from './pages/TasksPage'
-import { ProspectionPage } from './pages/ProspectionPage'
+import { ProspectionTelephonePage } from './pages/ProspectionTelephonePage'
 import { FichesTechniquesPage } from './pages/FichesTechniquesPage'
 import { CataloguePage } from './pages/CataloguePage'
 import { DevisPage } from './pages/DevisPage'
@@ -48,7 +48,7 @@ class AppErrorBoundary extends React.Component<React.PropsWithChildren, { hasErr
 const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: 'Tableau de bord', subtitle: 'Vue d\'ensemble de votre activité' },
   prospects: { title: 'Prospects', subtitle: 'Gérez vos contacts et prospects' },
-  prospection: { title: 'Prospection', subtitle: 'Import et suivi des contacts à prospecter' },
+  prospection: { title: 'Prospection Téléphone', subtitle: 'Import des leads, appels et suivi des résultats' },
   pipeline: { title: 'Pipeline commercial', subtitle: 'Visualisez les étapes de votre portefeuille de prospects' },
   a_traiter: { title: 'À traiter', subtitle: 'Appels, relances, rendez-vous et actions commerciales' },
   courrier: { title: 'Mon courrier', subtitle: 'Connexion Gmail professionnelle à configurer' },
@@ -193,7 +193,7 @@ function AppContent() {
         <div className="page-scroll">
           {page === 'dashboard' && <DashboardPage onNavigate={navigate} />}
           {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} />}
-          {page === 'prospection' && <ProspectionPage />}
+          {page === 'prospection' && <ProspectionTelephonePage />}
           {page === 'simulations' && <AidesSimulationPage initialProspectId={pendingSimulationProspectId} onInitialProspectHandled={() => setPendingSimulationProspectId(null)} />}
           {page === 'resultats_3cl' && <SimulationsPage onNavigateToDevis={goToDevis} />}
           {page === 'dossiers' && (
