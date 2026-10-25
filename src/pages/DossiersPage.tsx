@@ -71,6 +71,7 @@ export function DossiersPage({
   const { profile } = useAuth()
   const isAdmin =
     profile?.role === 'admin' || profile?.role === 'manager'
+  const canViewCompanyCommission = isAdmin || ['super_admin', 'partner_admin', 'company_admin'].includes(profile?.role || '')
 
   const [rows, setRows] = useState<DossierAvecRelations[]>([])
   const [prospects, setProspects] = useState<Prospect[]>([])
@@ -958,7 +959,7 @@ export function DossiersPage({
                   <th>Prospect</th>
                   <th>Statut</th>
                   <th>CA (devis TTC)</th>
-                  {isAdmin && <th>Commission société</th>}
+                  {canViewCompanyCommission && <th>Commission société</th>}
                   <th>Commission commerciale</th>
                 </tr>
               </thead>
