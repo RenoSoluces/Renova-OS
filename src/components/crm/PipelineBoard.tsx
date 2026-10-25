@@ -335,7 +335,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
                           className={`pl-btn ${hot ? 'is-hot' : ''}`}
                           onClick={e => { e.stopPropagation(); onOpen(p) }}
                         >
-                          Relancer
+                          Ouvrir le dossier
                         </button>
                       </footer>
                     </article>
