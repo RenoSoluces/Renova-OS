@@ -98,7 +98,7 @@ export function CommissionsPage() {
   const { profile } = useAuth()
   const admin =
     profile?.role === 'admin' || profile?.role === 'manager'
-  const canReviewFactures = ['admin', 'manager', 'super_admin', 'partner_admin', 'company_admin'].includes(profile?.role || '')
+  const canReviewFactures = ['admin', 'manager', 'super_admin', 'partner', 'partner_admin', 'company_admin'].includes(profile?.role || '')
   const canViewBareme = admin || profile?.role === 'apporteur' || profile?.role === 'partner'
 
   const [tab, setTab] = useState<'suivi' | 'bareme'>('suivi')
