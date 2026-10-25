@@ -1678,9 +1678,9 @@ export function CommissionsPage() {
                   </h3>
 
                   <p>
-                    Créez votre
-                    première règle
-                    de rémunération.
+                    {admin
+                      ? 'Créez votre première règle de rémunération.'
+                      : 'Aucune règle de rémunération ne correspond à cette catégorie pour votre compte.'}
                   </p>
                 </div>
               ) : (
