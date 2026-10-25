@@ -137,6 +137,7 @@ const EMPTY_FORM = {
   adresse_rue: '', adresse_complement: '', code_postal: '', ville: '',
   statut_occupation: 'propriétaire_occupant', nombre_personnes_foyer: 1,
   rfr: '', prenom_conjoint: '', nom_conjoint: '',
+  zone_climatique: '', regime_aide_commission: '',
   source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
 
@@ -408,6 +409,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       nombre_personnes_foyer: form.nombre_personnes_foyer,
       rfr: rfrNum || null,
       categorie_mpr: categorie?.categorie || null,
+      zone_climatique: form.zone_climatique || null,
+      regime_aide_commission: form.regime_aide_commission || null,
       zone_ile_de_france: ileDeFrance,
       prenom_conjoint: form.civilite === 'M. et Mme' ? form.prenom_conjoint || null : null,
       nom_conjoint: form.civilite === 'M. et Mme' ? form.nom_conjoint || null : null,
@@ -441,6 +444,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       statut_occupation: e.statut_occupation || 'propriétaire_occupant',
       nombre_personnes_foyer: e.nombre_personnes_foyer || 1,
       rfr: e.rfr ? String(e.rfr) : '',
+      zone_climatique: e.zone_climatique || '',
+      regime_aide_commission: e.regime_aide_commission || '',
       prenom_conjoint: e.prenom_conjoint || '',
       nom_conjoint: e.nom_conjoint || '',
       source: p.source || 'Site web',
@@ -473,6 +478,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       nombre_personnes_foyer: editForm.nombre_personnes_foyer,
       rfr: rfrEditNum || null,
       categorie_mpr: cat?.categorie || null,
+      zone_climatique: editForm.zone_climatique || null,
+      regime_aide_commission: editForm.regime_aide_commission || null,
       zone_ile_de_france: ileDeFranceEdit,
       prenom_conjoint: editForm.civilite === 'M. et Mme' ? editForm.prenom_conjoint || null : null,
       nom_conjoint: editForm.civilite === 'M. et Mme' ? editForm.nom_conjoint || null : null,
@@ -1518,6 +1525,11 @@ function EditFormBody({
         <FloatInput label="RFR (€)" type="number" value={form.rfr} onChange={v => set('rfr', v)} />
         <FloatSelect label="Personnes au foyer" value={String(form.nombre_personnes_foyer)} onChange={v => set('nombre_personnes_foyer', parseInt(v))} options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: String(n), label: String(n) }))} />
       </div>
+      <div className="grid grid-2 gap-3 mt-4">
+        <FloatSelect label="Zone climatique (barème commissions)" value={form.zone_climatique} onChange={v => set('zone_climatique', v)} options={[{ value: '', label: 'À renseigner' }, { value: 'H1', label: 'H1' }, { value: 'H2', label: 'H2' }, { value: 'H3', label: 'H3' }]} />
+        <FloatSelect label="Régime d’aide solaire thermique" value={form.regime_aide_commission} onChange={v => set('regime_aide_commission', v)} options={[{ value: '', label: 'Sans objet / à renseigner' }, { value: 'mpr_cee', label: 'MaPrimeRénov’ + CEE' }, { value: 'full_cee', label: 'Full CEE' }]} />
+      </div>
+      <p className="text-sm text-muted" style={{ marginTop: 6 }}>Ces paramètres servent au calcul du barème apporteur pour le solaire thermique et l’isolation des combles. Vérifiez-les avant de signer le devis.</p>
       <FloatSelect label="Source" value={form.source} onChange={v => set('source', v)} options={SOURCES.map(s => ({ value: s, label: s }))} />
       <div style={{ marginTop: 16 }}>
         <FloatTextarea label="Commentaires" value={form.commentaires} onChange={v => set('commentaires', v)} rows={3} />
