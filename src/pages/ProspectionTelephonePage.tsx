@@ -90,7 +90,8 @@ export function ProspectionTelephonePage(): JSX.Element {
     const { data, error } = await lirePages<Prospect>((debut, fin) =>
       supabase.from('prospects').select('*').order('created_at', { ascending: false }).order('id').range(debut, fin) as any)
     if (error) { setError(error.message); setLeads([]); setLoading(false); return }
-    const rows = data.filter(p => SOURCE_PROSPECTION.test(p.source || ''))
+    // Les portes saisies sur le terrain sans numéro de téléphone n'ont pas leur place dans une liste d'appels.
+    const rows = data.filter(p => SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || !/porte/i.test(p.source || '')))
 
     // Historique des appels de prospection, par paquets (une liste d'identifiants trop longue casse l'URL de la requête).
     const parProspect = new Map<string, { resultat: string; date: string; n: number }>()
