@@ -185,6 +185,24 @@ BEGIN
     END IF;
   END LOOP;
 
+  -- Add the explicit multi-split uplift once per outdoor unit, in addition
+  -- to the base Air/Air rate when a matching power bracket exists.
+  SELECT COALESCE(SUM(
+    CASE lower(COALESCE(cp.caracteristiques->>'configuration', ''))
+      WHEN 'bi-split' THEN 12.50 * GREATEST(COALESCE(dl.quantite, 1), 0)
+      WHEN 'tri-split' THEN 20.00 * GREATEST(COALESCE(dl.quantite, 1), 0)
+      ELSE 0
+    END
+  ), 0)
+  INTO v_base
+  FROM public.devis_lignes dl
+  JOIN public.catalogue_produits cp ON cp.id = dl.produit_id
+  WHERE dl.devis_id = NEW.id
+    AND cp.categorie = 'pac_air_air'
+    AND lower(COALESCE(cp.caracteristiques->>'type_element', '')) = 'groupe_exterieur'
+    AND lower(COALESCE(cp.caracteristiques->>'configuration', '')) IN ('bi-split', 'tri-split');
+  v_m_com := v_m_com + v_base;
+
   IF NOT v_has_line THEN
     SELECT * INTO r
     FROM public.fn_commission_rule('devis_signe', v_com, NULL, COALESCE(NEW.date_creation::date, CURRENT_DATE));
