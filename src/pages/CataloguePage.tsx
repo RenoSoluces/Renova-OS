@@ -142,8 +142,13 @@ function auditerProduit(p: Produit): string[] {
   // comme un équipement, ni un forfait de pose additionnel.
   const prestation = groupe === 'visite_technique' || estPrestationSansFiche(p) || /visite|diagnostic|prestation|main.?d.?œuvre/i.test(`${p.nom} ${p.categorie}`)
   if (!description || description.length < 35) issues.push('Description technique absente ou trop courte')
-  // Les portes d'entrée sont hors BAR-EN-104 : contrôle du coefficient Ud dédié.
-  if (p.categorie === 'menuiseries_portes' || /porte d entree|porte entree/i.test(String(car.type_menuiserie || p.nom))) {
+  // Les produits explicitement hors CEE et hors périmètre BAR-EN-104 ne doivent pas
+  // être bloqués par un contrôle réglementaire de fiche. Leurs caractéristiques
+  // techniques peuvent rester à documenter, sans les classer à tort « à auditer conformité ».
+  const horsCEEHorsPerimetre = !p.eligible_cee && estHorsChampBarEn104(p)
+  // Ud reste une information technique utile, mais ne constitue pas ici un blocage
+  // de conformité CEE puisque ces portes/volets ne relèvent pas de BAR-EN-104.
+  if (!horsCEEHorsPerimetre && (p.categorie === 'menuiseries_portes' || /porte d entree|porte entree/i.test(String(car.type_menuiserie || p.nom)))) {
     const ud = car.Ud_W_m2K ?? car.ud_w_m2k ?? car.Ud ?? car.coefficient_Ud_W_m2K
     const nUd = Number(String(ud ?? '').replace(',', '.'))
     if (ud === undefined || ud === null || String(ud).trim() === '' || !Number.isFinite(nUd) || nUd <= 0) {
@@ -165,7 +170,7 @@ function auditerProduit(p: Produit): string[] {
       .filter(x => x.gravite === 'bloc')
     if (manquants.length) issues.push(`Champs réglementaires à compléter (${manquants.length})`)
   }
-  if (!Object.keys(car).some(k => !['source_tarifs','source_date','prix_fourniture_ht','forfait_pose_ht','prix_a_renseigner','forfait_pose_a_renseigner','fiche_cee','aides_estimatives_a_verifier','conditions_cee','tva_indicative'].includes(k))) {
+  if (!horsCEEHorsPerimetre && !Object.keys(car).some(k => !['source_tarifs','source_date','prix_fourniture_ht','forfait_pose_ht','prix_a_renseigner','forfait_pose_a_renseigner','fiche_cee','aides_estimatives_a_verifier','conditions_cee','tva_indicative'].includes(k))) {
     if (!prestation) issues.push('Caractéristiques techniques détaillées absentes')
   }
   // L’audit réglementaire ne doit pas confondre conformité et tarification.
