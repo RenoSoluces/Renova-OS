@@ -782,6 +782,26 @@ export function CataloguePage() {
             </div>
           )}
 
+          {form.categorie === 'menuiseries_portes' && (
+            <label className="field">
+              <span>Coefficient Ud (W/m².K) — porte d’entrée</span>
+              <input
+                type="number"
+                min="0"
+                step="0.01"
+                value={String(carObj(form.caracteristiques).Ud_W_m2K ?? '')}
+                onChange={e => setForm(f => ({
+                  ...f,
+                  caracteristiques: [
+                    ...f.caracteristiques.filter(c => c.cle !== 'Ud_W_m2K'),
+                    { cle: 'Ud_W_m2K', valeur: e.target.value },
+                  ],
+                }))}
+                placeholder="Ex. 1,1"
+              />
+              <span className="text-sm text-muted">Critère technique propre aux portes d’entrée. Il ne rend pas une porte d’entrée éligible à BAR-EN-104, qui concerne les fenêtres et portes-fenêtres.</span>
+            </label>
+          )}
           <div>
             <div className="field-label" style={{ marginBottom: 6 }}>
               Autres caractéristiques techniques
