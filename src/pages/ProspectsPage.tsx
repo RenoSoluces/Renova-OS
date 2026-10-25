@@ -1408,6 +1408,13 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 )}
               </>
             )}
+            <div style={{ marginTop: 20, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
+              Paramètres du barème apporteur
+            </div>
+            <div className="grid grid-2 gap-3">
+              <FloatSelect label="Zone climatique" value={form.zone_climatique} onChange={v => set('zone_climatique', v)} options={[{ value: '', label: 'À renseigner' }, { value: 'H1', label: 'H1' }, { value: 'H2', label: 'H2' }, { value: 'H3', label: 'H3' }]} />
+              <FloatSelect label="Régime solaire thermique" value={form.regime_aide_commission} onChange={v => set('regime_aide_commission', v)} options={[{ value: '', label: 'À renseigner / sans objet' }, { value: 'mpr_cee', label: 'MaPrimeRénov’ + CEE' }, { value: 'full_cee', label: 'Full CEE' }]} />
+            </div>
           </>
         )}
 
