@@ -1,0 +1,196 @@
+/* =============================================================================
+   Simulateur solaire — parcours dédié (préfixe sol-)
+   ============================================================================= */
+.sol { --sol-or: #E8B04A; --sol-auto: #2D6A4F; max-width: 1180px; margin: 0 auto; padding: var(--sp-6) var(--sp-6) var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-5); }
+
+.sol-hero {
+  display: flex; align-items: center; gap: var(--sp-5);
+  padding: var(--sp-6) var(--sp-7); color: #fff; border-radius: var(--r-xl);
+  background:
+    radial-gradient(circle at 92% 20%, rgba(244,182,63,.55), transparent 38%),
+    linear-gradient(120deg, var(--c-primary) 0%, var(--c-primary-400) 100%);
+  box-shadow: var(--sh-lg);
+}
+.sol-hero-icon { flex-shrink: 0; width: 56px; height: 56px; display: grid; place-items: center; border-radius: 16px; background: rgba(255,255,255,.16); color: #FFD97A; }
+.sol-kicker { font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--c-primary-100); }
+.sol-hero h1 { margin: 2px 0 4px; font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -.02em; }
+.sol-hero p { margin: 0; font-size: 14px; color: var(--c-primary-50); max-width: 620px; }
+
+/* ---------- Étapes ---------- */
+.sol-etapes { display: grid; grid-template-columns: repeat(4, 1fr); gap: var(--sp-2); }
+.sol-etape {
+  display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 var(--sp-4);
+  border: 1px solid var(--c-border-light); border-radius: var(--r-md); background: var(--c-bg-alt);
+  color: var(--c-text-muted); font-weight: 600; font-size: 14px; text-align: left;
+  transition: all var(--tr-fast);
+}
+.sol-etape:hover { border-color: var(--c-border-dark); }
+.sol-etape-pastille { width: 30px; height: 30px; display: grid; place-items: center; flex-shrink: 0; border-radius: 50%; background: var(--c-bg-soft); }
+.sol-etape.active { color: var(--c-primary); border-color: var(--c-primary-300); background: var(--c-primary-50); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary-300) 25%, transparent); }
+.sol-etape.active .sol-etape-pastille { background: var(--c-primary-400); color: #fff; }
+.sol-etape.done .sol-etape-pastille { background: var(--c-success); color: #fff; }
+.sol-etape.done { color: var(--c-text); }
+
+/* ---------- Mise en page ---------- */
+.sol-corps { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); align-items: start; }
+@media (min-width: 1100px) { .sol-corps:has(.sol-lateral) { grid-template-columns: minmax(0, 1fr) 380px; } .sol-lateral { position: sticky; top: var(--sp-4); } }
+.sol-principal { display: flex; flex-direction: column; gap: var(--sp-5); min-width: 0; }
+
+.sol-carte { background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--r-lg); padding: var(--sp-6); box-shadow: var(--sh-sm); }
+.sol-carte h2 { margin: 0 0 var(--sp-5); font-family: var(--font-display); font-size: 21px; font-weight: 600; letter-spacing: -.02em; }
+.sol-carte h3 { margin: var(--sp-6) 0 var(--sp-3); font-family: var(--font-display); font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c-text-secondary); display: flex; align-items: center; gap: 10px; }
+.sol-carte h3::before { content: ''; width: 4px; height: 14px; border-radius: 2px; background: var(--c-accent); }
+.sol-carte h2 + h3, .sol-carte > h3:first-child { margin-top: 0; }
+.sol-carte-visuel { padding: var(--sp-5); }
+.sol-carte-visuel h3 { margin-top: 0; }
+
+/* ---------- Champs ---------- */
+.sol-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-4); }
+.sol-grille-compact { margin-top: var(--sp-4); }
+.sol-champ { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
+.sol-champ-large { grid-column: 1 / -1; }
+.sol-champ > span { font-size: 12px; font-weight: 600; letter-spacing: .02em; color: var(--c-text-secondary); }
+.sol-champ > span b.req { color: var(--c-error); }
+.sol-champ small { font-size: 12px; color: var(--c-text-muted); }
+.sol-champ input:not([type=range]), .sol-champ select {
+  width: 100%; min-height: 50px; padding: 0 14px; font-size: 16px; color: var(--c-text);
+  background: var(--c-bg-alt); border: 1px solid var(--c-border); border-radius: var(--r-sm);
+  transition: border-color var(--tr-fast), box-shadow var(--tr-fast);
+}
+.sol-champ input:focus, .sol-champ select:focus { outline: none; border-color: var(--c-border-focus); box-shadow: 0 0 0 3px rgba(82,183,136,.18); }
+.sol-prix-saisie { display: flex; align-items: center; gap: 10px; }
+.sol-prix-saisie em { font-style: normal; font-weight: 600; color: var(--c-text-muted); white-space: nowrap; }
+.sol-prix .sol-prix-saisie input { font-family: var(--font-display); font-size: 24px; font-weight: 600; min-height: 58px; border-color: var(--c-accent); background: color-mix(in srgb, var(--c-accent) 8%, #fff); }
+.sol-prix-inline { margin-top: 8px; max-width: 240px; }
+.sol-prix-inline input { min-height: 46px; padding: 0 12px; font-size: 18px; border: 1px solid var(--c-accent); border-radius: var(--r-sm); width: 100%; }
+
+input[type=range] { width: 100%; height: 36px; accent-color: var(--c-primary-400); cursor: pointer; }
+
+/* ---------- Choix ---------- */
+.sol-choix { display: grid; gap: var(--sp-3); }
+.sol-choix-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.sol-choix-4 { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+.sol-option {
+  display: flex; flex-direction: column; gap: 4px; align-items: flex-start; text-align: left; min-height: 64px;
+  padding: var(--sp-4); border: 2px solid var(--c-border); border-radius: var(--r-md); background: var(--c-bg-alt);
+  transition: all var(--tr-fast);
+}
+.sol-option strong { font-size: 14px; color: var(--c-text); }
+.sol-option small { font-size: 12px; color: var(--c-text-muted); line-height: 1.35; }
+.sol-option:hover { border-color: var(--c-border-dark); }
+.sol-option.on { border-color: var(--c-primary-400); background: var(--c-primary-50); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary-300) 22%, transparent); }
+
+.sol-orientations { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-2); margin-bottom: var(--sp-5); }
+.sol-orient { display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 12px 6px; min-height: 64px; border: 2px solid var(--c-border); border-radius: var(--r-md); background: var(--c-bg-alt); transition: all var(--tr-fast); }
+.sol-orient strong { font-family: var(--font-display); font-size: 18px; color: var(--c-text); }
+.sol-orient small { font-size: 11px; color: var(--c-text-muted); }
+.sol-orient:hover { border-color: var(--c-border-dark); }
+.sol-orient.on { border-color: var(--sol-or); background: color-mix(in srgb, var(--sol-or) 14%, #fff); }
+.sol-orient.on strong { color: #8A5A00; }
+
+/* ---------- Photos ---------- */
+.sol-photos { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: var(--sp-3); }
+.sol-photo { position: relative; margin: 0; aspect-ratio: 1; border-radius: var(--r-md); overflow: hidden; background: var(--c-bg-soft); }
+.sol-photo img { width: 100%; height: 100%; object-fit: cover; }
+.sol-photo figcaption { position: absolute; inset: auto 0 0 0; padding: 4px 6px; font-size: 10.5px; color: #fff; background: rgba(0,0,0,.55); }
+.sol-photo.erreur figcaption { background: rgba(138,90,0,.85); }
+.sol-photo-ajout { aspect-ratio: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; border: 2px dashed var(--c-border-dark); border-radius: var(--r-md); color: var(--c-text-muted); font-size: 12px; font-weight: 600; background: var(--c-bg-soft); }
+.sol-photo-ajout:hover { border-color: var(--c-primary-300); color: var(--c-primary-400); }
+
+/* ---------- Installation ---------- */
+.sol-puissance { padding: var(--sp-5); border-radius: var(--r-lg); background: linear-gradient(135deg, var(--c-primary-50), #FFF7E0); border: 1px solid var(--c-primary-100); margin-bottom: var(--sp-4); }
+.sol-puissance-valeur { display: flex; align-items: baseline; gap: 8px; }
+.sol-puissance-valeur strong { font-family: var(--font-display); font-size: 52px; line-height: 1; letter-spacing: -.03em; color: var(--c-primary); }
+.sol-puissance-valeur span { font-size: 20px; font-weight: 600; color: var(--c-primary-400); }
+.sol-puissance-info { margin-top: 6px; font-size: 13px; color: var(--c-text-secondary); }
+.sol-batterie { width: 100%; display: flex; align-items: center; gap: var(--sp-4); padding: var(--sp-4) var(--sp-5); margin-bottom: var(--sp-5); text-align: left; border: 2px solid var(--c-border); border-radius: var(--r-md); background: var(--c-bg-alt); color: var(--c-text-secondary); transition: all var(--tr-fast); }
+.sol-batterie > span:nth-child(2) { flex: 1; display: flex; flex-direction: column; }
+.sol-batterie strong { color: var(--c-text); font-size: 15px; }
+.sol-batterie small { font-size: 12.5px; color: var(--c-text-muted); }
+.sol-batterie.on { border-color: var(--c-primary-400); background: var(--c-primary-50); color: var(--c-primary-400); }
+.sol-interrupteur { position: relative; width: 46px; height: 26px; border-radius: 13px; background: var(--c-border-dark); transition: background var(--tr-fast); flex-shrink: 0; }
+.sol-interrupteur::after { content: ''; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: var(--sh-md); transition: transform var(--tr-fast); }
+.sol-batterie.on .sol-interrupteur { background: var(--c-primary-400); }
+.sol-batterie.on .sol-interrupteur::after { transform: translateX(20px); }
+
+.sol-formule { margin-top: var(--sp-6); padding: var(--sp-5); border-radius: var(--r-lg); background: var(--c-bg-soft); border: 1px solid var(--c-border-light); }
+.sol-formule-titre { display: flex; align-items: center; gap: 8px; margin-bottom: var(--sp-4); font-weight: 700; font-size: 13px; color: var(--c-primary); }
+.sol-formule-ligne { display: flex; align-items: stretch; flex-wrap: wrap; gap: var(--sp-2); }
+.sol-formule-ligne > div { flex: 1 1 120px; padding: 12px; border-radius: var(--r-md); background: var(--c-bg-alt); border: 1px solid var(--c-border-light); text-align: center; }
+.sol-formule-ligne > div.res { background: var(--c-primary); border-color: var(--c-primary); }
+.sol-formule-ligne > div.res small { color: var(--c-primary-100); } .sol-formule-ligne > div.res strong { color: #fff; }
+.sol-formule-ligne small { display: block; font-size: 11px; color: var(--c-text-muted); margin-bottom: 2px; }
+.sol-formule-ligne strong { font-family: var(--font-display); font-size: 18px; color: var(--c-text); }
+.sol-formule-ligne i { align-self: center; font-style: normal; font-size: 20px; font-weight: 700; color: var(--c-text-light); }
+
+.sol-note { display: flex; align-items: flex-start; gap: 6px; margin: var(--sp-3) 0 0; font-size: 12.5px; color: var(--c-text-muted); line-height: 1.45; }
+.sol-note svg { flex-shrink: 0; margin-top: 2px; }
+
+/* ---------- Résultats ---------- */
+.sol-resultats { display: flex; flex-direction: column; gap: var(--sp-5); }
+.sol-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: var(--sp-3); }
+.sol-kpi { display: flex; flex-direction: column; gap: 4px; padding: var(--sp-5); border-radius: var(--r-lg); background: var(--c-bg-alt); border: 1px solid var(--c-border-light); box-shadow: var(--sh-sm); }
+.sol-kpi small { font-size: 12px; font-weight: 600; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: .05em; }
+.sol-kpi strong { font-family: var(--font-display); font-size: 28px; font-weight: 600; letter-spacing: -.02em; color: var(--c-primary); font-variant-numeric: tabular-nums; }
+.sol-kpi span { font-size: 12px; color: var(--c-text-muted); line-height: 1.35; }
+.sol-kpi.accent { background: linear-gradient(135deg, var(--c-primary), var(--c-primary-400)); border-color: var(--c-primary); }
+.sol-kpi.accent small, .sol-kpi.accent span { color: var(--c-primary-100); } .sol-kpi.accent strong { color: #fff; }
+
+.sol-duo { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); gap: var(--sp-5); }
+.sol-svg { display: block; width: 100%; height: auto; }
+.sol-donut { max-width: 190px; margin: 0 auto; }
+.sol-donut-bloc { display: flex; flex-direction: column; gap: var(--sp-4); align-items: center; }
+.sol-legende { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: var(--sp-3); }
+.sol-legende li { display: flex; align-items: flex-start; gap: 10px; }
+.sol-legende i, .sol-legende-ligne i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-top: 3px; flex-shrink: 0; }
+.sol-legende i.auto, .sol-legende-ligne i.auto { background: #2D6A4F; } .sol-legende i.surplus, .sol-legende-ligne i.surplus { background: #E8B04A; }
+.sol-legende-ligne i.conso { background: transparent; border-top: 2px dashed #1A1A1A; height: 0; width: 16px; border-radius: 0; margin-top: 8px; }
+.sol-legende strong { font-size: 15px; } .sol-legende small { display: block; font-size: 12px; color: var(--c-text-muted); }
+.sol-carte-tete { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-3); }
+.sol-carte-tete h3 { margin: 0; }
+.sol-legende-ligne { display: flex; flex-wrap: wrap; gap: var(--sp-4); font-size: 12px; color: var(--c-text-secondary); }
+.sol-legende-ligne span { display: inline-flex; align-items: center; gap: 6px; }
+.sol-legende-ligne i { margin-top: 0; }
+
+.sol-alerte { display: flex; align-items: flex-start; gap: var(--sp-3); padding: var(--sp-4) var(--sp-5); border-radius: var(--r-md); border: 1px solid color-mix(in srgb, var(--c-warning) 55%, #fff); background: color-mix(in srgb, var(--c-warning) 12%, #fff); color: #6B4700; font-size: 14px; }
+.sol-alerte svg { flex-shrink: 0; margin-top: 2px; }
+.sol-alerte-douce { padding: var(--sp-3) var(--sp-4); font-size: 13px; }
+.sol-message { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); font-size: 14px; }
+.sol-message.ok { background: var(--c-primary-50); color: var(--c-primary); } .sol-message.erreur { background: color-mix(in srgb, var(--c-error) 9%, #fff); color: #A61E1E; }
+.sol-actions { display: flex; flex-wrap: wrap; gap: var(--sp-3); justify-content: flex-end; }
+
+.sol-nav { display: flex; justify-content: space-between; gap: var(--sp-3); }
+.sol-nav .btn { min-height: 48px; padding-inline: var(--sp-6); }
+
+.sol-mini { display: grid; grid-template-columns: 1fr 1fr; gap: var(--sp-3); margin-top: var(--sp-4); }
+.sol-mini div { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); background: var(--c-bg-soft); }
+.sol-mini small { display: block; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: var(--c-text-muted); }
+.sol-mini strong { font-family: var(--font-display); font-size: 18px; color: var(--c-primary); }
+
+/* ---------- Animations ---------- */
+.sol-barre { transform-box: fill-box; transform-origin: bottom; animation: sol-pousse .6s ease both; }
+@keyframes sol-pousse { from { transform: scaleY(0); } to { transform: scaleY(1); } }
+.sol-ligne { stroke-dasharray: 1200; stroke-dashoffset: 1200; animation: sol-trace 1.2s ease .1s forwards; }
+@keyframes sol-trace { to { stroke-dashoffset: 0; } }
+.sol-arc { animation: sol-pousse-arc .9s ease both; }
+@keyframes sol-pousse-arc { from { stroke-dasharray: 0 400; } }
+.sol-panneau { animation: sol-fondu .5s ease both; } @keyframes sol-fondu { from { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .sol-barre, .sol-ligne, .sol-arc, .sol-panneau { animation: none; stroke-dashoffset: 0; } }
+
+/* ---------- Petits écrans ---------- */
+@media (max-width: 900px) {
+  .sol { padding: var(--sp-4) var(--sp-4) var(--sp-10); }
+  .sol-hero { padding: var(--sp-5); } .sol-hero h1 { font-size: 23px; } .sol-hero-icon { width: 46px; height: 46px; }
+  .sol-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sol-duo { grid-template-columns: 1fr; }
+  .sol-carte { padding: var(--sp-5); }
+}
+@media (max-width: 640px) {
+  .sol-etape-label { display: none; } .sol-etape { justify-content: center; padding: 0; }
+  .sol-grille, .sol-choix-3 { grid-template-columns: 1fr; }
+  .sol-choix-4 { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .sol-orientations { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .sol-kpi { padding: var(--sp-4); } .sol-kpi strong { font-size: 22px; }
+  .sol-actions .btn { flex: 1 1 100%; }
+  .sol-puissance-valeur strong { font-size: 44px; }
+}
