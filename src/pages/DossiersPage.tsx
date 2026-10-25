@@ -1291,6 +1291,7 @@ export function DossiersPage({
               )}
             </div>
 
+            {isAdmin && (
             <div className="card card-pad" style={{ marginBottom: 14 }}>
               <div className="font-semibold" style={{ marginBottom: 4 }}>Facturation du dossier</div>
               <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
@@ -1317,6 +1318,7 @@ export function DossiersPage({
                 </Button>
               </div>
             </div>
+            )}
 
             {/* STATUT + DATE D'INSTALLATION */}
             <div style={{ display:'grid', gridTemplateColumns:'minmax(220px,1fr) minmax(180px,260px) auto', gap:8, alignItems:'end' }}>
