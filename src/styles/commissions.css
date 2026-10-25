@@ -42,3 +42,9 @@
   .commission-matrix .card-pad { padding:11px; }
 }
 @media (prefers-reduced-motion:reduce) { .commission-rule-row { transition:none; } }
+
+
+.commission-readonly-notice { display:flex; align-items:flex-start; gap:12px; margin:0 0 16px; padding:14px 16px; border:1px solid var(--c-border-light); border-radius:var(--r-md); background:var(--c-bg-soft); }
+.commission-readonly-icon { display:grid; place-items:center; flex:0 0 34px; width:34px; height:34px; color:var(--c-primary); background:var(--c-bg-alt); border:1px solid var(--c-border-light); border-radius:10px; }
+.commission-readonly-notice strong { display:block; margin:1px 0 4px; color:var(--c-text); font-size:13px; }
+.commission-readonly-notice p { margin:0; color:var(--c-text-secondary); font-size:12px; line-height:1.55; }
