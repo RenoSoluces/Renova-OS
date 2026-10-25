@@ -127,10 +127,11 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
       if (urgentOnly) {
         const tasks = (tasksByProspect[p.id] || []).filter(t => !t.done)
         const hasLateTask = tasks.some(isOverdue)
+        const hasNoNextAction = tasks.length === 0
         const days = p.derniere_interaction_at
           ? Math.floor((Date.now() - new Date(p.derniere_interaction_at).getTime()) / 86400000)
           : null
-        if (!hasLateTask && !(p.temperature === 'chaud') && !(days !== null && days >= 7)) return false
+        if (!hasLateTask && !hasNoNextAction && !(p.temperature === 'chaud') && !(days !== null && days >= 7)) return false
       }
       return true
     })
@@ -298,10 +299,10 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
                         <li><UserRound size={13} /><span>{p.commercial || 'Non attribué'}</span></li>
                       </ul>
 
-                      {(late || (days !== null && days >= 3) || (nextTask && !late) || extraTags.length > 0) && (
+                      {(late || (days !== null && days >= 3) || (nextTask && !late) || openTasks.length === 0 || extraTags.length > 0) && (
                         <div className="pl-signals">
                           {late && nextTask && (
-                            <span className="pl-chip pl-chip-danger"><AlertCircle size={12} />{formatDueDate(nextTask.due_at)}</span>
+                            <span className="pl-chip pl-chip-danger" title={nextTask.titre}><AlertCircle size={12} />{nextTask.titre} · {formatDueDate(nextTask.due_at)}</span>
                           )}
                           {days !== null && days >= 3 && (
                             <span className={`pl-chip ${days >= 7 ? 'pl-chip-danger' : 'pl-chip-warn'}`}>
@@ -309,10 +310,11 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
                             </span>
                           )}
                           {nextTask && !late && (
-                            <span className="pl-chip pl-chip-ok"><CalendarClock size={12} />{formatDueDate(nextTask.due_at)}</span>
+                            <span className="pl-chip pl-chip-ok" title={nextTask.titre}><CalendarClock size={12} />{nextTask.titre} · {formatDueDate(nextTask.due_at)}</span>
                           )}
                           {extraTags.slice(0, 2).map(t => <span key={t} className="pl-chip pl-chip-tag">{t}</span>)}
                           {extraTags.length > 2 && <span className="pl-chip pl-chip-tag">+{extraTags.length - 2}</span>}
+                          {openTasks.length === 0 && <span className="pl-chip pl-chip-warn"><CalendarClock size={12} />Action à planifier</span>
                         </div>
                       )}
 
