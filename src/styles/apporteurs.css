@@ -96,3 +96,19 @@
 .apporteurs-status-filters button.active { color:var(--c-primary); background:var(--c-bg-alt); border-color:var(--c-primary-200); box-shadow:var(--sh-sm); }
 @media (max-width:780px) { .apporteurs-directory-tools { align-items:stretch; width:100%; } .apporteurs-status-filters { justify-content:flex-start; } .apporteurs-search { width:auto; } }
 @media (prefers-reduced-motion:reduce) { .apporteurs-status-filters button { transition:none; } }
+
+
+/* Réseau : cartes plus denses sur grand écran, sans perdre la lisibilité mobile. */
+.apporteurs-hero { align-items:center; }
+.apporteurs-cards { grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; }
+.apporteur-card { padding:18px; box-shadow:0 1px 2px rgba(18,32,24,.04); }
+.apporteur-card:hover { transform:translateY(-2px); box-shadow:0 8px 24px rgba(18,32,24,.08); }
+.apporteur-card-top { align-items:flex-start; }
+.apporteur-card-avatar { width:44px; height:44px; }
+.apporteur-status { max-width:120px; white-space:nowrap; }
+@media (max-width:1240px) { .apporteurs-cards { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+@media (max-width:760px) {
+  .apporteurs-cards { grid-template-columns:1fr; }
+  .apporteurs-hero { align-items:flex-start; }
+  .apporteur-status { max-width:none; }
+}
