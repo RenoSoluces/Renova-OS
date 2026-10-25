@@ -2058,7 +2058,7 @@ export function CommissionsPage() {
 
         <div className="grid grid-2 gap-3 mt-4">
           <FloatSelect
-            label="Catégorie de dossier"
+            label="Catégorie de catalogue"
             value={form.public_cible}
             onChange={(v) => setForm((f: any) => ({ ...f, public_cible: v, categorie_produit: '', produit_id: '' }))}
             options={[
