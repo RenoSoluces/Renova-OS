@@ -1328,8 +1328,13 @@ export function CommissionsPage() {
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && f.numero_facture_emise && f.date_emission && f.pdf_storage_path && <Button size="sm" variant="primary" onClick={async () => {
                           const { error } = await supabase.rpc('soumettre_facture_commission', { p_facture_id: f.id })
                           if (error) { alert(`Soumission impossible : ${error.message}`); return }
+                          const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-commission-invoice', { body: { factureId: f.id } })
                           await chargerFacturesCommission()
-                          alert('Facture soumise à validation administrative. Le PDF et l’envoi restent à réaliser.')
+                          if (sendError || sendResult?.error) {
+                            alert(`Facture soumise à validation, mais l’e-mail n’a pas pu être envoyé : ${sendError?.message || sendResult?.error}. Vérifie l’adresse de Reno Soluces dans Paramètres ; tu pourras réessayer après correction.`)
+                            return
+                          }
+                          alert('Facture soumise et envoyée par e-mail à Reno Soluces.')
                         }}>{f.statut === 'refusee' ? 'Corriger et resoumettre' : 'Soumettre'}</Button>}
                       </div>
                     </div>
