@@ -174,7 +174,9 @@ export function CommissionsPage() {
       .select('id,nom_complet,role')
       .in('role', ['commercial','manager','admin'])
       .order('nom_complet')
-    const echeancesQuery = supabase.from('commission_echeances').select('*').order('ordre').order('created_at')
+    let echeancesQuery = supabase.from('commission_echeances').select('*').order('ordre').order('created_at')
+    // Les non-administrateurs ne chargent jamais les échéances de la société.
+    if (!admin) echeancesQuery = echeancesQuery.eq('beneficiaire', 'commercial') as typeof echeancesQuery
 
     const [commissionResult, baremeResult, produitsResult, commerciauxResult, echeancesResult] = await Promise.all([
       commissionQuery, baremeQuery, produitsQuery, commerciauxQuery, echeancesQuery,
