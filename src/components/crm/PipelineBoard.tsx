@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import type { CSSProperties } from 'react'
-import { Flame, Snowflake, Minus, Clock, CalendarClock, AlertCircle, MapPin, UserRound, Inbox } from 'lucide-react'
+import { Flame, Snowflake, Minus, Clock, CalendarClock, AlertCircle, MapPin, UserRound, Inbox, Search, X, SlidersHorizontal } from 'lucide-react'
 import type { Prospect, CrmTask } from '../../types'
 import { supabase } from '../../lib/supabase'
 import { PIPELINE_STAGES, stageOf, euro, formatDueDate, isOverdue, isProspectTerminal } from '../../lib/crm/constants'
@@ -23,6 +23,9 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
   const [dragId, setDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
   const [paidCommissionProspectIds, setPaidCommissionProspectIds] = useState<Set<string>>(new Set())
+  const [search, setSearch] = useState('')
+  const [temperatureFilter, setTemperatureFilter] = useState('tous')
+  const [urgentOnly, setUrgentOnly] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -107,9 +110,30 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
     }
   }, [prospects])
 
+  const filteredProspects = useMemo(() => {
+    const q = search.trim().toLocaleLowerCase('fr')
+    return prospects.filter(p => {
+      if (q) {
+        const haystack = [p.prenom, p.nom, p.ville, p.commercial, ...(p.tags || [])]
+          .filter(Boolean).join(' ').toLocaleLowerCase('fr')
+        if (!haystack.includes(q)) return false
+      }
+      if (temperatureFilter !== 'tous' && (p.temperature || 'tiede') !== temperatureFilter) return false
+      if (urgentOnly) {
+        const tasks = (tasksByProspect[p.id] || []).filter(t => !t.done)
+        const hasLateTask = tasks.some(isOverdue)
+        const days = p.derniere_interaction_at
+          ? Math.floor((Date.now() - new Date(p.derniere_interaction_at).getTime()) / 86400000)
+          : null
+        if (!hasLateTask && !(p.temperature === 'chaud') && !(days !== null && days >= 7)) return false
+      }
+      return true
+    })
+  }, [prospects, tasksByProspect, search, temperatureFilter, urgentOnly])
+
   const columns = useMemo(() => {
     return PIPELINE_STAGES.map(stage => {
-      const items = prospects.filter(p => {
+      const items = filteredProspects.filter(p => {
         if (isProspectTerminal(p.statut)) return false
         if (stageOf(p.statut).value !== stage.value) return false
         // Une fois la commission payée, le dossier quitte le Pipeline
@@ -120,7 +144,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
       const total = items.reduce((s, p) => s + (Number(p.montant_potentiel) || 0), 0)
       return { stage, items, total }
     })
-  }, [prospects, paidCommissionProspectIds])
+  }, [filteredProspects, paidCommissionProspectIds])
 
   const inactivityDays = (iso: string | null | undefined) => {
     if (!iso) return null
@@ -150,6 +174,40 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
         <div className="pl-stat"><span>Valeur potentielle</span><strong>{euro(summary.total)}</strong></div>
         <div className="pl-stat pl-stat-hot"><span>Leads chauds</span><strong>{summary.hot}</strong></div>
         <div className={`pl-stat ${summary.late ? 'pl-stat-late' : ''}`}><span>Actions en retard</span><strong>{summary.late}</strong></div>
+      </div>
+
+      <div className="pl-toolbar" aria-label="Filtres du Pipeline">
+        <label className="pl-search">
+          <Search size={17} aria-hidden="true" />
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Rechercher un prospect, une ville, un commercial…"
+            aria-label="Rechercher dans le Pipeline"
+          />
+          {search && <button type="button" onClick={() => setSearch('')} aria-label="Effacer la recherche"><X size={15} /></button>}
+        </label>
+        <label className="pl-filter">
+          <SlidersHorizontal size={16} aria-hidden="true" />
+          <span>Température</span>
+          <select value={temperatureFilter} onChange={e => setTemperatureFilter(e.target.value)} aria-label="Filtrer par température">
+            <option value="tous">Toutes</option>
+            <option value="chaud">Chauds</option>
+            <option value="tiede">Tièdes</option>
+            <option value="froid">Froids</option>
+          </select>
+        </label>
+        <label className={`pl-urgent-toggle ${urgentOnly ? 'is-active' : ''}`}>
+          <input type="checkbox" checked={urgentOnly} onChange={e => setUrgentOnly(e.target.checked)} />
+          <AlertCircle size={15} />
+          <span>Prioritaires</span>
+        </label>
+        {(search || temperatureFilter !== 'tous' || urgentOnly) && (
+          <button type="button" className="pl-reset" onClick={() => { setSearch(''); setTemperatureFilter('tous'); setUrgentOnly(false) }}>
+            Réinitialiser
+          </button>
+        )}
+        <span className="pl-result-count">{filteredProspects.length} / {prospects.length} prospects</span>
       </div>
 
       <div className="pl-board">
