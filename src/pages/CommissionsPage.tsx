@@ -398,7 +398,21 @@ export function CommissionsPage() {
         if (profilesError) console.error('[RENOVA OS] Chargement noms des émetteurs:', profilesError)
         for (const p of profilesData || []) names[p.id] = p.nom_complet || p.id
       }
-      setFacturesAdmin(list.map((f: any) => ({ ...f, commercial_nom: names[f.commercial_id] || f.commercial_id })))
+      const commissionIds = [...new Set(list.map((f: any) => f.commission_id).filter(Boolean))]
+      let commissionLabels: Record<string, string> = {}
+      if (commissionIds.length) {
+        const { data: commissionData, error: commissionError } = await supabase
+          .from('commissions_safe')
+          .select('id,libelle')
+          .in('id', commissionIds)
+        if (commissionError) console.error('[RENOVA OS] Chargement libellés de commissions:', commissionError)
+        for (const commission of commissionData || []) commissionLabels[commission.id] = commission.libelle || 'Commission'
+      }
+      setFacturesAdmin(list.map((f: any) => ({
+        ...f,
+        commercial_nom: names[f.commercial_id] || f.commercial_id,
+        commission_libelle: commissionLabels[f.commission_id] || 'Commission',
+      })))
     }
     setFacturesAdminLoading(false)
   }, [admin, canReviewFactures])
@@ -1006,7 +1020,7 @@ export function CommissionsPage() {
                     <div key={f.id} style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) auto', gap: 12, alignItems: 'center', padding: '12px 0', borderTop: '1px solid var(--c-border)' }}>
                       <div>
                         <strong>{f.commercial_nom}</strong>
-                        <div className="text-sm text-muted">{rows.find(c => c.id === f.commission_id)?.libelle || 'Commission'} · {euro(amount(f.montant_ht))} HT · Créée le {formatDate(f.created_at)}</div>
+                        <div className="text-sm text-muted">{f.commission_libelle || rows.find(c => c.id === f.commission_id)?.libelle || 'Commission'} · {euro(amount(f.montant_ht))} HT · Créée le {formatDate(f.created_at)}</div>
                         <div className="text-sm text-muted">Statut : {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string,string>)[f.statut] || f.statut}</div>
                         {f.motif_refus && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>Motif du refus : {f.motif_refus}</div>}
                         {f.email_erreur && <div className="text-sm" style={{ color: 'var(--c-danger, #b42318)' }}>Erreur e-mail : {f.email_erreur}</div>}
