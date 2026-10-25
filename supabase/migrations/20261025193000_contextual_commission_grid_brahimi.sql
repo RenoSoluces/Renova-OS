@@ -102,7 +102,7 @@ BEGIN
       WHERE cp.id = v_ligne.produit_id AND cp.categorie = 'solaire_thermique'
         AND cp.nom ~* '^(12|16|20) panneaux solaires thermiques'
     ) THEN
-      SELECT * INTO r
+      SELECT cb.* INTO r
       FROM public.commission_bareme cb
       JOIN public.catalogue_produits cp ON cp.id = v_ligne.produit_id
       JOIN public.prospects pr ON pr.id = NEW.prospect_id
@@ -123,7 +123,7 @@ BEGIN
       SELECT 1 FROM public.catalogue_produits cp
       WHERE cp.id = v_ligne.produit_id AND cp.categorie = 'combles_perdus'
     ) THEN
-      SELECT * INTO r
+      SELECT cb.* INTO r
       FROM public.commission_bareme cb
       JOIN public.prospects pr ON pr.id = NEW.prospect_id
       WHERE cb.type = 'devis_signe' AND cb.actif
