@@ -1336,6 +1336,12 @@ export function CommissionsPage() {
                           {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
                         </span>
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && <Button size="sm" variant="secondary" onClick={() => void genererPdfFactureCommission(f)}>Générer / refaire le PDF</Button>}
+                        {f.statut === 'deposee' && f.email_erreur && <Button size="sm" variant="secondary" onClick={async () => {
+                          const { data, error } = await supabase.functions.invoke('send-commission-invoice', { body: { factureId: f.id } })
+                          await chargerFacturesCommission()
+                          if (error || data?.error) alert(`Nouvelle tentative d’envoi impossible : ${error?.message || data?.error}`)
+                          else alert('E-mail de la facture envoyé à Reno Soluces.')
+                        }}>Réessayer l’envoi</Button>}
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && (!f.numero_facture_emise || !f.date_emission || !f.pdf_storage_path) && <span className="text-sm text-muted">PDF requis avant soumission</span>}
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && f.numero_facture_emise && f.date_emission && f.pdf_storage_path && <Button size="sm" variant="primary" onClick={async () => {
                           const { error } = await supabase.rpc('soumettre_facture_commission', { p_facture_id: f.id })
