@@ -150,7 +150,8 @@ function auditerProduit(p: Produit): string[] {
       issues.push('Coefficient Ud_W_m2K à renseigner (critère technique des portes d’entrée ; hors BAR-EN-104)')
     }
   }
-  if (/fiche cee|prix source|source tarif|pose incluse|fourniture et pose|conformit[eé] à v[eé]rifier|aides indicatives/i.test(description)) {
+  // La mention d’une fiche CEE dans la description n’est pas, à elle seule, une note interne : elle peut être une référence réglementaire légitime.
+  if (/prix source|source tarif|pose incluse|fourniture et pose|conformit[eé] à v[eé]rifier|aides indicatives/i.test(description)) {
     issues.push('Description contaminée par des notes internes/tarifaires')
   }
   if (!prestation && !p.marque?.trim()) issues.push('Marque non renseignée')
