@@ -440,9 +440,6 @@ export function verifierFiche(fiche: string | null, v: Record<string, string>, s
   switch (fiche) {
     case 'BAR-TH-171': {
       besoin('usage')
-      if (besoin('autre_systeme_chauffage') && /oui/i.test(norm(v.autre_systeme_chauffage))) {
-        bloc('Une PAC associée à un autre système de chauffage est exclue de BAR-TH-172', 'autre_systeme_chauffage')
-      }
       if (besoin('temp')) {
         const t = norm(v.temp)
         min('etas', t.includes('basse') && !t.includes('moy') ? 126 : 111, '%')
@@ -457,6 +454,9 @@ export function verifierFiche(fiche: string | null, v: Record<string, string>, s
     }
     case 'BAR-TH-172': {
       besoin('usage')
+      if (besoin('autre_systeme_chauffage') && /oui/i.test(norm(v.autre_systeme_chauffage))) {
+        bloc('Une PAC associée à un autre système de chauffage est exclue de BAR-TH-172', 'autre_systeme_chauffage')
+      }
       if (besoin('temp')) {
         const t = norm(v.temp)
         min('etas', t.includes('basse') && !t.includes('moy') ? 126 : 111, '%')
