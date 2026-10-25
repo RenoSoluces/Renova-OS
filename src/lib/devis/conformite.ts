@@ -466,7 +466,7 @@ export function verifierFiche(fiche: string | null, v: Record<string, string>, s
         if (!captage.includes('nappe') && !captage.includes('glycole')) bloc('Type de captage eau de nappe ou eau glycolée à préciser', 'captage')
       }
       if (besoin('regulateur')) {
-        const m = v.regulateur.toUpperCase().match(/\\b(VIII|VII|VI|IV|V|III|II|I)\\b/)
+        const m = v.regulateur.toUpperCase().match(/\b(VIII|VII|VI|IV|V|III|II|I)\b/)
         if (!m || !['IV', 'V', 'VI', 'VII', 'VIII'].includes(m[1])) bloc('Régulateur de classe IV à VIII exigé', 'regulateur')
       }
       if (surLigne && !/oui|true/i.test(v.note || '')) bloc('Note de dimensionnement à joindre et respecter', 'note')
@@ -660,7 +660,7 @@ export function controlerDevis(ctx: ContexteConformite): PointConformite[] {
     const cle = [f, c].sort().join('|')
     if (fiches.includes(c) && !vus.has(cle)) { vus.add(cle); add('Cumul', 'bloc', `${f} et ${c} ne sont pas cumulables sur un même dossier`) }
   }
-  // Fiches sans règles intégrées (BAT-*, BAR-TH-172…) : on le signale une fois
+  // Fiches sans règles intégrées (par ex. certaines fiches BAT-*) : on le signale une fois
   for (const f of new Set(lignesFiche.filter(x => !REGLES_FICHES[x.fiche]).map(x => x.fiche)))
     add('Fiches', 'info', `Fiche ${f} : règles non intégrées à l’outil, à contrôler sur le texte officiel.`)
 
