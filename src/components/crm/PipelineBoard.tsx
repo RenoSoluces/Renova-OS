@@ -314,7 +314,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
                           )}
                           {extraTags.slice(0, 2).map(t => <span key={t} className="pl-chip pl-chip-tag">{t}</span>)}
                           {extraTags.length > 2 && <span className="pl-chip pl-chip-tag">+{extraTags.length - 2}</span>}
-                          {openTasks.length === 0 && <span className="pl-chip pl-chip-warn"><CalendarClock size={12} />Action à planifier</span>
+                          {openTasks.length === 0 && <span className="pl-chip pl-chip-warn"><CalendarClock size={12} />Action à planifier</span>}
                         </div>
                       )}
 
