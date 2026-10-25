@@ -24,6 +24,8 @@ const nettoyerDescriptionProduit = (value: string | null | undefined) => String(
   // la fiche CEE est portée par le champ « fiche_cee », pas par la description client.
   .replace(/(?:^|\s)Fiche (?:CEE )?de r[ée]f[ée]rence\s*:\s*(?:BAR|BAT|BAE|IND|RES|TRA)-[A-Z]{2}-\d{3}[^.\n]*\.?/gi, '')
   .replace(/(?:^|\s)Fiche CEE (?:BAR|BAT|BAE|IND|RES|TRA)-[A-Z]{2}-\d{3}\s*:[^.\n]*\.?/gi, '')
+  // Nettoie les métadonnées d'import obsolètes ; elles ne doivent pas contredire les valeurs structurées.
+  .replace(/(?:^|\\n)\\s*(?:Coefficient Uw W M2k|Coefficient Uw W m2K|Facteur Solaire Sw|Notes Controle|Performances A Confirmer|Source Catalogue)\\s*:\\s*[^\\n]*/gi, '')
   .replace(/[ \t]+([,;|])/g, '$1')
   .replace(/[ \t]{2,}/g, ' ')
   .replace(/^[ \t—–;,|]+|[ \t—–;,|]+$/gm, '')
@@ -140,6 +142,14 @@ function auditerProduit(p: Produit): string[] {
   // comme un équipement, ni un forfait de pose additionnel.
   const prestation = groupe === 'visite_technique' || estPrestationSansFiche(p) || /visite|diagnostic|prestation|main.?d.?œuvre/i.test(`${p.nom} ${p.categorie}`)
   if (!description || description.length < 35) issues.push('Description technique absente ou trop courte')
+  // Les portes d'entrée sont hors BAR-EN-104 : contrôle du coefficient Ud dédié.
+  if (p.categorie === 'menuiseries_portes' || /porte d entree|porte entree/i.test(String(car.type_menuiserie || p.nom))) {
+    const ud = car.Ud_W_m2K ?? car.ud_w_m2k ?? car.Ud ?? car.coefficient_Ud_W_m2K
+    const nUd = Number(String(ud ?? '').replace(',', '.'))
+    if (ud === undefined || ud === null || String(ud).trim() === '' || !Number.isFinite(nUd) || nUd <= 0) {
+      issues.push('Coefficient Ud_W_m2K à renseigner (critère technique des portes d’entrée ; hors BAR-EN-104)')
+    }
+  }
   if (/fiche cee|prix source|source tarif|pose incluse|fourniture et pose|conformit[eé] à v[eé]rifier|aides indicatives/i.test(description)) {
     issues.push('Description contaminée par des notes internes/tarifaires')
   }
