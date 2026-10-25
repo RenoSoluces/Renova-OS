@@ -463,7 +463,7 @@ export function CommissionsPage() {
       return;
     }
     await chargerFacturesCommission()
-    alert("La préparation de facture est créée. Le numéro, le PDF et l'envoi restent à compléter.");
+    alert("La préparation de facture est créée. Les informations légales, la numérotation, le PDF et l'envoi restent à finaliser.");
   }
 
   function resetFilters() {
@@ -1055,12 +1055,12 @@ export function CommissionsPage() {
                         <span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'refusee' ? 'badge-danger' : 'badge-warning'}`}>
                           {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
                         </span>
-                        {f.statut === 'a_preparer' && <Button size="sm" variant="primary" onClick={async () => {
+                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && <Button size="sm" variant="primary" onClick={async () => {
                           const { error } = await supabase.rpc('soumettre_facture_commission', { p_facture_id: f.id })
                           if (error) { alert(`Soumission impossible : ${error.message}`); return }
                           await chargerFacturesCommission()
                           alert('Facture soumise à validation administrative. Le PDF et l’envoi restent à réaliser.')
-                        }}>Soumettre</Button>}
+                        }}>{f.statut === 'refusee' ? 'Corriger et resoumettre' : 'Soumettre'}</Button>}
                       </div>
                     </div>
                   ))}
