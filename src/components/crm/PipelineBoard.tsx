@@ -99,13 +99,18 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
     // le Pipeline se rafraîchit automatiquement sans nécessiter un reload.
     const refresh = () => { loadPaidCommissionProspects() }
     window.addEventListener('focus', refresh)
-    document.addEventListener('visibilitychange', refresh)
-    const interval = window.setInterval(loadPaidCommissionProspects, 5000)
+    const onVisibilityChange = () => { if (document.visibilityState === 'visible') refresh() }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    // La visibilité est également contrôlée à la reprise ; le polling de secours
+    // reste volontairement léger pour éviter 12 requêtes toutes les 5 secondes.
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === 'visible') loadPaidCommissionProspects()
+    }, 30000)
 
     return () => {
       cancelled = true
       window.removeEventListener('focus', refresh)
-      document.removeEventListener('visibilitychange', refresh)
+      document.removeEventListener('visibilitychange', onVisibilityChange)
       window.clearInterval(interval)
     }
   }, [prospects])
