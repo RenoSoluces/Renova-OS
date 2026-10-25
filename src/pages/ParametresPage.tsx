@@ -180,11 +180,27 @@ export function ParametresPage() {
   }, [profile])
 
   useEffect(() => {
-    supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => {
-      if (data) setEntreprise(data as Entreprise)
+    let cancelled = false
+    async function loadEntreprise() {
+      if (!profile?.organisation_id) {
+        setEntreprise(ENTREPRISE_VIDE)
+        setEntrepriseLoading(false)
+        return
+      }
+      setEntrepriseLoading(true)
+      const { data, error } = await supabase
+        .from('entreprises')
+        .select('*')
+        .eq('organisation_id', profile.organisation_id)
+        .maybeSingle()
+      if (cancelled) return
+      if (error) console.error('[RENOVA OS] Chargement des informations entreprise:', error)
+      setEntreprise(data ? data as Entreprise : { ...ENTREPRISE_VIDE, organisation_id: profile.organisation_id })
       setEntrepriseLoading(false)
-    })
-  }, [])
+    }
+    void loadEntreprise()
+    return () => { cancelled = true }
+  }, [profile?.organisation_id])
 
   function onLogoChange(file: File | null) {
     if (!file) return
@@ -194,13 +210,21 @@ export function ParametresPage() {
   }
 
   async function saveEntreprise() {
-    setSavingEntreprise(true)
-    if (entreprise.id) {
-      await supabase.from('entreprises').update(entreprise).eq('id', entreprise.id)
-    } else {
-      const { data } = await supabase.from('entreprises').insert(entreprise).select('*').single()
-      if (data) setEntreprise(data as Entreprise)
+    if (!profile?.organisation_id) {
+      alert("Impossible d'enregistrer l'entreprise : organisation du compte manquante.")
+      return
     }
+    setSavingEntreprise(true)
+    const payload = { ...entreprise, organisation_id: profile.organisation_id }
+    const result = entreprise.id
+      ? await supabase.from('entreprises').update(payload).eq('id', entreprise.id).eq('organisation_id', profile.organisation_id).select('*').single()
+      : await supabase.from('entreprises').insert(payload).select('*').single()
+    if (result.error) {
+      alert(`Enregistrement impossible : ${result.error.message}`)
+      setSavingEntreprise(false)
+      return
+    }
+    if (result.data) setEntreprise(result.data as Entreprise)
     setSavingEntreprise(false)
     setEntrepriseSaved(true)
     setTimeout(() => setEntrepriseSaved(false), 2500)
