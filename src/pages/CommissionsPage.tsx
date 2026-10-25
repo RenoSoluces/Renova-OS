@@ -57,7 +57,6 @@ type PaymentTarget = 'commercial' | 'societe'
 type PaymentFilter = 'toutes' | 'a_payer' | 'payees'
 
 type CommissionWithCommercial = Commission & {
-  organisation_id?: string | null
   commercial?: {
     id: string
     nom_complet: string
@@ -346,7 +345,7 @@ export function CommissionsPage() {
   )
 
   async function preparerFactureCommission(c: CommissionWithCommercial) {
-    if (!profile?.id || !c.organisation_id) {
+    if (!profile?.id || !profile.organisation_id) {
       alert("Impossible de préparer cette facture : organisation ou profil manquant.");
       return;
     }
@@ -357,7 +356,7 @@ export function CommissionsPage() {
     const { error } = await supabase.from('commission_factures').insert({
       commission_id: c.id,
       commercial_id: profile.id,
-      organisation_id: c.organisation_id,
+      organisation_id: profile.organisation_id,
       montant_ht: amount(c.montant_commercial),
       statut: 'a_preparer',
     });
