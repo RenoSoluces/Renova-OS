@@ -2074,41 +2074,10 @@ export function CommissionsPage() {
 
         <div className="grid grid-2 gap-3 mt-4">
           <FloatSelect
-            label="Commercial"
-            value={
-              form.commercial_id
-            }
-            onChange={(v) =>
-              setForm(
-                (f: any) => ({
-                  ...f,
-                  commercial_id:
-                    v,
-                }),
-              )
-            }
-            options={[
-              {
-                value: '',
-                label:
-                  'Tous les commerciaux',
-              },
-              ...commerciaux.map(
-                (c) => ({
-                  value: c.id,
-                  label:
-                    c.nom_complet ||
-                    c.email,
-                }),
-              ),
-            ]}
-          />
-
-          <FloatSelect
             label="Type de produit"
             value={form.categorie_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, variante_produit: '', produit_id: '' }))}
-            options={[{ value: '', label: 'Tous les types de produits' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replace(/_/g, ' ').charAt(0).toUpperCase() + categorie.replace(/_/g, ' ').slice(1) }))]}
+            options={[{ value: '', label: 'Sélectionnez d’abord un type de produit' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replace(/_/g, ' ').charAt(0).toUpperCase() + categorie.replace(/_/g, ' ').slice(1) }))]}
           />
 
           <FloatSelect
@@ -2145,7 +2114,38 @@ export function CommissionsPage() {
               ),
             ]}
           />
-        </div>
+
+
+          <FloatSelect
+            label="Commercial"
+            value={
+              form.commercial_id
+            }
+            onChange={(v) =>
+              setForm(
+                (f: any) => ({
+                  ...f,
+                  commercial_id:
+                    v,
+                }),
+              )
+            }
+            options={[
+              {
+                value: '',
+                label:
+                  'Tous les commerciaux',
+              },
+              ...commerciaux.map(
+                (c) => ({
+                  value: c.id,
+                  label:
+                    c.nom_complet ||
+                    c.email,
+                }),
+              ),
+            ]}
+          />        </div>
 
         <div className="grid grid-2 gap-3 mt-4">
           <FloatInput
