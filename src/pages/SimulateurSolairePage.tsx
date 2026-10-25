@@ -29,6 +29,20 @@ const ETAPES = [
 const CLE_BROUILLON = 'renova_simulateur_solaire_v1'
 const TYPES_TOITURE = [['tuiles', 'Tuiles'], ['ardoises', 'Ardoises'], ['bac_acier', 'Bac acier'], ['toit_terrasse', 'Toit terrasse'], ['autre', 'Autre']]
 
+/** Convertit une image (URL ou data URL) en data URL PNG, ou null si elle est illisible. */
+async function versDataUrl(src: string): Promise<string | null> {
+  try {
+    if (src.startsWith('data:image')) return src
+    const blob = await (await fetch(src)).blob()
+    return await new Promise<string>((resolve, reject) => {
+      const lecteur = new FileReader()
+      lecteur.onload = () => resolve(String(lecteur.result))
+      lecteur.onerror = reject
+      lecteur.readAsDataURL(blob)
+    })
+  } catch { return null }
+}
+
 function lireBrouillon(): { entree: EntreeSolaire; prospectId: string; typeToiture: string } | null {
   try {
     const brut = localStorage.getItem(CLE_BROUILLON)
@@ -90,7 +104,9 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
     if (resultat.prixManquant) { setMessage({ type: 'erreur', texte: 'Renseignez le prix du kWh avant d’éditer le PDF.' }); return }
     setAction('pdf'); setMessage(null)
     try {
-      const doc = genererSimulationSolairePDF(resultat, entree, prospect, entreprise)
+      // Logo de l'entreprise (Paramètres) ; à défaut, le logo Reno Soluces fourni avec l'application.
+      const logo = (entreprise?.logo_url && (await versDataUrl(entreprise.logo_url))) || (await versDataUrl('/Logo RenoSoluces.png'))
+      const doc = genererSimulationSolairePDF(resultat, entree, prospect, entreprise, logo)
       const nom = `simulation-solaire-${(prospect?.nom || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
       doc.save(nom)
       if (prospectId) await supabase.from('interactions').insert({ prospect_id: prospectId, type: 'note', contenu: `Simulation solaire éditée : ${resultat.puissanceKwc} kWc, ${resultat.productionAnnuelle} kWh/an, gain estimé ${resultat.gainAnnuel} €/an.` })
