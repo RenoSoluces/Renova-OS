@@ -26,6 +26,7 @@ import { SystemHealthPage } from './pages/SystemHealthPage'
 import { OrganisationPage } from './pages/OrganisationPage'
 import { ApporteursPage } from './pages/ApporteursPage'
 import { ChallengesPage } from './pages/ChallengesPage'
+import { SimulateurSolairePage } from './pages/SimulateurSolairePage'
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
@@ -71,6 +72,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },
   sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
   organisation: { title: 'Organigramme', subtitle: 'Structure des entreprises et équipes' },
+  solaire: { title: 'Simulateur solaire', subtitle: 'Production, autoconsommation et rentabilité photovoltaïque' },
 }
 
 function pageFromLocation(): PageKey {
@@ -225,6 +227,7 @@ function AppContent() {
           {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'organisation' && <OrganisationPage />}
+          {page === 'solaire' && <SimulateurSolairePage onCreateDevis={goToDevis} />}
         </div>
       </div>
     </div>
