@@ -31,6 +31,7 @@ export function ApporteursPage() {
   const [organisations, setOrganisations] = useState<Organisation[]>([])
   const [equipe, setEquipe] = useState<MembreEquipe[]>([])
   const [search, setSearch] = useState('')
+  const [statusFilter, setStatusFilter] = useState<'tous' | Apporteur['statut']>('tous')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -64,8 +65,9 @@ export function ApporteursPage() {
   useEffect(() => { if (profile?.id) void load() }, [profile?.id])
 
   const filtered = useMemo(() => rows.filter(r =>
+    (statusFilter === 'tous' || r.statut === statusFilter) &&
     `${r.nom} ${r.contact || ''} ${r.email || ''} ${r.ville || ''} ${r.telephone || ''}`.toLowerCase().includes(search.trim().toLowerCase())
-  ), [rows, search])
+  ), [rows, search, statusFilter])
   const stats = useMemo(() => ({
     total: rows.length,
     actifs: rows.filter(r => r.statut === 'actif').length,
@@ -169,9 +171,14 @@ export function ApporteursPage() {
     <section className="apporteurs-directory">
       <div className="apporteurs-directory-head">
         <div><h2>Apporteurs d’affaires</h2><p>Votre carnet de contacts et de partenaires prescripteurs.</p></div>
-        <div className="apporteurs-search"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nom, e-mail, téléphone, ville…"/><span>{filtered.length}</span></div>
+        <div className="apporteurs-directory-tools">
+          <div className="apporteurs-status-filters" aria-label="Filtrer par statut">
+            {[{ value: 'tous', label: 'Tous' }, ...STATUTS].map(option => <button key={option.value} type="button" className={statusFilter === option.value ? 'active' : ''} aria-pressed={statusFilter === option.value} onClick={() => setStatusFilter(option.value as typeof statusFilter)}>{option.label}</button>)}
+          </div>
+          <div className="apporteurs-search"><Search size={17}/><input value={search} onChange={e => setSearch(e.target.value)} placeholder="Nom, e-mail, téléphone, ville…"/><span>{filtered.length}</span></div>
+        </div>
       </div>
-      {loading ? <div className="card apporteurs-empty">Chargement du réseau…</div> : filtered.length === 0 ? <div className="card apporteurs-empty"><Users size={30}/><h3>{search ? 'Aucun résultat' : 'Votre réseau commence ici'}</h3><p>{search ? 'Essayez un autre nom ou une autre ville.' : 'Ajoutez les personnes ou sociétés susceptibles de vous apporter des prospects.'}</p>{canManage && !search && <Button variant="primary" onClick={() => setFormOpen(true)}><Plus size={16}/> Ajouter un apporteur</Button>}</div> :
+      {loading ? <div className="card apporteurs-empty">Chargement du réseau…</div> : filtered.length === 0 ? <div className="card apporteurs-empty"><Users size={30}/><h3>{search || statusFilter !== 'tous' ? 'Aucun résultat' : 'Votre réseau commence ici'}</h3><p>{search || statusFilter !== 'tous' ? 'Modifiez le texte recherché ou choisissez un autre statut.' : 'Ajoutez les personnes ou sociétés susceptibles de vous apporter des prospects.'}</p>{canManage && !search && <Button variant="primary" onClick={() => setFormOpen(true)}><Plus size={16}/> Ajouter un apporteur</Button>}</div> :
         <div className="apporteurs-cards">
           {filtered.map(row => <article className="apporteur-card" key={row.id}>
             <div className="apporteur-card-top">
