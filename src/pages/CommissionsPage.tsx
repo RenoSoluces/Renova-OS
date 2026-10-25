@@ -57,6 +57,7 @@ type PaymentTarget = 'commercial' | 'societe'
 type PaymentFilter = 'toutes' | 'a_payer' | 'payees'
 
 type CommissionWithCommercial = Commission & {
+  organisation_id?: string | null
   commercial?: {
     id: string
     nom_complet: string
