@@ -26,6 +26,7 @@ import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { euro } from '../lib/crm/constants'
+import { jsPDF } from 'jspdf'
 import '../styles/commissions.css'
 
 const TYPES: Record<CommissionType, string> = {
@@ -523,6 +524,131 @@ export function CommissionsPage() {
       return
     }
     await chargerFacturesAdmin()
+  }
+
+  async function genererPdfFactureCommission(facture: any) {
+    if (profile?.role !== 'apporteur' || !profile.id || facture.commercial_id && facture.commercial_id !== profile.id) {
+      alert('Accès refusé : seules vos propres factures de commission peuvent être générées.')
+      return
+    }
+    try {
+      const { data: issuer, error: issuerError } = await supabase
+        .from('apporteur_facturation')
+        .select('raison_sociale,forme_juridique,siret,numero_tva,adresse,code_postal,ville,email_facturation,telephone')
+        .eq('user_id', profile.id)
+        .maybeSingle()
+      if (issuerError) throw issuerError
+      if (!issuer || !issuer.raison_sociale?.trim() || !issuer.siret?.trim() || !issuer.adresse?.trim() ||
+          !issuer.code_postal?.trim() || !issuer.ville?.trim() || !issuer.email_facturation?.trim()) {
+        alert('Complète et enregistre d’abord tes informations de facturation (raison sociale, SIRET, adresse et e-mail).')
+        return
+      }
+      const { data: buyer, error: buyerError } = await supabase
+        .from('entreprises')
+        .select('raison_sociale,siret,forme_juridique,numero_tva,adresse,code_postal,ville,email,telephone')
+        .eq('organisation_id', facture.organisation_id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (buyerError) throw buyerError
+      if (!buyer || !buyer.raison_sociale?.trim() || !buyer.siret?.trim() || !buyer.adresse?.trim() ||
+          !buyer.code_postal?.trim() || !buyer.ville?.trim()) {
+        alert('Les informations légales de Reno Soluces sont incomplètes. Un administrateur doit compléter SIRET, adresse, code postal et ville dans Paramètres avant de générer une facture.')
+        return
+      }
+      const { data: numbered, error: numberError } = await supabase.rpc('attribuer_numero_facture_commission', {
+        p_facture_id: facture.id,
+      }).single()
+      if (numberError) throw numberError
+      const invoice = numbered as any
+      const commission = rows.find(c => c.id === facture.commission_id)
+      const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+      const left = 18
+      const right = 192
+      const line = (y: number) => doc.line(left, y, right, y)
+      const textSafe = (value: unknown) => String(value ?? '').trim() || '—'
+      const number = String(invoice.numero_facture || facture.numero_facture_emise || '')
+      const date = String(invoice.date_emission || facture.date_emission || todayInput())
+      const ht = amount(invoice.montant_ht ?? facture.montant_ht)
+      const vatRate = amount(invoice.taux_tva ?? facture.taux_tva)
+      const vat = Math.round(ht * vatRate) / 100
+      doc.setFont('helvetica', 'bold')
+      doc.setFontSize(20)
+      doc.text('FACTURE', left, 22)
+      doc.setFontSize(11)
+      doc.text(number, right, 22, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(10)
+      doc.text(`Date d’émission : ${date}`, right, 29, { align: 'right' })
+      doc.setFont('helvetica', 'bold')
+      doc.text('ÉMETTEUR', left, 43)
+      doc.text('DESTINATAIRE', 108, 43)
+      doc.setFont('helvetica', 'normal')
+      const issuerLines = [
+        issuer.raison_sociale,
+        issuer.forme_juridique,
+        `SIRET : ${issuer.siret}`,
+        issuer.numero_tva ? `TVA : ${issuer.numero_tva}` : '',
+        issuer.adresse,
+        `${issuer.code_postal} ${issuer.ville}`,
+        issuer.email_facturation,
+        issuer.telephone ? `Tél. : ${issuer.telephone}` : '',
+      ].filter(Boolean)
+      const buyerLines = [
+        buyer.raison_sociale,
+        buyer.forme_juridique,
+        `SIRET : ${buyer.siret}`,
+        buyer.numero_tva ? `TVA : ${buyer.numero_tva}` : '',
+        buyer.adresse,
+        `${buyer.code_postal} ${buyer.ville}`,
+        buyer.email,
+        buyer.telephone ? `Tél. : ${buyer.telephone}` : '',
+      ].filter(Boolean)
+      doc.text(issuerLines.map(textSafe), left, 50)
+      doc.text(buyerLines.map(textSafe), 108, 50)
+      line(100)
+      doc.setFont('helvetica', 'bold')
+      doc.text('Désignation', left, 108)
+      doc.text('Qté', 133, 108, { align: 'right' })
+      doc.text('Prix HT', 157, 108, { align: 'right' })
+      doc.text('Total HT', right, 108, { align: 'right' })
+      line(112)
+      doc.setFont('helvetica', 'normal')
+      const designation = commission?.libelle || 'Commission d’apport d’affaires'
+      const wrapped = doc.splitTextToSize(designation, 100)
+      doc.text(wrapped, left, 121)
+      doc.text('1', 133, 121, { align: 'right' })
+      doc.text(euro(ht), 157, 121, { align: 'right' })
+      doc.text(euro(ht), right, 121, { align: 'right' })
+      const totalY = Math.max(142, 121 + wrapped.length * 5 + 8)
+      line(totalY)
+      doc.text(`Total HT : ${euro(ht)}`, right, totalY + 9, { align: 'right' })
+      doc.text(`TVA (${vatRate}%): ${euro(vat)}`, right, totalY + 16, { align: 'right' })
+      doc.setFont('helvetica', 'bold')
+      doc.text(`Total TTC : ${euro(ht + vat)}`, right, totalY + 24, { align: 'right' })
+      doc.setFont('helvetica', 'normal')
+      doc.setFontSize(8)
+      doc.text('Facture de commission d’apport d’affaires. Les conditions et délais de paiement applicables restent ceux convenus entre les parties.', left, 270, { maxWidth: 170 })
+      doc.text(`Émetteur : ${issuer.raison_sociale} · Facture ${number}`, left, 285)
+      const pdfBlob = doc.output('blob')
+      const path = `${profile.id}/${facture.id}/${number}.pdf`
+      const { error: uploadError } = await supabase.storage
+        .from('commission-factures')
+        .upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true })
+      if (uploadError) throw uploadError
+      const { error: updateError } = await supabase
+        .from('commission_factures')
+        .update({ pdf_storage_path: path, updated_at: new Date().toISOString() })
+        .eq('id', facture.id)
+        .eq('commercial_id', profile.id)
+      if (updateError) throw updateError
+      doc.save(`${number}.pdf`)
+      await chargerFacturesCommission()
+      alert('PDF généré et enregistré dans le stockage privé. Vérifie son contenu avant de soumettre la facture.')
+    } catch (error: any) {
+      console.error('[RENOVA OS] Génération facture de commission:', error)
+      alert(`Génération du PDF impossible : ${error?.message || 'erreur inconnue'}`)
+    }
   }
 
   async function preparerFactureCommission(c: CommissionWithCommercial) {
@@ -1197,7 +1323,8 @@ export function CommissionsPage() {
                         <span className={`badge ${f.statut === 'payee' ? 'badge-success' : f.statut === 'refusee' ? 'badge-danger' : 'badge-warning'}`}>
                           {({ a_preparer: 'À préparer', deposee: 'Soumise', validee: 'Validée', refusee: 'Refusée', payee: 'Payée' } as Record<string, string>)[f.statut] || f.statut}
                         </span>
-                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && (!f.numero_facture_emise || !f.date_emission || !f.pdf_storage_path) && <span className="text-sm text-muted">Numéro, date et PDF requis avant soumission</span>}
+                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && <Button size="sm" variant="secondary" onClick={() => void genererPdfFactureCommission(f)}>Générer / refaire le PDF</Button>}
+                        {(f.statut === 'a_preparer' || f.statut === 'refusee') && (!f.numero_facture_emise || !f.date_emission || !f.pdf_storage_path) && <span className="text-sm text-muted">PDF requis avant soumission</span>}
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && f.numero_facture_emise && f.date_emission && f.pdf_storage_path && <Button size="sm" variant="primary" onClick={async () => {
                           const { error } = await supabase.rpc('soumettre_facture_commission', { p_facture_id: f.id })
                           if (error) { alert(`Soumission impossible : ${error.message}`); return }
