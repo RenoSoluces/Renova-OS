@@ -259,7 +259,7 @@ export const norm = (s: unknown) =>
 const rempli = (v: unknown) => {
   if (v === undefined || v === null) return false
   const s = String(v).trim()
-  return s !== '' && !/^(null|undefined|n\\/a|na)$/i.test(s)
+  return s !== '' && !/^(null|undefined|n\/a|na)$/i.test(s)
 }
 
 const nombre = (v: unknown): number | null => {
