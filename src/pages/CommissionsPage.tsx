@@ -13,6 +13,7 @@ import {
   Search,
   Filter,
   RotateCcw,
+  ShieldCheck,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
