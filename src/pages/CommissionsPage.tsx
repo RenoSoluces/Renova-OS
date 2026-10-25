@@ -914,8 +914,17 @@ export function CommissionsPage() {
   const produitsCategorie = produits.filter((p: any) => p.categorie === form.categorie_produit && (form.type === 'vt'
     ? p.catalogue_groupe === 'visite_technique'
     : form.public_cible === 'tous' || p.public_cible === form.public_cible))
-  const variantesProduits = [...new Set(produitsCategorie.map((p: any) => produitVariant(p)).filter(Boolean))].sort((a: any, b: any) => String(a).localeCompare(String(b), 'fr', { numeric: true }))
-  const produitsFiltres = produitsCategorie.filter((p: any) => !form.variante_produit || produitVariant(p) === form.variante_produit)
+  const contextualVariantCategory = ['solaire_thermique', 'combles_perdus'].includes(form.categorie_produit)
+  const ruleVariants = rules
+    .filter((r: any) => r.categorie_produit === form.categorie_produit
+      && (r.public_cible === form.public_cible || r.public_cible === 'tous')
+      && r.variante_produit)
+    .map((r: any) => String(r.variante_produit))
+  const variantesProduits = [...new Set([
+    ...produitsCategorie.map((p: any) => produitVariant(p)).filter(Boolean),
+    ...ruleVariants,
+  ])].sort((a: any, b: any) => String(a).localeCompare(String(b), 'fr', { numeric: true }))
+  const produitsFiltres = produitsCategorie.filter((p: any) => !form.variante_produit || contextualVariantCategory || produitVariant(p) === form.variante_produit)
 
   const echeanceTotal = echeances.reduce((sum, e) => sum + amount(e.montant), 0)
   const echeancePaid = echeances.filter(e => !!e.date_paiement).reduce((sum, e) => sum + amount(e.montant), 0)
@@ -2096,10 +2105,10 @@ export function CommissionsPage() {
           />
 
           <FloatSelect
-            label="Variante rémunérée (facultatif)"
+            label={form.categorie_produit === 'solaire_thermique' ? "Zone · panneaux · régime d’aide" : form.categorie_produit === 'combles_perdus' ? "Zone · profil du foyer" : "Variante rémunérée (facultatif)"}
             value={form.variante_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, variante_produit: v, produit_id: '' }))}
-            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: String(variante).replace(/_/g, ' ').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé') }))]}
+            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: String(variante).replace(/_/g, ' · ').replace(/mpr · cee/i, 'MaPrimeRénov’ + CEE').replace(/full · cee/i, 'Full CEE').replace(/autres/i, 'autres profils').replace(/bleu/i, 'Bleu').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé') }))]}
           />
 
           <FloatSelect
