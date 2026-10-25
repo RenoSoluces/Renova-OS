@@ -1,7 +1,7 @@
 import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
-  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun,
+  Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -32,6 +32,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
     { key: 'facturation', label: 'Facturation client', icon: Receipt },
     { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
     { key: 'prospection', label: 'Prospection Téléphone', icon: PhoneCall },
+    { key: 'prospection_terrain', label: 'Prospection Terrain', icon: MapPinned },
   ] },
   { label: 'Terrain', items: [
     { key: 'visites', label: 'Visite technique', icon: ClipboardCheck },
