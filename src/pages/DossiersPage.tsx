@@ -298,6 +298,7 @@ export function DossiersPage({
   }
 
   async function ajouterEcheanceFacturation() {
+    if (!isAdmin) { setDetailMessage('Seuls les administrateurs et managers peuvent préparer les échéances de facturation société.'); return }
     if (!detail) return
     const montant = Number(factureForm.montant_ht)
     const tva = Number(factureForm.taux_tva)
@@ -321,6 +322,7 @@ export function DossiersPage({
   }
 
   async function enregistrerModificationEcheance() {
+    if (!isAdmin) { setDetailMessage('Seuls les administrateurs et managers peuvent modifier les échéances de facturation société.'); return }
     if (!editingFacturationId) return
     const montant = Number(factureForm.montant_ht)
     const tva = Number(factureForm.taux_tva)
@@ -359,6 +361,7 @@ export function DossiersPage({
   }
 
   async function genererFactureEcheance(ligne: DossierFacturation) {
+    if (!isAdmin) { setDetailMessage('La génération des factures de commission société est réservée à l’administration.'); return }
     if (!detail || ligne.statut !== 'a_facturer') return
     setFactureSaving(true)
     try {
@@ -554,6 +557,7 @@ export function DossiersPage({
   }
 
   async function genererFactureDepuisCommission() {
+    if (!isAdmin) { setDetailMessage('La génération des factures de commission société est réservée à l’administration.'); return }
     if (!detail) return
     const montant = Number(factureForm.montant_ht)
     if (!Number.isFinite(montant) || montant <= 0) {
