@@ -136,6 +136,12 @@ export function CommissionsPage() {
   const [facturesLoading, setFacturesLoading] = useState(false)
   const [facturesAdmin, setFacturesAdmin] = useState<any[]>([])
   const [facturesAdminLoading, setFacturesAdminLoading] = useState(false)
+  const [facturationProfil, setFacturationProfil] = useState({
+    raison_sociale: '', forme_juridique: '', siret: '', numero_tva: '',
+    adresse: '', code_postal: '', ville: '', email_facturation: '', telephone: '',
+  })
+  const [facturationLoading, setFacturationLoading] = useState(false)
+  const [facturationSaving, setFacturationSaving] = useState(false)
 
   const [search, setSearch] = useState('')
   const [commercialFilter, setCommercialFilter] =
@@ -371,6 +377,70 @@ export function CommissionsPage() {
   useEffect(() => {
     void chargerFacturesCommission()
   }, [chargerFacturesCommission])
+
+  const chargerProfilFacturation = useCallback(async () => {
+    if (!profile?.id || profile.role !== 'apporteur') return
+    setFacturationLoading(true)
+    const { data, error } = await supabase
+      .from('apporteur_facturation')
+      .select('raison_sociale,forme_juridique,siret,numero_tva,adresse,code_postal,ville,email_facturation,telephone')
+      .eq('user_id', profile.id)
+      .maybeSingle()
+    if (error) {
+      console.error('[RENOVA OS] Profil de facturation apporteur:', error)
+      alert(`Impossible de charger les informations de facturation : ${error.message}`)
+    } else if (data) {
+      setFacturationProfil({
+        raison_sociale: data.raison_sociale || '', forme_juridique: data.forme_juridique || '',
+        siret: data.siret || '', numero_tva: data.numero_tva || '', adresse: data.adresse || '',
+        code_postal: data.code_postal || '', ville: data.ville || '',
+        email_facturation: data.email_facturation || '', telephone: data.telephone || '',
+      })
+    }
+    setFacturationLoading(false)
+  }, [profile?.id, profile?.role])
+
+  useEffect(() => {
+    void chargerProfilFacturation()
+  }, [chargerProfilFacturation])
+
+  async function enregistrerProfilFacturation() {
+    if (!profile?.id || profile.role !== 'apporteur' || facturationSaving) return
+    const required = [
+      ['raison_sociale', 'raison sociale'], ['siret', 'SIRET'], ['adresse', 'adresse'],
+      ['code_postal', 'code postal'], ['ville', 'ville'], ['email_facturation', 'e-mail'],
+    ] as const
+    const missing = required.filter(([key]) => !facturationProfil[key].trim())
+    if (missing.length) {
+      alert(`Complète les champs obligatoires : ${missing.map(([, label]) => label).join(', ')}.`)
+      return
+    }
+    if (!/^\d{14}$/.test(facturationProfil.siret.replace(/\s/g, ''))) {
+      alert('Le SIRET doit contenir exactement 14 chiffres.')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(facturationProfil.email_facturation.trim())) {
+      alert('L’adresse e-mail de facturation est invalide.')
+      return
+    }
+    setFacturationSaving(true)
+    const payload = {
+      ...facturationProfil,
+      siret: facturationProfil.siret.replace(/\s/g, ''),
+      email_facturation: facturationProfil.email_facturation.trim(),
+      updated_at: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('apporteur_facturation').upsert({
+      user_id: profile.id,
+      ...payload,
+    }, { onConflict: 'user_id' })
+    setFacturationSaving(false)
+    if (error) {
+      alert(`Enregistrement impossible : ${error.message}`)
+      return
+    }
+    alert('Informations de facturation enregistrées.')
+  }
 
   const chargerFacturesAdmin = useCallback(async () => {
     if (!canReviewFactures) {
@@ -1045,6 +1115,53 @@ export function CommissionsPage() {
                     </div>
                   ))}
                 </div>
+              )}
+            </section>
+          )}
+
+          {profile?.role === 'apporteur' && (
+            <section className="card card-pad" style={{ marginBottom: 20 }}>
+              <div style={{ marginBottom: 14 }}>
+                <h2 style={{ margin: 0 }}>Mes informations de facturation</h2>
+                <p className="text-sm text-muted" style={{ margin: '5px 0 0' }}>
+                  Ces informations sont privées et accessibles uniquement à votre compte. Elles seront utilisées pour préparer vos factures ; vérifiez-les avant toute émission.
+                </p>
+              </div>
+              {facturationLoading ? <p className="text-sm text-muted">Chargement des informations…</p> : (
+                <>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 12 }}>
+                    {([
+                      ['raison_sociale', 'Raison sociale *'],
+                      ['forme_juridique', 'Forme juridique'],
+                      ['siret', 'SIRET (14 chiffres) *'],
+                      ['numero_tva', 'N° TVA intracommunautaire'],
+                      ['adresse', 'Adresse de facturation *'],
+                      ['code_postal', 'Code postal *'],
+                      ['ville', 'Ville *'],
+                      ['email_facturation', 'E-mail de facturation *'],
+                      ['telephone', 'Téléphone'],
+                    ] as const).map(([key, label]) => (
+                      <label key={key} style={{ display: 'grid', gap: 5, fontSize: 13, color: 'var(--c-text-secondary, var(--c-muted))' }}>
+                        {label}
+                        <input
+                          value={facturationProfil[key]}
+                          onChange={e => setFacturationProfil(prev => ({ ...prev, [key]: e.target.value }))}
+                          autoComplete="off"
+                          type={key === 'email_facturation' ? 'email' : 'text'}
+                          style={{ width: '100%', minWidth: 0, padding: '10px 11px', border: '1px solid var(--c-border)', borderRadius: 8, background: 'var(--c-card, white)', color: 'var(--c-text)' }}
+                        />
+                      </label>
+                    ))}
+                  </div>
+                  <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 14 }}>
+                    <Button variant="primary" onClick={() => void enregistrerProfilFacturation()} disabled={facturationSaving || facturationLoading}>
+                      {facturationSaving ? 'Enregistrement…' : 'Enregistrer mes informations'}
+                    </Button>
+                  </div>
+                  <p className="text-sm text-muted" style={{ marginTop: 10 }}>
+                    La génération du PDF et l’envoi resteront bloqués tant que les informations légales du destinataire et les paramètres de facturation ne seront pas confirmés.
+                  </p>
+                </>
               )}
             </section>
           )}
