@@ -648,11 +648,10 @@ export function CommissionsPage() {
         .from('commission-factures')
         .upload(path, pdfBlob, { contentType: 'application/pdf', upsert: true })
       if (uploadError) throw uploadError
-      const { error: updateError } = await supabase
-        .from('commission_factures')
-        .update({ pdf_storage_path: path, updated_at: new Date().toISOString() })
-        .eq('id', facture.id)
-        .eq('commercial_id', profile.id)
+      const { error: updateError } = await supabase.rpc('enregistrer_pdf_facture_commission', {
+        p_facture_id: facture.id,
+        p_storage_path: path,
+      })
       if (updateError) throw updateError
       doc.save(`${number}.pdf`)
       await chargerFacturesCommission()
