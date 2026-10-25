@@ -344,6 +344,31 @@ export function CommissionsPage() {
     [filteredRows],
   )
 
+  async function preparerFactureCommission(c: CommissionWithCommercial) {
+    if (!profile?.id || !c.organisation_id) {
+      alert("Impossible de préparer cette facture : organisation ou profil manquant.");
+      return;
+    }
+    if (c.statut === 'annulee' || amount(c.montant_commercial) <= 0) {
+      alert("Cette commission annulée ou d'un montant nul ne peut pas être facturée.");
+      return;
+    }
+    const { error } = await supabase.from('commission_factures').insert({
+      commission_id: c.id,
+      commercial_id: profile.id,
+      organisation_id: c.organisation_id,
+      montant_ht: amount(c.montant_commercial),
+      statut: 'a_preparer',
+    });
+    if (error) {
+      alert(error.code === '23505'
+        ? "Une facture de commission est déjà préparée pour cette commission."
+        : `Préparation impossible : ${error.message}`);
+      return;
+    }
+    alert("La préparation de facture est créée. Le numéro, le PDF et l'envoi restent à compléter.");
+  }
+
   function resetFilters() {
     setSearch('')
     setCommercialFilter('all')
@@ -1571,9 +1596,19 @@ export function CommissionsPage() {
                           )}
 
                         {!admin && (
-                          <span className="badge badge-info">
-                            Lecture seule
-                          </span>
+                          <>
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              disabled={c.statut === 'annulee' || amount(c.montant_commercial) <= 0}
+                              onClick={() => void preparerFactureCommission(c)}
+                            >
+                              <Banknote size={14} /> Préparer ma facture
+                            </Button>
+                            <span className="badge badge-info">
+                              Lecture seule
+                            </span>
+                          </>
                         )}
                       </div>
                     </div>
