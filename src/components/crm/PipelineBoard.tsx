@@ -114,7 +114,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
     const q = search.trim().toLocaleLowerCase('fr')
     return prospects.filter(p => {
       if (q) {
-        const haystack = [p.prenom, p.nom, p.ville, p.commercial, ...(p.tags || [])]
+        const haystack = [p.prenom, p.nom, p.ville, p.commercial, p.email, p.telephone, p.source, p.raison_sociale, ...(p.tags || [])]
           .filter(Boolean).join(' ').toLocaleLowerCase('fr')
         if (!haystack.includes(q)) return false
       }
@@ -182,7 +182,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
-            placeholder="Rechercher un prospect, une ville, un commercial…"
+            placeholder="Nom, téléphone, e-mail, ville, commercial…"
             aria-label="Rechercher dans le Pipeline"
           />
           {search && <button type="button" onClick={() => setSearch('')} aria-label="Effacer la recherche"><X size={15} /></button>}
