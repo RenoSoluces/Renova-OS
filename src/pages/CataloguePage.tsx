@@ -650,6 +650,8 @@ export function CataloguePage() {
                       <th>Fiche</th>
                       <th>Conformité à la fiche</th>
                       {isAdmin && <th>Prix HT</th>}
+                      {isAdmin && <th>Pose HT</th>}
+                      {isAdmin && <th>Consommables HT</th>}
                       <th>TVA</th>
                       <th>Statut</th>
                       <th></th>
@@ -682,6 +684,8 @@ export function CataloguePage() {
                             )}
                           </td>
                           {isAdmin && <td className="num">{prixARenseigner(p) ? 'À renseigner' : euro(p.prix_unitaire_ht)} <span className="note">/ {UNITES.find(u => u.value === p.unite)?.label || p.unite}</span></td>}
+                          {isAdmin && <td className="num">{Number(p.forfait_pose_ht) > 0 ? euro(p.forfait_pose_ht) : 'À renseigner'}</td>}
+                          {isAdmin && <td className="num">{Number(p.forfait_consommables_ht) > 0 ? euro(p.forfait_consommables_ht) : 'À renseigner'}</td>}
                           <td className="num">{p.tva_taux} %</td>
                           <td>
                             <button className={`pill ${p.actif ? 'g' : 'n'}`} onClick={() => toggleActif(p)} style={{ cursor: 'pointer', border: 'none' }}>{p.actif ? 'Actif' : 'Inactif'}</button>
