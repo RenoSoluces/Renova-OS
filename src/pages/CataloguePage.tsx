@@ -25,7 +25,7 @@ const nettoyerDescriptionProduit = (value: string | null | undefined) => String(
   .replace(/(?:^|\s)Fiche (?:CEE )?de r[ée]f[ée]rence\s*:\s*(?:BAR|BAT|BAE|IND|RES|TRA)-[A-Z]{2}-\d{3}[^.\n]*\.?/gi, '')
   .replace(/(?:^|\s)Fiche CEE (?:BAR|BAT|BAE|IND|RES|TRA)-[A-Z]{2}-\d{3}\s*:[^.\n]*\.?/gi, '')
   // Nettoie les métadonnées d'import obsolètes ; elles ne doivent pas contredire les valeurs structurées.
-  .replace(/(?:^|\\n)\\s*(?:Coefficient Uw W M2k|Coefficient Uw W m2K|Facteur Solaire Sw|Notes Controle|Performances A Confirmer|Source Catalogue)\\s*:\\s*[^\\n]*/gi, '')
+  .replace(/(?:^|\n)\s*(?:Coefficient Uw W M2k|Coefficient Uw W m2K|Facteur Solaire Sw|Notes Controle|Performances A Confirmer|Source Catalogue)\s*:\s*[^\n]*/gi, '')
   .replace(/[ \t]+([,;|])/g, '$1')
   .replace(/[ \t]{2,}/g, ' ')
   .replace(/^[ \t—–;,|]+|[ \t—–;,|]+$/gm, '')
