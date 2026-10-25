@@ -1717,13 +1717,10 @@ export function CommissionsPage() {
                       </div>
 
                       <span>
-                        {commerciaux.find(
-                          (c) =>
-                            c.id ===
-                            r.commercial_id,
-                        )
-                          ?.nom_complet ||
-                          'Tous les commerciaux'}
+                        {r.commercial_id === profile?.id && !admin
+                          ? 'Votre compte'
+                          : commerciaux.find((c) => c.id === r.commercial_id)?.nom_complet ||
+                            'Tous les commerciaux'}
                       </span>
 
                       <span>
