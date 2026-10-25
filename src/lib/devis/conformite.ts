@@ -146,6 +146,7 @@ export const CHAMPS_FICHE: Record<string, ChampFiche[]> = {
   ],
   'BAR-TH-172': [
     { k: 'usage', l: 'Usage de la PAC', type: 'choix', options: ['Chauffage seul', 'Chauffage + eau chaude sanitaire'] },
+    { k: 'autre_systeme_chauffage', l: 'PAC associée à un autre système de chauffage', type: 'choix', options: ['Non', 'Oui'] },
     { k: 'temp', l: 'Type d’application', type: 'choix', options: ['Basse température', 'Moyenne ou haute température'] },
     { k: 'captage', l: 'Type d’eau du captage', type: 'choix', options: ['Eau de nappe (eau/eau)', 'Eau glycolée (eau glycolée/eau)'] },
     { k: 'etas', l: 'Efficacité énergétique saisonnière ηs', u: '%', type: 'nombre' },
@@ -439,6 +440,9 @@ export function verifierFiche(fiche: string | null, v: Record<string, string>, s
   switch (fiche) {
     case 'BAR-TH-171': {
       besoin('usage')
+      if (besoin('autre_systeme_chauffage') && /oui/i.test(norm(v.autre_systeme_chauffage))) {
+        bloc('Une PAC associée à un autre système de chauffage est exclue de BAR-TH-172', 'autre_systeme_chauffage')
+      }
       if (besoin('temp')) {
         const t = norm(v.temp)
         min('etas', t.includes('basse') && !t.includes('moy') ? 126 : 111, '%')
