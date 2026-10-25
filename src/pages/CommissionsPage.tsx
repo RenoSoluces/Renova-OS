@@ -848,6 +848,16 @@ export function CommissionsPage() {
         </div>
       )}
 
+      {tab === 'bareme' && !admin && (
+        <div className="commission-readonly-notice" role="status">
+          <div className="commission-readonly-icon"><ShieldCheck size={18} /></div>
+          <div>
+            <strong>Matrice en lecture seule</strong>
+            <p>Vous pouvez consulter les règles de rémunération applicables à votre compte. La création et la modification des barèmes sont réservées à l’administration.</p>
+          </div>
+        </div>
+      )}
+
       {(tab === 'suivi' || !canViewBareme) && (
         <>
           <div
