@@ -1,0 +1,71 @@
+/* Prospection Téléphone (préfixe pt-) */
+.pt-message { padding: var(--sp-3) var(--sp-4); border-radius: var(--r-md); margin-bottom: var(--sp-4); font-size: 14px; }
+.pt-message.ok { background: var(--c-primary-50); color: var(--c-primary); }
+.pt-message.erreur { background: color-mix(in srgb, var(--c-error) 9%, #fff); color: #A61E1E; }
+
+.pt-stats { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--sp-3); margin-bottom: var(--sp-4); }
+.pt-stat {
+  position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 2px; text-align: left;
+  padding: var(--sp-4); border-radius: var(--r-md); background: var(--c-bg-alt); border: 1px solid var(--c-border-light);
+  box-shadow: var(--sh-sm); transition: all var(--tr-fast); overflow: hidden;
+}
+button.pt-stat:hover { border-color: var(--c-border-dark); transform: translateY(-1px); }
+.pt-stat.on { border-color: var(--c-primary-400); box-shadow: 0 0 0 3px color-mix(in srgb, var(--c-primary-300) 25%, transparent); }
+.pt-stat strong { font-family: var(--font-display); font-size: 26px; font-weight: 600; color: var(--c-text); font-variant-numeric: tabular-nums; }
+.pt-stat small { font-size: 12px; color: var(--c-text-muted); }
+.pt-stat-icone { position: absolute; top: 12px; right: 12px; width: 30px; height: 30px; display: grid; place-items: center; border-radius: 50%; background: var(--c-bg-soft); color: var(--c-text-muted); }
+.pt-stat.info .pt-stat-icone { background: color-mix(in srgb, var(--c-info) 12%, #fff); color: var(--c-info); }
+.pt-stat.ok .pt-stat-icone { background: var(--c-primary-50); color: var(--c-primary-400); }
+.pt-stat.alerte .pt-stat-icone { background: color-mix(in srgb, var(--c-warning) 16%, #fff); color: #8A5A00; }
+.pt-stat.taux { background: linear-gradient(135deg, var(--c-primary), var(--c-primary-400)); border-color: var(--c-primary); }
+.pt-stat.taux strong { color: #fff; } .pt-stat.taux small { color: var(--c-primary-100); }
+
+.pt-barre { display: flex; gap: var(--sp-3); align-items: center; }
+.pt-recherche { position: relative; flex: 1; }
+.pt-recherche svg { position: absolute; left: 12px; top: 50%; transform: translate(0, -50%); color: var(--c-text-light); }
+.pt-recherche .input { padding-left: 38px; min-height: 48px; }
+.pt-aide { margin: var(--sp-2) 0 var(--sp-4); font-size: 12.5px; color: var(--c-text-muted); line-height: 1.45; }
+
+.pt-liste { display: flex; flex-direction: column; gap: var(--sp-2); }
+.pt-lead {
+  display: grid; grid-template-columns: minmax(180px, 1.4fr) minmax(130px, .8fr) minmax(190px, 1.2fr) auto; align-items: center; gap: var(--sp-4);
+  padding: var(--sp-3) var(--sp-4); background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-left: 4px solid var(--c-border-dark);
+  border-radius: var(--r-md); box-shadow: var(--sh-sm);
+}
+.pt-lead.a_appeler { border-left-color: var(--c-info); } .pt-lead.joint { border-left-color: var(--c-success); } .pt-lead.pas_joint { border-left-color: var(--c-warning); }
+.pt-lead-id { display: flex; flex-direction: column; min-width: 0; }
+.pt-lead-id strong { font-size: 15px; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pt-lead-id span { font-size: 12.5px; color: var(--c-text-muted); }
+.pt-lead-tel a { font-weight: 600; color: var(--c-primary-400); text-decoration: none; font-variant-numeric: tabular-nums; }
+.pt-lead-tel em { font-size: 12.5px; color: var(--c-text-light); }
+.pt-lead-statut { display: flex; flex-direction: column; gap: 3px; align-items: flex-start; }
+.pt-lead-statut small { font-size: 12px; color: var(--c-text-muted); }
+.pt-badge { display: inline-flex; padding: 3px 10px; border-radius: var(--r-pill); font-size: 12px; font-weight: 700; }
+.pt-badge.a_appeler { color: #1F5F99; background: color-mix(in srgb, var(--c-info) 13%, #fff); }
+.pt-badge.joint { color: var(--c-primary); background: var(--c-primary-50); }
+.pt-badge.pas_joint { color: #8A5A00; background: color-mix(in srgb, var(--c-warning) 16%, #fff); }
+.pt-lead-actions { display: flex; gap: var(--sp-2); justify-content: flex-end; }
+
+.pt-modal { display: flex; flex-direction: column; gap: var(--sp-4); }
+.pt-modal-contact { display: flex; flex-direction: column; gap: 4px; padding: var(--sp-4); border-radius: var(--r-md); background: var(--c-bg-soft); }
+.pt-modal-contact span { font-size: 13px; color: var(--c-text-secondary); } .pt-modal-contact small { color: var(--c-text-muted); }
+.pt-gros-tel { display: inline-flex; align-items: center; gap: 10px; font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--c-primary-400); text-decoration: none; }
+.pt-groupe { margin-bottom: var(--sp-2); font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--c-text-secondary); }
+.pt-resultats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--sp-2); }
+.pt-resultat { display: flex; align-items: center; gap: 8px; min-height: 48px; padding: 0 var(--sp-3); text-align: left; font-size: 14px; font-weight: 500; color: var(--c-text); border: 2px solid var(--c-border); border-radius: var(--r-md); background: var(--c-bg-alt); transition: all var(--tr-fast); }
+.pt-resultat:hover { border-color: var(--c-border-dark); }
+.pt-resultat.joint.on { border-color: var(--c-success); background: var(--c-primary-50); }
+.pt-resultat.pas_joint.on { border-color: var(--c-warning); background: color-mix(in srgb, var(--c-warning) 13%, #fff); }
+
+@media (max-width: 1100px) { .pt-stats { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+@media (max-width: 800px) {
+  .pt-barre { flex-direction: column; align-items: stretch; }
+  .pt-lead { grid-template-columns: 1fr auto; row-gap: var(--sp-2); }
+  .pt-lead-statut { grid-column: 1 / 2; } .pt-lead-actions { grid-column: 2 / 3; grid-row: 1 / 3; flex-direction: column; }
+  .pt-lead-tel { grid-column: 1 / 2; }
+}
+@media (max-width: 520px) { .pt-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); } .pt-resultats { grid-template-columns: 1fr; } }
+.pt-recherche .input { width: 100%; }
+.pt-modal { gap: var(--sp-3); }
+.pt-resultat { min-height: 42px; }
+.pt-modal .pt-aide { margin: 0; }

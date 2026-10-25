@@ -31,7 +31,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
     { key: 'simulations', label: 'Simulation des aides', icon: Calculator },
     { key: 'facturation', label: 'Facturation client', icon: Receipt },
     { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
-    { key: 'prospection', label: 'Prospection', icon: PhoneCall },
+    { key: 'prospection', label: 'Prospection Téléphone', icon: PhoneCall },
   ] },
   { label: 'Terrain', items: [
     { key: 'visites', label: 'Visite technique', icon: ClipboardCheck },
