@@ -18,7 +18,7 @@ const OR: [number, number, number] = [232, 176, 74]
 const GRIS: [number, number, number] = [110, 110, 110]
 const FOND: [number, number, number] = [240, 244, 242]
 
-export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire, prospect: Prospect | null, entreprise: Entreprise | null): jsPDF {
+export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire, prospect: Prospect | null, entreprise: Entreprise | null, logoDataUrl?: string | null): jsPDF {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const L = doc.internal.pageSize.getWidth()
   const M = 15
@@ -26,7 +26,13 @@ export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire
 
   // ---- En-tête
   doc.setFillColor(...VERT); doc.rect(0, 0, L, 38, 'F')
-  doc.setFillColor(...OR); doc.circle(L - 26, 19, 7, 'F')
+  // Le logo (texte sombre sur fond transparent) est posé sur une pastille blanche.
+  if (logoDataUrl) {
+    doc.setFillColor(255, 255, 255); doc.roundedRect(L - M - 30, 4.5, 30, 29, 4, 4, 'F')
+    try { doc.addImage(logoDataUrl, 'PNG', L - M - 28, 6, 26, 26, undefined, 'FAST') } catch { /* logo illisible : on l'omet */ }
+  } else {
+    doc.setFillColor(...OR); doc.circle(L - 26, 19, 7, 'F')
+  }
   doc.setTextColor(255); doc.setFont('helvetica', 'bold'); doc.setFontSize(22)
   doc.text('Votre simulation solaire', M, 19)
   doc.setFont('helvetica', 'normal'); doc.setFontSize(10.5)
@@ -122,6 +128,7 @@ export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire
   // ---- Page 2
   doc.addPage()
   y = 20
+  if (logoDataUrl) { try { doc.addImage(logoDataUrl, 'PNG', L - M - 16, 8, 16, 16, undefined, 'FAST') } catch { /* ignoré */ } }
   doc.setTextColor(30); doc.setFont('helvetica', 'bold'); doc.setFontSize(11)
   doc.text('Gain cumulé sur 20 ans, installation déduite', M, y)
   const cx0 = M + 16, cy0 = y + 8, cw = L - 2 * M - 18, ch = 70
