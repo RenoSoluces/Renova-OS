@@ -349,7 +349,7 @@ export function CommissionsPage() {
   )
 
   const chargerFacturesCommission = useCallback(async () => {
-    if (!profile?.id || admin) {
+    if (!profile?.id || admin || profile.role !== 'apporteur') {
       setCommissionFactures([])
       return
     }
