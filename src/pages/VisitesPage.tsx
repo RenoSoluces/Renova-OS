@@ -1654,6 +1654,7 @@ export function VisitesPage({
           setCurrentEtape(0)
         }}
         activeSections={activeSections}
+        onBack={() => setView('list')}
         tutorialText={
           produitCibleInfo
             ? `Visite ciblée : ${produitCibleInfo.label} — seules les sections nécessaires à ce geste sont demandées`

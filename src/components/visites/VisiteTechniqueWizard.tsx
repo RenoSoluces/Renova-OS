@@ -100,12 +100,14 @@ interface WizardShellProps {
   activeSections?: number[]
   /** Badge de statut de synchronisation hors-ligne, affiché dans la barre du haut */
   syncBadge?: React.ReactNode
+  /** Retour à la liste des visites (la saisie est enregistrée au fil de l'eau) */
+  onBack?: () => void
   children: React.ReactNode
 }
 
 export function VisiteTechniqueWizard({
   prospect, currentSection, currentEtape, completedSections, auditData,
-  onSelectSection, tutorialText, activeSections, syncBadge, children,
+  onSelectSection, tutorialText, activeSections, syncBadge, onBack, children,
 }: WizardShellProps) {
   const active = activeSections && activeSections.length > 0 ? activeSections : SECTIONS.map(s => s.id)
   const activeSectionDefs = SECTIONS.filter(s => active.includes(s.id))
@@ -131,7 +133,7 @@ export function VisiteTechniqueWizard({
       {/* Audit sidebar */}
       <aside className="audit-sidebar">
         <div className="audit-sidebar-header">
-          <button className="audit-back">
+          <button type="button" className="audit-back" onClick={onBack} disabled={!onBack}>
             <ArrowLeft size={16} /> Retour
           </button>
           <div className="audit-prospect">
@@ -180,6 +182,32 @@ export function VisiteTechniqueWizard({
 
       {/* Main area */}
       <div className="audit-main">
+        {/* Barre mobile / tablette : remplace le menu latéral */}
+        <div className="audit-mobilebar">
+          <button type="button" className="audit-mobilebar-back" onClick={onBack} disabled={!onBack} aria-label="Retour à la liste des visites">
+            <ArrowLeft size={18} />
+          </button>
+          <div className="audit-mobilebar-who">
+            <b>{prospect.prenom} {prospect.nom}</b>
+            <span>{completedSteps} / {totalSteps} étapes · {progressPct}%</span>
+          </div>
+          {syncBadge}
+        </div>
+        <nav className="audit-chips" aria-label="Sections de la visite">
+          {activeSectionDefs.map(s => (
+            <button
+              key={s.id}
+              type="button"
+              className={`audit-chip ${s.id === currentSection ? 'active' : ''} ${completedSections.includes(s.id) ? 'completed' : ''}`}
+              onClick={() => onSelectSection(s.id)}
+              ref={el => { if (el && s.id === currentSection) el.scrollIntoView?.({ inline: 'center', block: 'nearest' }) }}
+            >
+              <span className="num">{completedSections.includes(s.id) ? <Check size={11} /> : s.id}</span>
+              {s.short}
+            </button>
+          ))}
+        </nav>
+
         <div className="audit-topbar">
           <div className="audit-breadcrumb">
             <b>{section.label}</b>
@@ -216,9 +244,10 @@ export function VisiteTechniqueWizard({
                 {i > 0 && <div className={`audit-step-line ${i <= currentEtape ? 'completed' : ''}`} />}
                 <div className={`audit-step-dot ${
                   i < currentEtape ? 'completed' : i === currentEtape ? 'current' : ''
-                }`}>
+                }`} title={etape.label}>
                   {i < currentEtape ? <Check size={12} /> : i + 1}
                 </div>
+                {i === currentEtape && <span className="audit-step-name">{etape.label}</span>}
               </div>
             ))}
           </div>
