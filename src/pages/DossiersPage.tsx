@@ -133,20 +133,30 @@ export function DossiersPage({
       .from('commissions_safe')
       .select('reference_id, montant_commercial, montant_societe')
       .eq('reference_type', 'devis')
-      .then(({ data, error }) => {
+      .then(async ({ data, error }) => {
         if (error) {
           console.error('Erreur chargement commissions des dossiers:', error)
           return
         }
 
         const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
+        const commissionRows = data || []
+        const devisIds = commissionRows.map(c => c.reference_id).filter(Boolean) as string[]
+        const { data: liensDevis, error: liensError } = devisIds.length
+          ? await supabase.from('devis').select('id,dossier_id').in('id', devisIds)
+          : { data: [], error: null }
 
-        for (const c of data || []) {
+        if (liensError) console.error('Erreur chargement des liens devis/dossiers:', liensError)
+
+        for (const c of commissionRows) {
           if (!c.reference_id) continue
-          map[c.reference_id] = {
+          const value = {
             montant_commercial: Number(c.montant_commercial) || 0,
             montant_societe: Number(c.montant_societe) || 0,
           }
+          map[c.reference_id] = value
+          const lien = (liensDevis || []).find(v => v.id === c.reference_id)
+          if (lien?.dossier_id) map[lien.dossier_id] = value
         }
 
         setCommissionsParDevis(map)
@@ -267,7 +277,7 @@ export function DossiersPage({
 
     setPieces(await resolveDocumentRows((data || []) as DocumentPiece[]))
     setFacturation((factures || []) as DossierFacturation[])
-    const commission = d.devis_id ? commissionsParDevis[d.devis_id] : undefined
+    const commission = commissionsParDevis[d.devis_id || d.id]
     const totalFactureNonAnnulee = (factures || []).filter((f: any) => f.statut !== 'annulee').reduce((sum: number, f: any) => sum + Number(f.montant_ht || 0), 0)
     const restant = Math.max(0, Number(commission?.montant_societe || 0) - totalFactureNonAnnulee)
     setFactureForm({
