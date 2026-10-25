@@ -195,7 +195,7 @@ export function ParametresPage() {
         .maybeSingle()
       if (cancelled) return
       if (error) console.error('[RENOVA OS] Chargement des informations entreprise:', error)
-      setEntreprise(data ? data as Partial<Entreprise> : { ...ENTREPRISE_VIDE, organisation_id: profile.organisation_id })
+      setEntreprise(data ? (data as Partial<Entreprise>) : ({ ...ENTREPRISE_VIDE, organisation_id: profile.organisation_id } as Partial<Entreprise>))
       setEntrepriseLoading(false)
     }
     void loadEntreprise()
