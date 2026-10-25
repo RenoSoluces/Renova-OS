@@ -98,6 +98,7 @@ export function CommissionsPage() {
   const { profile } = useAuth()
   const admin =
     profile?.role === 'admin' || profile?.role === 'manager'
+  const canReviewFactures = ['admin', 'manager', 'super_admin', 'partner_admin', 'company_admin'].includes(profile?.role || '')
   const canViewBareme = admin || profile?.role === 'apporteur' || profile?.role === 'partner'
 
   const [tab, setTab] = useState<'suivi' | 'bareme'>('suivi')
@@ -372,7 +373,7 @@ export function CommissionsPage() {
   }, [chargerFacturesCommission])
 
   const chargerFacturesAdmin = useCallback(async () => {
-    if (!admin) {
+    if (!canReviewFactures) {
       setFacturesAdmin([])
       return
     }
@@ -400,7 +401,7 @@ export function CommissionsPage() {
       setFacturesAdmin(list.map((f: any) => ({ ...f, commercial_nom: names[f.commercial_id] || f.commercial_id })))
     }
     setFacturesAdminLoading(false)
-  }, [admin])
+  }, [admin, canReviewFactures])
 
   useEffect(() => {
     void chargerFacturesAdmin()
@@ -986,7 +987,7 @@ export function CommissionsPage() {
 
       {(tab === 'suivi' || !canViewBareme) && (
         <>
-          {admin && (
+          {canReviewFactures && (
             <section className="card card-pad" style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                 <div>
@@ -1025,7 +1026,7 @@ export function CommissionsPage() {
             </section>
           )}
 
-          {!admin && (
+          {profile?.role === 'apporteur' && (
             <section className="card card-pad" style={{ marginBottom: 20 }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 12, marginBottom: 14 }}>
                 <div>
