@@ -256,7 +256,11 @@ const FICHES_BONIFICATION = ['BAR-TH-148', 'BAR-TH-101', 'BAR-TH-143', 'BAR-TH-1
 export const norm = (s: unknown) =>
   String(s ?? '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
 
-const rempli = (v: unknown) => v !== undefined && v !== null && String(v).trim() !== ''
+const rempli = (v: unknown) => {
+  if (v === undefined || v === null) return false
+  const s = String(v).trim()
+  return s !== '' && !/^(null|undefined|n\\/a|na)$/i.test(s)
+}
 
 const nombre = (v: unknown): number | null => {
   const m = String(v ?? '').replace(',', '.').match(/-?\d+(\.\d+)?/)
@@ -276,9 +280,15 @@ export function extraireFiche(code: string | null | undefined): string | null {
 export function estHorsChampBarEn104(p: ProduitMin | undefined | null): boolean {
   if (!p) return false
   const nom = norm(p.nom)
-  if (p.categorie === 'menuiseries' && norm(p.caracteristiques?.type_menuiserie) === 'accessoire') return true
-  return p.categorie === 'menuiseries_portes'
-    || /porte d entree|porte entree|volet roulant|bubendorff|men-pvc-fixe|chassis fixe pvc/.test(nom)
+  const typeMenuiserie = norm(p.caracteristiques?.type_menuiserie)
+  if (p.categorie === 'menuiseries' && typeMenuiserie === 'accessoire') return true
+  // BAR-EN-104 accepte explicitement les baies fixes. Les portes d'entrée,
+  // elles, restent hors périmètre même si leur Ud est renseigné : Ud ne remplace pas Uw/Sw.
+  const porteFenetre = /porte.?fenetre|fenetre.?porte/.test(nom) || /porte.?fenetre|fenetre.?porte/.test(typeMenuiserie)
+  const porteEntree = /porte d entree|porte entree/.test(nom) || /porte_entree|porte entree/.test(typeMenuiserie)
+  return (p.categorie === 'menuiseries_portes' && !porteFenetre)
+    || (porteEntree && !porteFenetre)
+    || /volet roulant|bubendorff/.test(nom)
 }
 
 /**
