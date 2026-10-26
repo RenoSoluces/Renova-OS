@@ -287,3 +287,33 @@
 .journee-relance:last-child { border-bottom: 0; }
 .journee-resultats { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
 .journee-resultats .btn, .journee-relance .btn-primary { display: inline-flex; align-items: center; gap: 6px; }
+
+/* Abonnement agenda */
+.abo-agenda { margin-bottom: 16px; overflow: hidden; }
+.abo-agenda-tete { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: none; border: 0; text-align: left; cursor: pointer; color: var(--c-text); }
+.abo-agenda-tete .tourne { transform: rotate(180deg); }
+.abo-agenda-icone { width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--c-primary-50, #EAF4EE); color: var(--c-primary); }
+.abo-agenda-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.abo-agenda-texte strong { font-size: 14px; }
+.abo-agenda-texte small { font-size: 12.5px; color: var(--c-text-muted); }
+.abo-agenda-corps { padding: 0 16px 16px 66px; display: flex; flex-direction: column; gap: 12px; }
+.abo-agenda-boutons { display: flex; flex-wrap: wrap; gap: 8px; }
+.abo-agenda-boutons .btn { text-decoration: none; }
+.abo-agenda-lien { display: flex; flex-direction: column; gap: 6px; font-size: 12.5px; color: var(--c-text-secondary); }
+.abo-agenda-copie { display: flex; gap: 8px; align-items: center; }
+.abo-agenda-copie code { flex: 1; min-width: 0; padding: 7px 9px; border-radius: 8px; border: 1px solid var(--c-border-light); background: var(--c-bg-soft); font-size: 11.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.abo-agenda-copie .btn { display: inline-flex; align-items: center; gap: 5px; flex-shrink: 0; }
+.abo-agenda-reset { display: inline-flex; align-items: center; gap: 4px; padding: 0; border: 0; background: none; color: var(--c-primary); font-weight: 600; font-size: inherit; cursor: pointer; }
+@media (max-width: 640px) { .abo-agenda-corps { padding-left: 16px; } }
+
+/* E-mail au prospect */
+.email-prospect { display: flex; flex-direction: column; gap: 12px; }
+.email-modeles { display: flex; flex-wrap: wrap; gap: 6px; }
+.email-modeles button { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--c-border); background: #fff; font-size: 12.5px; font-weight: 600; color: var(--c-text-secondary); cursor: pointer; }
+.email-modeles button.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.email-champ { display: flex; align-items: center; gap: 10px; padding-bottom: 8px; border-bottom: 1px solid var(--c-border-light); font-size: 14px; }
+.email-champ span { width: 48px; flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--c-text-muted); text-transform: uppercase; letter-spacing: .04em; }
+.email-champ input { flex: 1; min-width: 0; border: 0; font-size: 15px; padding: 4px 0; background: none; }
+.email-champ input:focus { outline: none; }
+.email-corps { width: 100%; padding: 12px; border: 1px solid var(--c-border); border-radius: var(--r-md, 10px); font: inherit; font-size: 15px; line-height: 1.5; resize: vertical; }
+.email-aide { margin: 0; font-size: 12px; color: var(--c-text-muted); }
