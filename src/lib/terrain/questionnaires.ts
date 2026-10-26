@@ -128,7 +128,7 @@ export const QUESTIONNAIRES: Questionnaire[] = [
   },
   {
     produit: 'photovoltaique', label: 'Panneaux solaires', court: 'Solaire',
-    accroche: 'Produire son électricité et réduire sa facture de 30 à 60 %, avec la prime à l’autoconsommation.',
+    accroche: 'Produire et consommer sa propre électricité en journée : chaque kWh solaire consommé sur place est un kWh qui n’est plus acheté.',
     questions: [OCCUPATION, LOGEMENT_MAISON,
       { id: 'orientation', label: 'Orientation du toit', options: [
         { valeur: 'sud', label: 'Sud', poids: 3 }, { valeur: 'sud_est_ouest', label: 'Sud-Est / Sud-Ouest', poids: 2 }, { valeur: 'est_ouest', label: 'Est / Ouest', poids: 1 },

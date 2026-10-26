@@ -150,7 +150,7 @@ export function GraphiqueMensuel({ r }: { r: ResultatSolaire }) {
       ))}
       {r.productionMensuelle.map((v, i) => {
         const x = g + largeur * i + largeur * 0.16, w = largeur * 0.68
-        const auto = v * t
+        const auto = r.autoconsommationMensuelle?.[i] ?? v * t
         return (
           <g key={i} className="sol-barre" style={{ animationDelay: `${i * 40}ms` }}>
             <rect x={x} y={y(v)} width={w} height={Math.max(0, y(auto) - y(v))} rx="3" fill={COULEURS.surplus} />

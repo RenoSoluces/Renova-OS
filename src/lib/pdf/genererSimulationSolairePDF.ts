@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf'
 import type { Entreprise, Prospect } from '../../types'
-import { MOIS, ORIENTATIONS, TARIF_RACHAT_SURPLUS, type EntreeSolaire, type ResultatSolaire } from '../photovoltaique/simulateurSolaire'
+import { MOIS, ORIENTATIONS, type EntreeSolaire, type ResultatSolaire } from '../photovoltaique/simulateurSolaire'
 
 // Voir genererDevisPDF.ts : on formate les nombres à la main (l'espace fine insécable de
 // Intl.NumberFormat('fr-FR') n'existe pas dans la police standard de jsPDF).
@@ -87,7 +87,7 @@ export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire
   })
   y += 28
   doc.setFont('helvetica', 'normal'); doc.setFontSize(8); doc.setTextColor(...GRIS)
-  doc.text(`Formule ADEME : puissance x coefficient d'orientation x heures d'ensoleillement. Toit orienté ${orient.toLowerCase()}, inclinaison ${e.inclinaisonDeg ?? 30} degrés${r.coefficientMasques < 1 ? `, masques solaires (x ${nombre(r.coefficientMasques, 2)})` : ''}.`, M, y, { maxWidth: L - 2 * M })
+  doc.text(`${r.sourcePvgis ? `Production calculée avec PVGIS (Commission européenne) pour l'adresse du client` : `Formule ADEME : puissance x coefficient d'orientation x heures d'ensoleillement`}. Toit orienté ${orient.toLowerCase()}, inclinaison ${e.inclinaisonDeg ?? 30} degrés${r.coefficientMasques < 1 ? `, masques solaires (x ${nombre(r.coefficientMasques, 2)})` : ''}.`, M, y, { maxWidth: L - 2 * M })
 
   // ---- Graphique mensuel
   y += 12
@@ -105,7 +105,7 @@ export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire
   }
   const bl = gw / 12
   r.productionMensuelle.forEach((v, i) => {
-    const hTot = (v / echelle) * gh, hAuto = hTot * r.tauxAutoconsommation
+    const hTot = (v / echelle) * gh, hAuto = ((r.autoconsommationMensuelle?.[i] ?? v * r.tauxAutoconsommation) / echelle) * gh
     const x = gx + bl * i + bl * 0.18, bw2 = bl * 0.64
     doc.setFillColor(...OR); doc.rect(x, gy + gh - hTot, bw2, hTot - hAuto, 'F')
     doc.setFillColor(...VERT_CLAIR); doc.rect(x, gy + gh - hAuto, bw2, hAuto, 'F')
@@ -160,7 +160,8 @@ export function genererSimulationSolairePDF(r: ResultatSolaire, e: EntreeSolaire
   const lignes: [string, string][] = [
     ['Prix du kWh payé aujourd\'hui', `${nombre(e.prixKwh ?? 0, 3)} EUR TTC`],
     ['Évolution du prix du kWh', `+ ${nombre(e.inflationKwhPct, 1)} % par an`],
-    ['Rachat du surplus injecté', `${nombre(TARIF_RACHAT_SURPLUS, 2)} EUR / kWh`],
+    ['Rachat du surplus injecté', `${nombre(r.tarifRachat, 3)} EUR / kWh (indexé ~2 %/an)`],
+    ...(r.mensualite != null ? [['Financement', `${nombre(r.mensualite, 0)} EUR / mois sur ${e.financementMois} mois${r.effortMensuel != null ? ` (effort net ${nombre(r.effortMensuel, 0)} EUR / mois la 1re année)` : ''}`]] as [string, string][] : []),
     ['Prime à l\'autoconsommation', 'Aucune'],
     ['Consommation annuelle du foyer', r.consommationAnnuelle ? `${nombre(r.consommationAnnuelle)} kWh` : 'Non renseignée'],
     ['Part de la production autoconsommée', `${nombre(r.tauxAutoconsommation * 100)} %${e.batterie ? ' (avec batterie)' : ''}`],
