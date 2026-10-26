@@ -391,6 +391,33 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   async function saveProspect() {
     if (form.type_prospect === 'professionnel' ? !form.raison_sociale : !(form.nom && form.prenom)) return
     setSaving(true)
+
+    // Relire l'identité et l'organisation depuis Supabase juste avant l'insertion :
+    // le contrôle RLS s'appuie sur auth.uid(), pas seulement sur l'état React du profil.
+    const { data: authResult, error: authError } = await supabase.auth.getUser()
+    if (authError || !authResult.user) {
+      setSaving(false)
+      alert("Création du prospect impossible : session expirée. Reconnectez-vous puis réessayez.")
+      return
+    }
+
+    const { data: creatorProfile, error: creatorProfileError } = await supabase
+      .from('profiles')
+      .select('id, nom_complet, role, organisation_id')
+      .eq('id', authResult.user.id)
+      .maybeSingle()
+
+    if (creatorProfileError || !creatorProfile) {
+      setSaving(false)
+      alert("Création du prospect impossible : profil utilisateur introuvable. Reconnectez-vous ou contactez l'administrateur.")
+      return
+    }
+    if (!creatorProfile.organisation_id) {
+      setSaving(false)
+      alert("Création du prospect impossible : votre compte n'est rattaché à aucune entreprise. Contactez l'administrateur.")
+      return
+    }
+
     const payload: any = {
       type_prospect: form.type_prospect,
       raison_sociale: form.type_prospect === 'professionnel' ? (form.raison_sociale || null) : null,
@@ -418,10 +445,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       commentaires: form.commentaires || null,
       fiches_cee: form.fiches_cee,
       statut: 'Nouveau',
-      commercial: profile?.nom_complet || null,
-      commercial_id: profile?.id || null,
-      // La politique RLS exige que le prospect soit rattaché à l'organisation du créateur.
-      organisation_id: profile?.organisation_id || null,
+      commercial: creatorProfile.nom_complet || null,
+      commercial_id: authResult.user.id,
+      organisation_id: creatorProfile.organisation_id,
     }
     const { data: nouveauProspect, error: insertError } = await supabase.from('prospects').insert(payload).select('id').single()
     setSaving(false)
