@@ -7,6 +7,7 @@ type Etat = { connecte: boolean; google_email: string | null; derniere_synchro: 
 /** Délai minimal entre deux synchronisations automatiques à l'ouverture de l'agenda. */
 const DELAI_AUTO_MS = 10 * 60 * 1000
 const retourGoogle = parametresArrivee.get('google')
+const detailGoogle = parametresArrivee.get('detail')
 
 async function appeler(action: string, extra: Record<string, unknown> = {}) {
   const { data, error } = await supabase.functions.invoke('google-agenda', { body: { action, ...extra } })
@@ -23,7 +24,7 @@ export function ConnexionGoogleAgenda({ onSynchronise }: { onSynchronise?: () =>
   const [message, setMessage] = useState(
     retourGoogle === 'ok' ? 'Google Agenda est connecté : vos rendez-vous sont synchronisés.'
       : retourGoogle === 'refuse' ? 'Connexion annulée : l’accès à Google Agenda n’a pas été autorisé.'
-      : retourGoogle === 'erreur' ? 'La connexion à Google Agenda a échoué. Réessayez ; si le problème persiste, vérifiez que votre adresse Gmail figure parmi les utilisateurs autorisés.'
+      : retourGoogle === 'erreur' ? `La connexion à Google Agenda a échoué.${detailGoogle ? ` Détail : ${detailGoogle}` : ' Réessayez ; si le problème persiste, vérifiez que votre adresse Gmail figure parmi les utilisateurs autorisés.'}`
       : '')
   const autoFaite = useRef(false)
   // Rappel du parent conservé dans une référence : il change à chaque rendu de la page.

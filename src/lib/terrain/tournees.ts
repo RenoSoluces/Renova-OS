@@ -125,7 +125,7 @@ export async function synchroniserPorte(porte: Porte, profil: Profile | null): P
   const champs = {
     nom: porte.nom.trim() || 'Contact porte-à-porte', prenom: porte.prenom.trim(), telephone: porte.telephone.trim() || null, email: porte.email.trim() || null,
     adresse: porte.adresse || null, adresse_rue: porte.adresse || null, code_postal: porte.codePostal || null, ville: porte.ville || null,
-    notes: porte.note.trim() || null,
+    commentaires: porte.note.trim() || null,
   }
   let prospectId = porte.prospectId
   if (prospectId) {
