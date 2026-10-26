@@ -406,3 +406,37 @@
 .rp-retirer { align-self: flex-start; background: none; border: none; color: var(--c-text-muted); font-size: 12.5px; text-decoration: underline; padding: 0; }
 .rp-option.on:hover, .rp-option.on:focus { background: var(--c-primary-600); color: #fff; }
 .rp-option:not(.on):hover { border-color: var(--c-primary-300); }
+
+/* Suivi des aides (dossier) */
+.sa { background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--r-lg); padding: 16px; display: flex; flex-direction: column; gap: 14px; }
+.sa-tete { display: flex; justify-content: space-between; align-items: center; gap: 10px; flex-wrap: wrap; }
+.sa-titre { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; color: var(--c-text); }
+.sa-aides { display: flex; gap: 6px; }
+.sa-aides button { border: 1.5px solid var(--c-border); background: var(--c-bg-alt); border-radius: var(--r-pill); padding: 6px 12px; font-size: 13px; font-weight: 600; color: var(--c-text-secondary); cursor: pointer; }
+.sa-aides button.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.sa-vide { margin: 0; color: var(--c-text-muted); font-size: 13.5px; }
+.sa-alertes { display: flex; flex-direction: column; gap: 6px; }
+.sa-alerte { display: flex; gap: 8px; align-items: flex-start; font-size: 13px; line-height: 1.45; border-radius: var(--r-md); padding: 9px 12px; }
+.sa-alerte svg { flex: none; margin-top: 2px; }
+.sa-alerte.bloquant { background: #fde8e8; color: #8f1d14; }
+.sa-alerte.en_retard { background: #fdf0dc; color: #8a4b00; }
+.sa-etapes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; }
+.sa-etape { display: flex; gap: 10px; align-items: flex-start; padding: 8px 0; border-bottom: 1px dashed var(--c-border-light); }
+.sa-etape:last-child { border-bottom: none; }
+.sa-etape svg { flex: none; margin-top: 1px; color: var(--c-text-light); }
+.sa-etape.fait svg { color: var(--c-success); }
+.sa-etape.en_retard svg { color: var(--c-warning); }
+.sa-etape.bloquant svg { color: var(--c-error); }
+.sa-etape div { display: flex; flex-direction: column; min-width: 0; }
+.sa-etape strong { font-size: 13.5px; color: var(--c-text); }
+.sa-etape.fait strong { color: var(--c-text-secondary); }
+.sa-etape small { font-size: 12px; color: var(--c-text-muted); }
+.sa-dates { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.sa-date { display: flex; flex-direction: column; gap: 4px; font-size: 12px; font-weight: 600; color: var(--c-text-secondary); }
+.sa-date input { border: 1px solid var(--c-border); border-radius: var(--r-md); padding: 7px 9px; font-size: 13px; background: var(--c-bg); }
+.sa-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.sa-btn { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--c-border); background: var(--c-bg-alt); border-radius: var(--r-md); padding: 8px 12px; font-size: 13px; font-weight: 600; color: var(--c-text); cursor: pointer; }
+.sa-btn.prim { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.sa-btn:disabled { opacity: .5; cursor: not-allowed; }
+.sa-note { color: var(--c-text-muted); font-size: 12px; }
+.sa-message { margin: 0; font-size: 13px; color: var(--c-primary-400); font-weight: 600; }
