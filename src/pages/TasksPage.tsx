@@ -111,7 +111,7 @@ export function TasksPage(): JSX.Element {
                 <span className="dashboard-kpi-icon green"><Calendar size={18}/></span>
                 <div style={{flex:1,minWidth:0}}>
                   <div className="font-semibold">{event.titre || 'Rendez-vous'}</div>
-                  <div className="text-sm text-muted" style={{marginTop:4}}>{new Date(`${event.date}T${event.heure || '09:00'}:00`).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})}</div>
+                  <div className="text-sm text-muted" style={{marginTop:4}}>{new Date(`${event.date}T${(event.heure || '09:00').slice(0,5)}:00`).toLocaleString('fr-FR',{dateStyle:'full',timeStyle:'short'})}</div>
                   <div className="text-sm" style={{marginTop:4}}>{event.prospect ? `${event.prospect.prenom || ''} ${event.prospect.nom || ''}`.trim() : 'Prospect non renseigné'}</div>
                   {address && <div className="text-sm text-muted" style={{marginTop:4}}><MapPin size={13} style={{verticalAlign:'middle',marginRight:4}}/>{address}</div>}
                   {event.notes && <div className="text-sm text-muted" style={{marginTop:4}}>{event.notes}</div>}
