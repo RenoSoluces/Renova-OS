@@ -235,8 +235,8 @@ export function CataloguePage() {
   const [regles, setRegles] = useState<Record<string, RegleTarifaire>>({})
   const estAdministrateur = profile?.role === 'admin'
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function fetchProduits() {
-    setLoading(true)
     const pageSize = 1000
     const all: Produit[] = []
     for (let from = 0; ; from += pageSize) {

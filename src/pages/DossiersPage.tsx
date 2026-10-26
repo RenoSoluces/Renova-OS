@@ -113,8 +113,8 @@ export function DossiersPage({
     Record<string, { montant_commercial: number; montant_societe: number }>
   >({})
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   function fetchListe() {
-    setLoading(true)
 
     supabase
       .from('dossiers')

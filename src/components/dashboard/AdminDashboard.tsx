@@ -21,8 +21,8 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
   const [facturations,setFacturations]=useState<any[]>([])
   const [loading,setLoading]=useState(true),[dispatcherOpen,setDispatcherOpen]=useState(false),[dispatching,setDispatching]=useState(false),[invoiceOpen,setInvoiceOpen]=useState<Commission|null>(null),[tickerRefresh,setTickerRefresh]=useState(0),[dispatcherSelections,setDispatcherSelections]=useState<Record<string,string>>({})
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load(){
-    setLoading(true)
     try {
       const queries = [
         supabase.from('prospects').select('*').order('created_at',{ascending:false}),
@@ -78,7 +78,8 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
 
   useEffect(()=>{
     load()
-    const timer=window.setInterval(()=>load(),30000)
+    // Mise à jour discrète toutes les 2 minutes, uniquement quand l'écran est affiché.
+    const timer=window.setInterval(()=>{ if(document.visibilityState==='visible') load() },120000)
     return ()=>window.clearInterval(timer)
   },[])
 

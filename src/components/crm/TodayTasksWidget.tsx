@@ -13,8 +13,8 @@ export function TodayTasksWidget({ onNavigate, limit = 6 }: Props) {
   const [tasks, setTasks] = useState<CrmTask[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load() {
-    setLoading(true)
     const endOfToday = new Date()
     endOfToday.setHours(23, 59, 59, 999)
     const { data } = await supabase

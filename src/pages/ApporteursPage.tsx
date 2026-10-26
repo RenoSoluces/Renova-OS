@@ -43,8 +43,8 @@ export function ApporteursPage() {
   const canManage = ['admin', 'manager', 'partner'].includes(profile?.role || '')
   const isGlobalAdmin = profile?.role === 'admin'
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load() {
-    setLoading(true)
     setError('')
     const [a, o, e] = await Promise.all([
       supabase.from('apporteurs_affaires').select('*').order('nom'),

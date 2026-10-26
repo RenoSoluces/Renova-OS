@@ -41,7 +41,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
   ] },
   { label: 'Suivi', items: [
     { key: 'commissions', label: 'Commissions', icon: Wallet },
-    { key: 'partenaires', label: 'Mon réseau — apporteurs', icon: Users },
+    { key: 'partenaires', label: 'Mon réseau', icon: Users },
     { key: 'challenges', label: 'Challenges & classements', icon: Trophy },
     { key: 'installateurs', label: 'Installateurs', icon: Building2 },
     { key: 'pilotage', label: 'Pilotage équipe', icon: Gauge },
