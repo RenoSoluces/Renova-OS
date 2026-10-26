@@ -47,8 +47,8 @@
 .tr-pin.actif { box-shadow: 0 0 0 4px rgba(27,67,50,.45), 0 3px 8px rgba(0,0,0,.35); }
 
 .tr-panneau { background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--r-lg); box-shadow: var(--sh-sm); overflow: hidden; }
-.tr-onglets { display: grid; grid-template-columns: 1fr 1fr; border-bottom: 1px solid var(--c-border-light); }
-.tr-onglets button { padding: 12px; font-size: 14px; font-weight: 600; color: var(--c-text-muted); border-bottom: 3px solid transparent; }
+.tr-onglets { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--c-border-light); }
+.tr-onglets button { padding: 12px 6px; font-size: 13px; white-space: nowrap; font-weight: 600; color: var(--c-text-muted); border-bottom: 3px solid transparent; }
 .tr-onglets button b { margin-left: 4px; padding: 1px 8px; border-radius: var(--r-pill); background: var(--c-bg-soft); font-size: 12px; }
 .tr-onglets button.on { color: var(--c-primary); border-bottom-color: var(--c-primary-400); }
 .tr-liste { display: flex; flex-direction: column; max-height: clamp(320px, calc(100vh - 430px), 640px); overflow-y: auto; }
@@ -104,3 +104,18 @@
 }
 @media (max-width: 520px) { .tr-hero { padding: var(--sp-4); } .tr-hero-actions { width: 100%; } .tr-select { flex: 1; max-width: none; } .tr-grille { grid-template-columns: 1fr; } }
 .tr-feuille .tr-recherche input { padding-left: 34px; }
+
+/* Sauvegarde et classement */
+.tr-sauvegarde { display: flex; align-items: center; gap: 6px; padding: 7px 14px; font-size: 12px; color: var(--c-text-muted); border-bottom: 1px solid var(--c-border-light); }
+.tr-sauvegarde.ok { color: var(--c-success, #2D8659); }
+.tr-sauvegarde.hors_ligne, .tr-sauvegarde.erreur { color: #8A5A00; background: color-mix(in srgb, var(--c-warning, #E8A317) 10%, #fff); }
+.tr-classement { padding: 12px 14px 16px; }
+.tr-classement-titre { margin: 0 0 10px; font-size: 12px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; color: var(--c-text-secondary); }
+.tr-classement ol { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.tr-classement li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 10px; border-radius: var(--r-md); background: var(--c-bg-soft); }
+.tr-classement li.moi { background: var(--c-primary-50); outline: 2px solid var(--c-primary-300); }
+.tr-rang { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #fff; font-weight: 800; font-size: 13px; color: var(--c-primary); }
+.tr-classement li:first-child .tr-rang { background: var(--c-accent, #D4A574); color: #fff; }
+.tr-classement-nom { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tr-classement-chiffres { font-size: 12px; color: var(--c-text-secondary); white-space: nowrap; }
+.tr-classement-chiffres b { color: var(--c-success, #2D8659); font-size: 15px; }
