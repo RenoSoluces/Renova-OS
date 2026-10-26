@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from 'react'
-import { Building2, Network, UserRound, RefreshCw } from 'lucide-react'
+import { Building2, Network, UserRound, RefreshCw, Copy, Mail, MessageCircle, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 
@@ -30,6 +30,8 @@ export function OrganisationPage() {
   const [inviteManagerId, setInviteManagerId] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteMessage, setInviteMessage] = useState('')
+  const [invitation, setInvitation] = useState<{ email: string; nom: string; lien: string; emailEnvoye: boolean; renvoi: boolean } | null>(null)
+  const [lienCopie, setLienCopie] = useState(false)
   const [newOrganisationName, setNewOrganisationName] = useState('')
   const [creatingOrganisation, setCreatingOrganisation] = useState(false)
   const [organisationMessage, setOrganisationMessage] = useState('')
@@ -133,19 +135,30 @@ export function OrganisationPage() {
     event.preventDefault()
     setInviteLoading(true)
     setInviteMessage('')
-    const { error: inviteError } = await supabase.functions.invoke('invite-organisation-user', {
+    setInvitation(null)
+    setLienCopie(false)
+    const nomInvite = inviteName.trim()
+    const { data, error: inviteError } = await supabase.functions.invoke('invite-organisation-user', {
       body: {
         email: inviteEmail.trim(),
-        nom_complet: inviteName.trim(),
+        nom_complet: nomInvite,
         role: inviteRole,
         organisation_id: isGlobalAdmin ? inviteOrganisationId : profile?.organisation_id,
         manager_id: inviteManagerId || null,
       },
     })
-    if (inviteError) {
-      setInviteMessage("Invitation impossible. Vérifiez que la fonction sécurisée est déployée et que l'adresse e-mail est valide.")
+    if (inviteError || !data?.success) {
+      let detail = data?.error as string | undefined
+      const contexte = (inviteError as { context?: Response } | null)?.context
+      if (!detail && contexte && typeof contexte.json === 'function') {
+        detail = await contexte.json().then((b: { error?: string }) => b?.error).catch(() => undefined)
+      }
+      setInviteMessage(detail || "Invitation impossible. Vérifiez l'adresse e-mail puis réessayez.")
     } else {
-      setInviteMessage("Invitation envoyée. Le membre recevra un e-mail pour activer son compte.")
+      setInvitation({ email: data.user.email, nom: nomInvite, lien: data.lien, emailEnvoye: !!data.email_envoye, renvoi: !!data.renvoi })
+      setInviteMessage(data.email_envoye
+        ? `${data.renvoi ? 'Invitation renvoyée' : 'Invitation envoyée'} à ${data.user.email}. Vous pouvez aussi lui transmettre le lien ci-dessous.`
+        : `Compte ${data.renvoi ? 'réactivé' : 'créé'} pour ${data.user.email}. Aucun e-mail automatique n'est configuré : envoyez-lui le lien ci-dessous.`)
       setInviteName('')
       setInviteEmail('')
       await load()
@@ -252,6 +265,24 @@ export function OrganisationPage() {
             </div>
           </form>
           {inviteMessage && <p className="text-muted" role="status" style={{ margin: '10px 0 0', fontSize: 13 }}>{inviteMessage}</p>}
+          {invitation && (
+            <div className="invitation-lien">
+              <div className="invitation-lien-titre">Lien d’activation de {invitation.nom || invitation.email}</div>
+              <code>{invitation.lien}</code>
+              <div className="invitation-lien-actions">
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { void navigator.clipboard?.writeText(invitation.lien).then(() => setLienCopie(true)) }}>
+                  {lienCopie ? <Check size={14} /> : <Copy size={14} />} {lienCopie ? 'Copié' : 'Copier le lien'}
+                </button>
+                <a className="btn btn-secondary btn-sm" href={`mailto:${invitation.email}?subject=${encodeURIComponent('Votre accès Renova OS')}&body=${encodeURIComponent(`Bonjour ${invitation.nom.split(' ')[0] || ''},\n\nVoici votre lien pour activer votre compte Renova OS et choisir votre mot de passe :\n${invitation.lien}\n\nÀ bientôt,\n${profile?.nom_complet || ''}`)}`}>
+                  <Mail size={14} /> Envoyer depuis ma messagerie
+                </a>
+                <a className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${encodeURIComponent(`Bonjour ${invitation.nom.split(' ')[0] || ''}, voici votre lien pour activer votre compte Renova OS : ${invitation.lien}`)}`}>
+                  <MessageCircle size={14} /> WhatsApp
+                </a>
+              </div>
+              <p>Ce lien est personnel et a une durée de validité limitée. S’il a expiré, saisissez à nouveau le nom et l’e-mail du membre : une nouvelle invitation sera générée.</p>
+            </div>
+          )}
         </section>
       )}
       {loading ? <div className="card card-pad">Chargement de l'organigramme…</div> : (

@@ -1,38 +1,39 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { DashboardPage } from './pages/DashboardPage'
-import { ProspectsPage } from './pages/ProspectsPage'
-import { VisitesPage } from './pages/VisitesPage'
-import { SimulationsPage } from './pages/SimulationsPage'
-import { AidesSimulationPage } from './pages/AidesSimulationPage'
-import { DossiersPage } from './pages/DossiersPage'
-import { PlanningPage } from './pages/PlanningPage'
-import { DocumentsPage } from './pages/DocumentsPage'
-import { FacturationPage } from './pages/FacturationPage'
-import { CourrierPage } from './pages/CourrierPage'
-import { TasksPage } from './pages/TasksPage'
-import { ProspectionTelephonePage } from './pages/ProspectionTelephonePage'
-import { ProspectionTerrainPage } from './pages/ProspectionTerrainPage'
-import { FichesTechniquesPage } from './pages/FichesTechniquesPage'
-import { CataloguePage } from './pages/CataloguePage'
-import { DevisPage } from './pages/DevisPage'
-import { ParametresPage } from './pages/ParametresPage'
-import { ActivitePage } from './pages/ActivitePage'
-import { CommissionsPage } from './pages/CommissionsPage'
-import { SuiviChantierPage } from './pages/SuiviChantierPage'
-import { PartenairesPage } from './pages/PartenairesPage'
-import { PerformancePage } from './pages/PerformancePage'
-import { SystemHealthPage } from './pages/SystemHealthPage'
-import { OrganisationPage } from './pages/OrganisationPage'
-import { ApporteursPage } from './pages/ApporteursPage'
-import { ChallengesPage } from './pages/ChallengesPage'
-import { SimulateurSolairePage } from './pages/SimulateurSolairePage'
+const ProspectsPage = lazy(() => import('./pages/ProspectsPage').then(m => ({ default: m.ProspectsPage })))
+const VisitesPage = lazy(() => import('./pages/VisitesPage').then(m => ({ default: m.VisitesPage })))
+const SimulationsPage = lazy(() => import('./pages/SimulationsPage').then(m => ({ default: m.SimulationsPage })))
+const AidesSimulationPage = lazy(() => import('./pages/AidesSimulationPage').then(m => ({ default: m.AidesSimulationPage })))
+const DossiersPage = lazy(() => import('./pages/DossiersPage').then(m => ({ default: m.DossiersPage })))
+const PlanningPage = lazy(() => import('./pages/PlanningPage').then(m => ({ default: m.PlanningPage })))
+const DocumentsPage = lazy(() => import('./pages/DocumentsPage').then(m => ({ default: m.DocumentsPage })))
+const FacturationPage = lazy(() => import('./pages/FacturationPage').then(m => ({ default: m.FacturationPage })))
+const CourrierPage = lazy(() => import('./pages/CourrierPage').then(m => ({ default: m.CourrierPage })))
+const TasksPage = lazy(() => import('./pages/TasksPage').then(m => ({ default: m.TasksPage })))
+const ProspectionTelephonePage = lazy(() => import('./pages/ProspectionTelephonePage').then(m => ({ default: m.ProspectionTelephonePage })))
+const ProspectionTerrainPage = lazy(() => import('./pages/ProspectionTerrainPage').then(m => ({ default: m.ProspectionTerrainPage })))
+const FichesTechniquesPage = lazy(() => import('./pages/FichesTechniquesPage').then(m => ({ default: m.FichesTechniquesPage })))
+const CataloguePage = lazy(() => import('./pages/CataloguePage').then(m => ({ default: m.CataloguePage })))
+const DevisPage = lazy(() => import('./pages/DevisPage').then(m => ({ default: m.DevisPage })))
+const ParametresPage = lazy(() => import('./pages/ParametresPage').then(m => ({ default: m.ParametresPage })))
+const ActivitePage = lazy(() => import('./pages/ActivitePage').then(m => ({ default: m.ActivitePage })))
+const CommissionsPage = lazy(() => import('./pages/CommissionsPage').then(m => ({ default: m.CommissionsPage })))
+const SuiviChantierPage = lazy(() => import('./pages/SuiviChantierPage').then(m => ({ default: m.SuiviChantierPage })))
+const PartenairesPage = lazy(() => import('./pages/PartenairesPage').then(m => ({ default: m.PartenairesPage })))
+const PerformancePage = lazy(() => import('./pages/PerformancePage').then(m => ({ default: m.PerformancePage })))
+const SystemHealthPage = lazy(() => import('./pages/SystemHealthPage').then(m => ({ default: m.SystemHealthPage })))
+const OrganisationPage = lazy(() => import('./pages/OrganisationPage').then(m => ({ default: m.OrganisationPage })))
+const ApporteursPage = lazy(() => import('./pages/ApporteursPage').then(m => ({ default: m.ApporteursPage })))
+const ChallengesPage = lazy(() => import('./pages/ChallengesPage').then(m => ({ default: m.ChallengesPage })))
+const SimulateurSolairePage = lazy(() => import('./pages/SimulateurSolairePage').then(m => ({ default: m.SimulateurSolairePage })))
 import type { PageKey } from './types'
 import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
 import { useAuth } from './lib/auth/AuthContext'
 import { LoginPage } from './pages/LoginPage'
+import { DefinirMotDePassePage } from './pages/DefinirMotDePassePage'
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import React from 'react'
 
@@ -84,7 +85,7 @@ function pageFromLocation(): PageKey {
 }
 
 function AppContent() {
-  const { session, loading: authLoading, profile, profileError, signOut, refreshProfile } = useAuth()
+  const { session, loading: authLoading, profile, profileError, signOut, refreshProfile, doitDefinirMotDePasse } = useAuth()
   const [page, setPage] = useState<PageKey>(() => pageFromLocation())
   const [collapsed, setCollapsed] = useState(false)
   const tasksBadge = useOpenTasksCount(page)
@@ -154,6 +155,10 @@ function AppContent() {
     return <LoginPage />
   }
 
+  if (doitDefinirMotDePasse) {
+    return <DefinirMotDePassePage />
+  }
+
   // A valid Auth session is not enough: the database profile is required to
   // resolve the user's role. Fail closed if it is missing or cannot be read.
   if (!profile) {
@@ -193,6 +198,7 @@ function AppContent() {
       <div className="app-content">
         <Topbar title={pageTitle.title} subtitle={pageTitle.subtitle} onNavigate={navigate} refreshKey={notifRefresh} />
         <div className="page-scroll">
+          <Suspense fallback={<div className="page" style={{display:'flex',justifyContent:'center',padding:48}}><Loader2 className="spin" size={26} /></div>}>
           {page === 'dashboard' && <DashboardPage onNavigate={navigate} />}
           {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} />}
           {page === 'prospection' && <ProspectionTelephonePage />}
@@ -231,6 +237,7 @@ function AppContent() {
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'organisation' && <OrganisationPage />}
           {page === 'solaire' && <SimulateurSolairePage onCreateDevis={goToDevis} />}
+          </Suspense>
         </div>
       </div>
     </div>

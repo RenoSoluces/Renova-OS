@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase } from '../supabase'
+import { supabase, typeLienAuth } from '../supabase'
 
 export interface Profile {
   id: string
@@ -24,6 +24,10 @@ interface AuthState {
   signUp: (email: string, password: string, nomComplet: string) => Promise<{ error: string | null }>
   signOut: () => Promise<void>
   refreshProfile: () => Promise<void>
+  /** Vrai quand l'utilisateur arrive d'une invitation ou d'un lien « mot de passe oublié ». */
+  doitDefinirMotDePasse: boolean
+  definirMotDePasse: (motDePasse: string) => Promise<{ error: string | null }>
+  envoyerLienMotDePasse: (email: string) => Promise<{ error: string | null }>
 }
 
 const AuthContext = createContext<AuthState | null>(null)
@@ -34,6 +38,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
   const requestId = useRef(0)
+  const [lienMotDePasse, setLienMotDePasse] = useState(typeLienAuth === 'invite' || typeLienAuth === 'recovery')
 
   const loadProfile = useCallback(async (userId: string) => {
     const currentRequest = ++requestId.current
@@ -84,8 +89,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true
-    const { data: subscription } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: subscription } = supabase.auth.onAuthStateChange((event, nextSession) => {
       if (!active) return
+      if (event === 'PASSWORD_RECOVERY') setLienMotDePasse(true)
       setSession(nextSession)
       if (nextSession) {
         // Defer database work until after the auth callback returns.
@@ -100,7 +106,24 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     })
 
-    void supabase.auth.getSession().then(({ data, error }) => {
+    // Lien d'invitation Renova OS : ?token_hash=…&type=invite|magiclink|recovery → on valide le jeton.
+    const valider = async () => {
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const tokenHash = params.get('token_hash')
+        const type = params.get('type') as 'invite' | 'magiclink' | 'recovery' | 'signup' | 'email' | null
+        if (tokenHash && type) {
+          const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
+          if (error) setProfileError('Ce lien d’activation a expiré ou a déjà été utilisé. Demandez une nouvelle invitation.')
+          if (type === 'invite' || type === 'recovery') setLienMotDePasse(true)
+          window.history.replaceState(null, '', window.location.pathname)
+        }
+      } catch (error) {
+        console.error('[RENOVA OS] Validation du lien impossible:', error)
+      }
+    }
+
+    void valider().then(() => supabase.auth.getSession()).then(({ data, error }) => {
       if (!active) return
       if (error) {
         setSession(null)
@@ -145,6 +168,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { error: null }
   }
 
+  async function definirMotDePasse(motDePasse: string) {
+    const { error } = await supabase.auth.updateUser({ password: motDePasse, data: { mot_de_passe_a_definir: false } })
+    if (error) return { error: traduireErreur(error.message) }
+    setLienMotDePasse(false)
+    const { data } = await supabase.auth.getSession()
+    setSession(data.session)
+    return { error: null }
+  }
+
+  async function envoyerLienMotDePasse(email: string) {
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: `${window.location.origin}/` })
+    return { error: error ? traduireErreur(error.message) : null }
+  }
+
+  const doitDefinirMotDePasse = !!session && (lienMotDePasse || session.user.user_metadata?.mot_de_passe_a_definir === true)
+
   async function signOut() {
     const { error } = await supabase.auth.signOut()
     if (error) throw error
@@ -156,7 +195,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   return (
-    <AuthContext.Provider value={{ session, profile, loading, profileError, signIn, signUp, signOut, refreshProfile }}>
+    <AuthContext.Provider value={{ session, profile, loading, profileError, signIn, signUp, signOut, refreshProfile, doitDefinirMotDePasse, definirMotDePasse, envoyerLienMotDePasse }}>
       {children}
     </AuthContext.Provider>
   )
@@ -168,6 +207,8 @@ function traduireErreur(msg: string): string {
   if (/password.*at least/i.test(msg)) return 'Le mot de passe doit contenir au moins 6 caractères.'
   if (/email.*invalid/i.test(msg)) return 'Adresse email invalide.'
   if (/email not confirmed/i.test(msg)) return 'Confirmez votre adresse email avant de vous connecter.'
+  if (/should be different/i.test(msg)) return 'Choisissez un mot de passe différent de l’ancien.'
+  if (/rate limit|too many/i.test(msg)) return 'Trop de demandes : patientez quelques minutes avant de réessayer.'
   return msg
 }
 

@@ -207,9 +207,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     setAnciensCommerciaux((anciens || []) as any)
   }
 
-  async function actualiserPotCommun() {
-    await supabase.rpc('actualiser_pot_commun')
-  }
+  // Le pot commun est désormais actualisé chaque nuit côté serveur (tâche planifiée pg_cron).
+  async function actualiserPotCommun() {}
 
   async function fetchInstallateurs() {
     if (!['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')) {
