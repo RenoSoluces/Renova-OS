@@ -88,13 +88,14 @@ export interface ParametresTarifairesPV {
 
 /** Valeurs par défaut si l'entreprise n'a pas encore renseigné ses propres tarifs. */
 export const PARAMETRES_PV_PAR_DEFAUT: ParametresTarifairesPV = {
-  prixAchatEvite: 0.25,
-  prixReventeSurplus: 0.13,
+  prixAchatEvite: 0.2016,
+  // Obligation d'achat du surplus ≤ 9 kWc depuis le 5 juin 2026 ; la prime à l'autoconsommation est supprimée.
+  prixReventeSurplus: 0.011,
   coutInstallationParKwc: 2200,
-  primeMoins3kwc: 220,
-  prime3a9kwc: 190,
-  prime9a36kwc: 100,
-  primePlus36kwc: 70,
+  primeMoins3kwc: 0,
+  prime3a9kwc: 0,
+  prime9a36kwc: 0,
+  primePlus36kwc: 0,
 };
 
 export interface ResultatSimulationPV {

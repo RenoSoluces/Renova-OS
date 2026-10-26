@@ -23,14 +23,14 @@ const ENTREPRISE_VIDE: Partial<Entreprise> = {
   telephone: '', email: '', logo_url: '', iban: '', bic: '', banque: '', conditions_paiement_defaut: 'Paiement à 30 jours date de facture', taux_penalite_retard: '3 fois le taux d’intérêt légal', escompte_defaut: 'Néant', conditions_generales_devis: '',
   taux_cee_eur_par_mwh_cumac: 6,
   devis_duree_validite_jours: 30,
-  devis_conditions_paiement_defaut: 'Acompte de 30% à la signature du devis, solde à la réception des travaux.',
+  devis_conditions_paiement_defaut: 'Acompte de 30 % versé après expiration d’un délai de 7 jours suivant la signature (aucun paiement avant ce délai pour une vente à domicile), solde à la réception des travaux.',
   pv_prix_achat_evite_eur_kwh: 0.25,
-  pv_prix_revente_surplus_eur_kwh: 0.13,
+  pv_prix_revente_surplus_eur_kwh: 0.011,
   pv_cout_installation_eur_par_kwc: 2200,
-  pv_prime_moins_3kwc_eur_par_kwc: 220,
-  pv_prime_3_9kwc_eur_par_kwc: 190,
-  pv_prime_9_36kwc_eur_par_kwc: 100,
-  pv_prime_plus_36kwc_eur_par_kwc: 70,
+  pv_prime_moins_3kwc_eur_par_kwc: 0,
+  pv_prime_3_9kwc_eur_par_kwc: 0,
+  pv_prime_9_36kwc_eur_par_kwc: 0,
+  pv_prime_plus_36kwc_eur_par_kwc: 0,
 }
 
 const CATEGORIES_DISPOSITIF = [
