@@ -420,6 +420,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       statut: 'Nouveau',
       commercial: profile?.nom_complet || null,
       commercial_id: profile?.id || null,
+      // La politique RLS exige que le prospect soit rattaché à l'organisation du créateur.
+      organisation_id: profile?.organisation_id || null,
     }
     const { data: nouveauProspect, error: insertError } = await supabase.from('prospects').insert(payload).select('id').single()
     setSaving(false)
