@@ -15,7 +15,17 @@ import type { ResultatSimulationPV } from './calculProduction'
  *   donnée par le simulateur ADEME pour la commune du client (champ modifiable dans le parcours).
  *
  * Les tarifs ne sont pas codés en dur dans le calcul : le prix du kWh est saisi en direct devant le
- * prospect ; le tarif de rachat du surplus est de 0,04 €/kWh ; il n'y a plus de prime à l'autoconsommation.
+ * prospect ; le tarif de rachat du surplus (obligation d'achat, ≤ 9 kWc) est de 1,1 c€/kWh HT depuis le
+ * 5 juin 2026 et la prime à l'autoconsommation est supprimée (arrêté du 1er juin 2026) : la rentabilité
+ * repose donc sur l'électricité autoconsommée. Le tarif reste modifiable dans le parcours.
+ *
+ * Autoconsommation (si la consommation est connue) : calcul mois par mois. La part de la consommation
+ * placée en journée dépend du profil de présence ; l'énergie autoconsommée est le « minimum lissé » entre
+ * production et consommation de journée. Une batterie restitue le soir une partie du surplus, dans la
+ * limite de sa capacité utile (un cycle par jour, rendement 90 %) et de la consommation du soir.
+ *
+ * Production : formule ADEME ci-dessus, ou production mensuelle PVGIS (Commission européenne) pour
+ * l'adresse exacte quand elle a été récupérée.
  */
 
 export type OrientationToit = 'sud' | 'sud_est' | 'sud_ouest' | 'est' | 'ouest' | 'nord_est' | 'nord_ouest' | 'nord'
@@ -51,11 +61,18 @@ export const PROFILS_PRESENCE: { value: ProfilPresence; label: string; desc: str
   { value: 'present_journee', label: 'Présent en journée', desc: 'Télétravail, retraités, équipements programmables', tauxBase: 0.5 },
 ]
 
-export const TARIF_RACHAT_SURPLUS = 0.04 // €/kWh
+/** Tarif de rachat du surplus ≤ 9 kWc depuis le 5 juin 2026 (€/kWh). */
+export const TARIF_RACHAT_SURPLUS = 0.011
 export const PUISSANCE_PANNEAU_KWC = 0.45
 export const SURFACE_PANNEAU_M2 = 1.95
 const GAIN_BATTERIE = 0.25
 const PLAFOND_AUTOCONSO = 0.85
+/** Part de la consommation placée pendant les heures de production, selon le profil. */
+const PART_JOUR: Record<ProfilPresence, number> = { absent_journee: 0.32, mixte: 0.42, present_journee: 0.52 }
+const JOURS_MOIS = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+const RENDEMENT_BATTERIE = 0.9
+/** Capacité utile de batterie par défaut (kWh) quand aucune n'est précisée. */
+export const CAPACITE_BATTERIE_DEFAUT = 5
 
 /** Répartition mensuelle indicative de la production en France métropolitaine (somme = 1). */
 const PART_PRODUCTION_BRUTE = [0.035, 0.055, 0.09, 0.112, 0.127, 0.134, 0.139, 0.121, 0.094, 0.064, 0.031, 0.028]
@@ -87,6 +104,17 @@ export interface EntreeSolaire {
   prixInstallationTtc: number | null
   inflationKwhPct: number
   degradationPanneauxPct: number
+  /** Tarif de rachat du surplus (€/kWh). */
+  tarifRachat?: number | null
+  /** Capacité utile de la batterie (kWh). */
+  capaciteBatterieKwh?: number | null
+  /** Production mensuelle PVGIS pour 1 kWc à l'adresse du client (12 valeurs, kWh). */
+  pvgisMensuelParKwc?: number[] | null
+  pvgisSource?: string | null
+  /** Financement : durée (mois) et taux annuel (%) ; null = paiement comptant. */
+  financementMois?: number | null
+  financementTaux?: number | null
+  apportTtc?: number | null
 }
 
 export const ENTREE_PAR_DEFAUT: EntreeSolaire = {
@@ -145,6 +173,13 @@ export interface ResultatSolaire {
   consommationMensuelle: number[] | null
   trajectoire: PointAnnuel[]
   alertes: string[]
+  /** Production mois par mois issue de PVGIS (true) ou de la formule ADEME (false). */
+  sourcePvgis: boolean
+  tarifRachat: number
+  autoconsommationMensuelle: number[]
+  /** Mensualité du financement et effort mensuel net la première année (mensualité − économies). */
+  mensualite: number | null
+  effortMensuel: number | null
 }
 
 const arrondi = (n: number, d = 0) => { const f = 10 ** d; return Math.round(n * f) / f }
@@ -169,28 +204,47 @@ export function simulerSolaire(e: EntreeSolaire): ResultatSolaire {
   const nombrePanneaux = Math.max(0, Math.round(puissance / PUISSANCE_PANNEAU_KWC))
   const surfaceNecessaire = arrondi(nombrePanneaux * SURFACE_PANNEAU_M2, 1)
 
-  // Formule ADEME : puissance × coefficient d'orientation × heures d'ensoleillement (× masques si présents)
-  const production = Math.round(puissance * coefOrientation * heures * coefMasques)
+  // Production : PVGIS à l'adresse exacte si disponible, sinon formule ADEME (puissance × orientation × heures × masques).
+  const pvgis = e.pvgisMensuelParKwc && e.pvgisMensuelParKwc.length === 12 && e.pvgisMensuelParKwc.some(v => v > 0) ? e.pvgisMensuelParKwc : null
+  const productionMensuelle = pvgis
+    ? pvgis.map(v => Math.round(v * puissance * coefMasques))
+    : PART_PRODUCTION_MENSUELLE.map(p => Math.round(puissance * coefOrientation * heures * coefMasques * p))
+  const production = productionMensuelle.reduce((a, b) => a + b, 0)
 
   const conso = consommationRetenue(e)
   const profil = PROFILS_PRESENCE.find(p => p.value === e.profil) ?? PROFILS_PRESENCE[1]
-  let taux = Math.min(PLAFOND_AUTOCONSO, profil.tauxBase + (e.batterie ? GAIN_BATTERIE : 0))
-  let autoconsommee = Math.round(production * taux)
-  if (conso != null) autoconsommee = Math.min(autoconsommee, Math.round(conso * 0.95))
-  autoconsommee = Math.min(autoconsommee, production)
-  taux = production > 0 ? autoconsommee / production : 0
+  let autoMensuelle: number[]
+  if (conso != null && conso > 0) {
+    const capacite = e.batterie ? Math.max(0, e.capaciteBatterieKwh ?? CAPACITE_BATTERIE_DEFAUT) : 0
+    autoMensuelle = productionMensuelle.map((prod, m) => {
+      const consoMois = conso * PART_CONSO_MENSUELLE[m]
+      const jour = consoMois * PART_JOUR[e.profil]
+      const soir = consoMois - jour
+      // Minimum lissé : la production ne coïncide jamais parfaitement avec la consommation.
+      const direct = prod > 0 && jour > 0 ? (prod * jour) / Math.pow(prod ** 3 + jour ** 3, 1 / 3) : 0
+      const surplus = Math.max(0, prod - direct)
+      const stocke = Math.min(surplus * RENDEMENT_BATTERIE, soir * 0.9, capacite * JOURS_MOIS[m] * RENDEMENT_BATTERIE)
+      return Math.round(Math.min(prod, direct + stocke))
+    })
+  } else {
+    const tauxForfait = Math.min(PLAFOND_AUTOCONSO, profil.tauxBase + (e.batterie ? GAIN_BATTERIE : 0))
+    autoMensuelle = productionMensuelle.map(p => Math.round(p * tauxForfait))
+  }
+  const autoconsommee = Math.min(production, autoMensuelle.reduce((a, b) => a + b, 0))
+  const taux = production > 0 ? autoconsommee / production : 0
   const revendue = production - autoconsommee
+  const tarifRachat = e.tarifRachat != null && e.tarifRachat >= 0 ? e.tarifRachat : TARIF_RACHAT_SURPLUS
 
   const prixManquant = !(e.prixKwh && e.prixKwh > 0)
   const prix = e.prixKwh && e.prixKwh > 0 ? e.prixKwh : 0
   const economie = Math.round(autoconsommee * prix)
-  const revenu = Math.round(revendue * TARIF_RACHAT_SURPLUS)
+  const revenu = Math.round(revendue * tarifRachat)
   const gainAnnuel = economie + revenu
 
   const investissementEstime = !(e.prixInstallationTtc && e.prixInstallationTtc > 0)
   const investissement = e.prixInstallationTtc && e.prixInstallationTtc > 0
     ? e.prixInstallationTtc
-    : Math.round(puissance * 2200 + (e.batterie ? 5500 : 0))
+    : Math.round(puissance * 2200 + (e.batterie ? 900 * (e.capaciteBatterieKwh ?? CAPACITE_BATTERIE_DEFAUT) + 1000 : 0))
 
   // Trajectoire sur 20 ans : prix du kWh en hausse, panneaux qui se dégradent légèrement.
   const trajectoire: PointAnnuel[] = []
@@ -201,7 +255,8 @@ export function simulerSolaire(e: EntreeSolaire): ResultatSolaire {
     const facteurPrix = (1 + e.inflationKwhPct / 100) ** (an - 1)
     const prod = production * facteurProd
     const auto = Math.min(prod, autoconsommee * facteurProd)
-    const gain = auto * prix * facteurPrix + (prod - auto) * TARIF_RACHAT_SURPLUS
+    // Contrat d'achat indexé d'environ 2 % par an.
+    const gain = auto * prix * facteurPrix + (prod - auto) * tarifRachat * 1.02 ** (an - 1)
     const avant = cumul
     cumul += gain
     if (delai == null && cumul >= 0 && gain > 0) delai = arrondi(an - 1 + -avant / gain, 1)
@@ -218,6 +273,16 @@ export function simulerSolaire(e: EntreeSolaire): ResultatSolaire {
   if (conso != null && production > conso * 1.3) alertes.push('La production dépasse nettement la consommation : une puissance plus faible serait plus rentable.')
 
   const partsConso = conso != null ? PART_CONSO_MENSUELLE.map(p => Math.round(conso * p)) : null
+  if (production > 0 && taux < 0.4 && !e.batterie) alertes.push(`Seulement ${Math.round(taux * 100)} % de la production est consommée sur place : le surplus étant racheté ${(tarifRachat * 100).toLocaleString('fr-FR')} c€/kWh, réduire la puissance ou ajouter une batterie améliore la rentabilité.`)
+
+  // Financement : mensualité d'un crédit amortissable sur le montant financé.
+  const finance = Math.max(0, investissement - (e.apportTtc || 0))
+  let mensualite: number | null = null
+  if (e.financementMois && e.financementMois > 0 && finance > 0) {
+    const r = (e.financementTaux || 0) / 100 / 12
+    mensualite = Math.round(r > 0 ? (finance * r) / (1 - (1 + r) ** -e.financementMois) : finance / e.financementMois)
+  }
+  const effortMensuel = mensualite != null && !prixManquant ? Math.round(mensualite - gainAnnuel / 12) : null
 
   return {
     prixManquant, zone, puissanceKwc: puissance, nombrePanneaux, surfaceNecessaireM2: surfaceNecessaire,
@@ -228,8 +293,9 @@ export function simulerSolaire(e: EntreeSolaire): ResultatSolaire {
     economieAutoconsommation: economie, revenuRevente: revenu, gainAnnuel,
     investissement, investissementEstime, delaiRetourAnnees: prixManquant ? null : delai,
     gain20Ans: trajectoire[19].cumul + investissement,
-    productionMensuelle: PART_PRODUCTION_MENSUELLE.map(p => Math.round(production * p)),
+    productionMensuelle,
     consommationMensuelle: partsConso, trajectoire, alertes,
+    sourcePvgis: !!pvgis, tarifRachat, autoconsommationMensuelle: autoMensuelle, mensualite, effortMensuel,
   }
 }
 
@@ -254,4 +320,33 @@ export function versResultatSimulationPV(r: ResultatSolaire): ResultatSimulation
     alerteSurfaceInsuffisante: r.alertes.some(a => a.includes('m² de toiture')),
     alerteMasquesImportants: r.coefficientMasques < 0.75,
   }
+}
+
+export interface OptionPuissance { libelle: string; description: string; puissanceKwc: number; batterie: boolean; resultat: ResultatSolaire }
+
+/**
+ * Propose trois dimensionnements à comparer devant le client : le plus rentable (retour le plus court),
+ * le meilleur gain net sur 20 ans, et l'option « autonomie » avec batterie.
+ */
+export function optionsPuissance(e: EntreeSolaire): OptionPuissance[] {
+  if (!(e.prixKwh && e.prixKwh > 0)) return []
+  const puissances: number[] = []
+  for (let n = 6; n <= 20; n++) puissances.push(Math.round(n * PUISSANCE_PANNEAU_KWC * 100) / 100) // 2,7 à 9 kWc
+  const simul = (kwc: number, batterie: boolean) => simulerSolaire({ ...e, puissanceKwc: kwc, batterie, prixInstallationTtc: null })
+  const sans = puissances.map(k => simul(k, false))
+  const avec = puissances.map(k => simul(k, true))
+  const rentable = [...sans].filter(r => r.delaiRetourAnnees != null).sort((a, b) => a.delaiRetourAnnees! - b.delaiRetourAnnees! || b.gain20Ans - a.gain20Ans)[0]
+  const net = (r: ResultatSolaire) => r.gain20Ans - r.investissement
+  const gain = [...sans].sort((a, b) => net(b) - net(a))[0]
+  const autonomie = [...avec].sort((a, b) => (b.tauxCouverture ?? 0) - (a.tauxCouverture ?? 0) || net(b) - net(a)).find(r => net(r) > 0) || [...avec].sort((a, b) => net(b) - net(a))[0]
+  const options: OptionPuissance[] = []
+  if (rentable) options.push({ libelle: 'Rentabilité', description: 'Retour sur investissement le plus rapide', puissanceKwc: rentable.puissanceKwc, batterie: false, resultat: rentable })
+  if (gain && gain.puissanceKwc !== rentable?.puissanceKwc) options.push({ libelle: 'Gain maximal', description: 'Le plus d’économies sur 20 ans', puissanceKwc: gain.puissanceKwc, batterie: false, resultat: gain })
+  if (autonomie) options.push({ libelle: 'Autonomie', description: 'Batterie : plus d’électricité solaire le soir', puissanceKwc: autonomie.puissanceKwc, batterie: true, resultat: autonomie })
+  return options
+}
+
+/** Azimut PVGIS (0 = sud, −90 = est, 90 = ouest) pour une orientation de toiture. */
+export function azimutPvgis(o: OrientationToit): number {
+  return ({ sud: 0, sud_est: -45, sud_ouest: 45, est: -90, ouest: 90, nord_est: -135, nord_ouest: 135, nord: 180 } as Record<OrientationToit, number>)[o]
 }

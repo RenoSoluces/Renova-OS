@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Sun, User, Home, Zap, LineChart, ArrowLeft, ArrowRight, Check, FileDown, FileSignature, Camera,
-  AlertTriangle, BatteryCharging, Info, Loader2, Calculator,
+  AlertTriangle, BatteryCharging, Info, Loader2, Calculator, Satellite, Sparkles, Wallet,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { creerDevisDepuisPV } from '../lib/devis/creerDevisDepuisPV'
 import { genererSimulationSolairePDF } from '../lib/pdf/genererSimulationSolairePDF'
 import {
-  ENTREE_PAR_DEFAUT, MASQUES, ORIENTATIONS, PROFILS_PRESENCE, PUISSANCE_PANNEAU_KWC, TARIF_RACHAT_SURPLUS,
+  ENTREE_PAR_DEFAUT, MASQUES, ORIENTATIONS, PROFILS_PRESENCE, PUISSANCE_PANNEAU_KWC, TARIF_RACHAT_SURPLUS, CAPACITE_BATTERIE_DEFAUT,
+  optionsPuissance, azimutPvgis,
   consommationRetenue, heuresPourZone, simulerSolaire, versResultatSimulationPV, zoneDepuisCodePostal,
   type EntreeSolaire,
 } from '../lib/photovoltaique/simulateurSolaire'
@@ -67,7 +68,11 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
   const [message, setMessage] = useState<{ type: 'ok' | 'erreur'; texte: string } | null>(null)
   const fichierRef = useRef<HTMLInputElement>(null)
 
-  const maj = (patch: Partial<EntreeSolaire>) => setEntree(e => ({ ...e, ...patch }))
+  // Toute modification de l'orientation ou de l'inclinaison invalide la production PVGIS déjà récupérée.
+  const maj = (patch: Partial<EntreeSolaire>) => setEntree(e => ({ ...e, ...patch, ...(('orientation' in patch && patch.orientation !== e.orientation) || ('inclinaisonDeg' in patch && patch.inclinaisonDeg !== e.inclinaisonDeg) || ('codePostal' in patch && patch.codePostal !== e.codePostal) ? { pvgisMensuelParKwc: null, pvgisSource: null } : {}) }))
+  const [pvgisEtat, setPvgisEtat] = useState<'' | 'calcul' | 'erreur'>('')
+  const [pvgisMessage, setPvgisMessage] = useState('')
+  const options = useMemo(() => optionsPuissance(entree), [entree])
   const prospect = prospects.find(p => p.id === prospectId) || null
   const resultat = useMemo(() => simulerSolaire(entree), [entree])
   const zone = zoneDepuisCodePostal(entree.codePostal)
@@ -98,6 +103,26 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
       setPhotos(p => p.map(x => x.url === url ? { ...x, envoi: error ? 'erreur' : 'ok' } : x))
     }
     if (fichierRef.current) fichierRef.current.value = ''
+  }
+
+  /** Production PVGIS à l'adresse du client (géocodage Base Adresse Nationale, puis relais PVGIS). */
+  async function calculerPvgis() {
+    const adresse = [prospect?.adresse_rue || prospect?.adresse, prospect?.code_postal || entree.codePostal, prospect?.ville].filter(Boolean).join(' ')
+    const requete = adresse.trim() || entree.codePostal
+    if (!requete) { setPvgisEtat('erreur'); setPvgisMessage('Renseignez le code postal ou choisissez le client.'); return }
+    setPvgisEtat('calcul'); setPvgisMessage('')
+    try {
+      const r = await fetch(`https://api-adresse.data.gouv.fr/search/?q=${encodeURIComponent(requete)}&limit=1`)
+      const f = ((await r.json()).features || [])[0]
+      if (!f) throw new Error('adresse introuvable')
+      const [lon, lat] = f.geometry.coordinates
+      const { data, error } = await supabase.functions.invoke('pvgis', { body: { lat, lon, inclinaison: entree.inclinaisonDeg ?? 30, azimut: azimutPvgis(entree.orientation) } })
+      if (error || data?.error) throw new Error(data?.error || error?.message || 'PVGIS indisponible')
+      setEntree(e => ({ ...e, pvgisMensuelParKwc: data.mensuel, pvgisSource: `${data.source} · ${f.properties.label}` }))
+      setPvgisEtat(''); setPvgisMessage(`${Math.round(data.annuel).toLocaleString('fr-FR')} kWh par kWc et par an à ${f.properties.label}.`)
+    } catch (e) {
+      setPvgisEtat('erreur'); setPvgisMessage(`Calcul PVGIS impossible (${e instanceof Error ? e.message : 'erreur'}) : la formule ADEME reste utilisée.`)
+    }
   }
 
   async function exporterPDF() {
@@ -255,6 +280,16 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
                 ))}
               </div>
 
+              <div className={`sol-pvgis ${entree.pvgisMensuelParKwc ? 'on' : ''}`}>
+                <Satellite size={22} />
+                <div>
+                  <strong>{entree.pvgisMensuelParKwc ? 'Production calculée à l’adresse exacte' : 'Calculer la production à l’adresse exacte'}</strong>
+                  <small>{entree.pvgisMensuelParKwc ? entree.pvgisSource : 'Données d’ensoleillement satellite PVGIS de la Commission européenne, selon la position, l’orientation et l’inclinaison du toit.'}</small>
+                  {pvgisMessage && <small className={pvgisEtat === 'erreur' ? 'sol-pvgis-erreur' : ''}>{pvgisMessage}</small>}
+                </div>
+                <button type="button" className="btn btn-secondary" onClick={() => void calculerPvgis()} disabled={pvgisEtat === 'calcul'}>{pvgisEtat === 'calcul' ? <Loader2 size={16} className="spin" /> : null}{entree.pvgisMensuelParKwc ? 'Recalculer' : 'Calculer avec PVGIS'}</button>
+              </div>
+
               <h3>Photos de la toiture</h3>
               <div className="sol-photos">
                 {photos.map(p => (
@@ -284,7 +319,19 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
                 <span className="sol-interrupteur" />
               </button>
 
+              {entree.batterie && (
+                <label className="sol-champ sol-champ-court">
+                  <span>Capacité utile de la batterie (kWh)</span>
+                  <Nombre value={entree.capaciteBatterieKwh ?? CAPACITE_BATTERIE_DEFAUT} min={1} max={30} step={0.5} onChange={v => maj({ capaciteBatterieKwh: v })} />
+                </label>
+              )}
+
               <div className="sol-grille">
+                <label className="sol-champ">
+                  <span>Tarif de rachat du surplus (€/kWh)</span>
+                  <Nombre value={entree.tarifRachat ?? TARIF_RACHAT_SURPLUS} min={0} step={0.001} onChange={v => maj({ tarifRachat: v })} />
+                  <small>0,011 €/kWh depuis le 5 juin 2026 (≤ 9 kWc) ; plus de prime à l’autoconsommation.</small>
+                </label>
                 <label className="sol-champ">
                   <span>Prix de l’installation posée (€ TTC)</span>
                   <Nombre value={entree.prixInstallationTtc} min={0} step={100} onChange={v => maj({ prixInstallationTtc: v })} placeholder={`≈ ${resultat.investissement.toLocaleString('fr-FR')}`} />
@@ -292,8 +339,24 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
                 </label>
               </div>
 
+              <h3><Wallet size={16} /> Financement</h3>
+              <div className="sol-grille">
+                <label className="sol-champ">
+                  <span>Mode de paiement</span>
+                  <select value={entree.financementMois ?? 0} onChange={e => maj({ financementMois: Number(e.target.value) || null })}>
+                    <option value={0}>Comptant</option>
+                    {[60, 84, 120, 144, 180].map(m => <option key={m} value={m}>Crédit sur {m / 12} ans</option>)}
+                  </select>
+                </label>
+                {!!entree.financementMois && <>
+                  <label className="sol-champ"><span>Taux annuel (%)</span><Nombre value={entree.financementTaux ?? 4.5} min={0} max={15} step={0.1} onChange={v => maj({ financementTaux: v })} /></label>
+                  <label className="sol-champ"><span>Apport (€)</span><Nombre value={entree.apportTtc ?? null} min={0} step={100} onChange={v => maj({ apportTtc: v })} placeholder="0" /></label>
+                </>}
+              </div>
+
               <div className="sol-formule">
-                <div className="sol-formule-titre"><Calculator size={16} /> Calcul de la production (formule ADEME)</div>
+                <div className="sol-formule-titre"><Calculator size={16} /> Calcul de la production ({resultat.sourcePvgis ? 'PVGIS à l’adresse du client' : 'formule ADEME'})</div>
+                {resultat.sourcePvgis && <p className="sol-note"><Satellite size={14} /> Production mensuelle PVGIS utilisée : {kwh(resultat.productionAnnuelle)} par an pour {entree.puissanceKwc.toLocaleString('fr-FR')} kWc. La formule ci-dessous sert de contrôle.</p>}
                 <div className="sol-formule-ligne">
                   <div><small>Puissance</small><strong>{entree.puissanceKwc.toLocaleString('fr-FR')} kWc</strong></div><i>×</i>
                   <div><small>Coefficient d’orientation</small><strong>{resultat.coefficientOrientation.toLocaleString('fr-FR')}</strong></div><i>×</i>
@@ -335,6 +398,41 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
                 <div className="sol-kpi"><small>Gain net sur 20 ans</small><strong>{resultat.prixManquant ? '—' : euro(resultat.gain20Ans - resultat.investissement)}</strong><span>prix du kWh +{entree.inflationKwhPct}%/an</span></div>
               </div>
 
+              {resultat.mensualite != null && (
+                <div className="sol-financement">
+                  <div><small>Mensualité du crédit</small><strong>{euro(resultat.mensualite)}</strong><span>sur {(entree.financementMois || 0) / 12} ans à {(entree.financementTaux ?? 0).toLocaleString('fr-FR')} %</span></div>
+                  <i>−</i>
+                  <div><small>Économies par mois</small><strong>{resultat.prixManquant ? '—' : euro(Math.round(resultat.gainAnnuel / 12))}</strong><span>la première année</span></div>
+                  <i>=</i>
+                  <div className="res"><small>{(resultat.effortMensuel ?? 0) <= 0 ? 'Gain mensuel' : 'Effort mensuel réel'}</small><strong>{resultat.effortMensuel == null ? '—' : euro(Math.abs(resultat.effortMensuel))}</strong><span>{(resultat.effortMensuel ?? 0) <= 0 ? 'l’installation se paie seule' : 'puis baisse avec le prix du kWh'}</span></div>
+                </div>
+              )}
+
+              {options.length > 0 && (
+                <section className="sol-carte">
+                  <div className="sol-carte-tete"><h3><Sparkles size={16} /> Dimensionnements conseillés</h3><small className="sol-note-inline">Prix estimés · tarif de rachat {resultat.tarifRachat.toLocaleString('fr-FR')} €/kWh</small></div>
+                  <div className="sol-options">
+                    {options.map(o => {
+                      const actif = Math.abs(o.puissanceKwc - entree.puissanceKwc) < 0.01 && o.batterie === entree.batterie
+                      return (
+                        <div key={o.libelle} className={`sol-option-carte ${actif ? 'on' : ''}`}>
+                          <span className="sol-option-tag">{o.libelle}</span>
+                          <strong>{o.puissanceKwc.toLocaleString('fr-FR')} kWc{o.batterie ? ' + batterie' : ''}</strong>
+                          <small>{o.description}</small>
+                          <ul>
+                            <li><span>Autoconsommation</span><b>{Math.round(o.resultat.tauxAutoconsommation * 100)} %</b></li>
+                            <li><span>Économies / an</span><b>{euro(o.resultat.gainAnnuel)}</b></li>
+                            <li><span>Retour</span><b>{o.resultat.delaiRetourAnnees != null ? `${o.resultat.delaiRetourAnnees.toLocaleString('fr-FR')} ans` : '> 20 ans'}</b></li>
+                            <li><span>Gain net 20 ans</span><b>{euro(o.resultat.gain20Ans - o.resultat.investissement)}</b></li>
+                          </ul>
+                          <button type="button" className="btn btn-secondary btn-sm" disabled={actif} onClick={() => maj({ puissanceKwc: o.puissanceKwc, batterie: o.batterie })}>{actif ? 'Retenu' : 'Retenir'}</button>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </section>
+              )}
+
               <div className="sol-duo">
                 <section className="sol-carte sol-carte-visuel"><h3>Votre toiture</h3>
                   <SchemaToiture orientation={entree.orientation} inclinaisonDeg={entree.inclinaisonDeg} nombrePanneaux={resultat.nombrePanneaux} puissanceKwc={resultat.puissanceKwc} surfaceNecessaireM2={resultat.surfaceNecessaireM2} />
@@ -344,7 +442,7 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
                     <DonutAutoconsommation r={resultat} />
                     <ul className="sol-legende">
                       <li><i className="auto" /><span><strong>{kwh(resultat.energieAutoconsommee)}</strong> autoconsommés<small>{resultat.tauxCouverture != null ? `couvre ${Math.round(resultat.tauxCouverture * 100)} % de vos besoins` : 'économisés sur votre facture'}</small></span></li>
-                      <li><i className="surplus" /><span><strong>{kwh(resultat.energieRevendue)}</strong> revendus<small>{TARIF_RACHAT_SURPLUS.toLocaleString('fr-FR')} €/kWh · {euro(resultat.revenuRevente)} par an</small></span></li>
+                      <li><i className="surplus" /><span><strong>{kwh(resultat.energieRevendue)}</strong> revendus<small>{resultat.tarifRachat.toLocaleString('fr-FR')} €/kWh · {euro(resultat.revenuRevente)} par an</small></span></li>
                     </ul>
                   </div>
                 </section>
@@ -359,7 +457,7 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
               <section className="sol-carte sol-carte-visuel">
                 <h3>Gain cumulé sur 20 ans, installation déduite</h3>
                 <CourbeRentabilite r={resultat} />
-                <p className="sol-note"><Info size={14} /> Hypothèses : prix du kWh +{entree.inflationKwhPct} %/an, panneaux −{entree.degradationPanneauxPct.toLocaleString('fr-FR')} %/an, surplus racheté {TARIF_RACHAT_SURPLUS.toLocaleString('fr-FR')} €/kWh, aucune prime à l’autoconsommation.</p>
+                <p className="sol-note"><Info size={14} /> Hypothèses : prix du kWh +{entree.inflationKwhPct} %/an, panneaux −{entree.degradationPanneauxPct.toLocaleString('fr-FR')} %/an, surplus racheté {resultat.tarifRachat.toLocaleString('fr-FR')} €/kWh (indexé ~2 %/an), aucune prime à l’autoconsommation (supprimée le 5 juin 2026). Production : {resultat.sourcePvgis ? 'PVGIS (Commission européenne)' : 'formule ADEME'}.</p>
               </section>
 
               {message && <div className={`sol-message ${message.type}`}>{message.texte}</div>}
