@@ -49,8 +49,8 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
     const userName = profile.nom_complet || null
     const currentProfile = profile
 
+      // Rechargement discret : l'écran reste affiché pendant la mise à jour.
     async function load() {
-      setLoading(true)
       const [p, d, ds, c, profileRow, pa, t, i] = await Promise.all([
         supabase.from('prospects').select('*').eq('commercial_id', userId).order('created_at', { ascending: false }),
         supabase.from('devis').select('*').order('created_at', { ascending: false }),

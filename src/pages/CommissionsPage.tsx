@@ -152,8 +152,8 @@ export function CommissionsPage() {
   const [paymentFilter, setPaymentFilter] =
     useState<PaymentFilter>('toutes')
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   const load = useCallback(async () => {
-    setLoading(true)
 
     const commissionQuery = supabase
       .from('commissions_safe')

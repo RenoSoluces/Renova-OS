@@ -177,8 +177,8 @@ export function DevisPage({
   const [conf, setConf] = useState<ConformiteMeta>(META_PAR_DEFAUT)
   const [rechercheProduit, setRechercheProduit] = useState('')
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   function fetchListe() {
-    setLoading(true)
     supabase.from('devis').select('*, prospect:prospects(*)').order('created_at', { ascending: false })
       .then(({ data, error }) => {
         if (error) { setRows([]); setLoading(false); return }

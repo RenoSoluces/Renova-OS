@@ -84,8 +84,8 @@ export function ProspectionTelephonePage(): JSX.Element {
   const [resultForm, setResultForm] = useState({ resultat: '', note: '', date_rappel: '', priorite: 'normale' })
   const [savingResult, setSavingResult] = useState(false)
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load(): Promise<void> {
-    setLoading(true)
     // Lecture paginée : un fichier de leads dépasse vite les 1 000 lignes servies par défaut.
     const { data, error } = await lirePages<Prospect>((debut, fin) =>
       supabase.from('prospects').select('*').order('created_at', { ascending: false }).order('id').range(debut, fin) as any)

@@ -63,8 +63,8 @@ export function TasksPage(): JSX.Element {
   const [mesRdvSeulement, setMesRdvSeulement] = useState(true)
   const [emailPour, setEmailPour] = useState<Prospect | null>(null)
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load() {
-    setLoading(true)
     setError('')
     const [taskResult, eventResult] = await Promise.all([
       supabase.from('tasks').select('id,prospect_id,titre,description,type,priorite,assigne,due_at,done,done_at,created_at').order('done', { ascending: true }).order('due_at', { ascending: true, nullsFirst: false }),

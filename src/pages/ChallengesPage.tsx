@@ -31,8 +31,9 @@ export function ChallengesPage() {
   const [scoreEditingId, setScoreEditingId] = useState<string | null>(null)
   const [form, setForm] = useState({ nom: '', description: '', date_debut: dateToday(), date_fin: dateToday(), objectif: '', organisation_id: '' })
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function loadBase() {
-    setLoading(true); setError('')
+    setError('')
     const [o, m, c] = await Promise.all([
       supabase.from('organisations').select('id,nom').eq('actif', true).order('nom'),
       supabase.from('profiles').select('id,nom_complet,role,organisation_id').order('nom_complet'),

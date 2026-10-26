@@ -75,7 +75,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   activite: { title: 'Historique & activité', subtitle: 'Flux centralisé des échanges' },
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
   suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
-  partenaires: { title: 'Mon réseau — apporteurs', subtitle: 'Personnes et sociétés susceptibles de recommander de nouveaux clients' },
+  partenaires: { title: 'Mon réseau', subtitle: 'Créez les accès de vos apporteurs et partenaires, puis envoyez-les par WhatsApp' },
   installateurs: { title: 'Installateurs', subtitle: 'Répertoire des partenaires techniques et installateurs' },
   challenges: { title: 'Challenges & classements', subtitle: 'Challenges et classements isolés par société' },
   performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },

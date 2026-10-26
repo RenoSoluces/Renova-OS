@@ -32,8 +32,8 @@ export function FichesTechniquesPage() {
   const [recherche, setRecherche] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load() {
-    setLoading(true)
     const [{ data: documents, error: docError }, { data: catalogue, error: produitError }] = await Promise.all([
       supabase.from('documents').select('id, nom, categorie, produit_id, url, created_at, produit:catalogue_produits(id, nom, marque, reference, fiche_cee)')
         .in('categorie', Object.values(CATEGORIE).flat()).order('created_at', { ascending: false }),

@@ -179,7 +179,8 @@ export function ParametresPage() {
     const parts = (profile.nom_complet || '').trim().split(/\s+/).filter(Boolean)
     setProfil({ nom: parts.length > 1 ? parts.slice(1).join(' ') : parts[0] || '', prenom: parts.length > 1 ? parts[0] : '', email: profile.email || '', telephone: profile.telephone || '' })
     setProfilLoading(false)
-  }, [profile])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id])
 
   useEffect(() => {
     let cancelled = false
