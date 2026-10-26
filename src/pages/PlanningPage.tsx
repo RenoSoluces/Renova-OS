@@ -7,6 +7,7 @@ import { FloatInput, FloatSelect, FloatTextarea } from '../components/ui/FloatIn
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { euro } from '../lib/crm/constants'
+import { AbonnementAgenda } from '../components/agenda/AbonnementAgenda'
 
 const TYPES = [
   { value: 'visite', label: 'Visite technique (VT)' },
@@ -202,6 +203,8 @@ export function PlanningPage() {
           </Button>
         </div>
       </div>
+
+      <AbonnementAgenda />
 
       {isAdmin && commerciaux.length > 0 && (
         <div className="flex items-center gap-2 mb-4" style={{ flexWrap: 'wrap' }}>

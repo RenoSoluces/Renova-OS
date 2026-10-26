@@ -17,6 +17,7 @@ import { Timeline } from '../components/crm/Timeline'
 import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
+import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { resolveDocumentRows } from '../lib/storage/documentUrl'
@@ -154,6 +155,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [potCommunOnly, setPotCommunOnly] = useState(false)
   const [selected, setSelected] = useState<Prospect | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
+  const [emailOuvert, setEmailOuvert] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
@@ -591,6 +593,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             ))}
           </div>
 
+          {emailOuvert && <EmailProspectModal prospect={selected as any} onClose={() => setEmailOuvert(false)} onEnvoye={() => setTimelineRefresh(r => r + 1)} />}
           <h1 className="prospect-detail-name">{e.civilite} {selected.prenom} {selected.nom}</h1>
           {(selected as any).pot_commun && <div style={{ margin: '8px 0 12px' }}><span className="prospect-cee-tag" style={{ background: '#fff3cd', color: '#8a5a00' }}>🟠 POT COMMUN · sans action depuis 90 jours</span></div>}
           <p className="prospect-detail-addr">
@@ -612,7 +615,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               </a>
             )}
             {selected.email && (
-              <a href={`mailto:${selected.email}`} className="btn btn-outline" style={{ textDecoration: 'none' }}>
+              <a href={`mailto:${selected.email}`} className="btn btn-outline" style={{ textDecoration: 'none' }} onClick={ev => { ev.preventDefault(); setEmailOuvert(true) }}>
                 <Mail size={16} /> Email
               </a>
             )}
@@ -736,7 +739,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     </a>
                   )}
                   {selected.email && (
-                    <a href={`mailto:${selected.email}`} className="detail-contact-btn" style={{ textDecoration: 'none' }}>
+                    <a href={`mailto:${selected.email}`} className="detail-contact-btn" style={{ textDecoration: 'none' }} onClick={ev => { ev.preventDefault(); setEmailOuvert(true) }}>
                       <Mail size={16} /> Email
                     </a>
                   )}

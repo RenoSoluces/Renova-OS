@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { CalendarClock, CheckCircle2, Circle, Phone, Mail, Calendar, RefreshCw, MapPin, MessageCircle, Navigation, UserRoundX, PhoneOff, PhoneCall, Clock3, StickyNote } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { normalizeStatut } from '../lib/crm/constants'
+import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { supabase } from '../lib/supabase'
 import type { CrmTask, Prospect } from '../types'
 import { Button } from '../components/ui/Button'
@@ -57,6 +58,7 @@ export function TasksPage(): JSX.Element {
   const [dernieres, setDernieres] = useState<Map<string, DerniereInteraction>>(new Map())
   const [appelOuvert, setAppelOuvert] = useState<string | null>(null)
   const [mesRdvSeulement, setMesRdvSeulement] = useState(true)
+  const [emailPour, setEmailPour] = useState<Prospect | null>(null)
 
   async function load() {
     setLoading(true)
@@ -67,7 +69,7 @@ export function TasksPage(): JSX.Element {
     ])
     // Mes prospects avant signature, pour repérer ceux qui n'ont plus de nouvelles.
     const mesProspects = profile?.id
-      ? await supabase.from('prospects').select('id,prenom,nom,telephone,email,adresse,adresse_rue,code_postal,ville,raison_sociale,statut,categorie_mpr,created_at').eq('commercial_id', profile.id)
+      ? await supabase.from('prospects').select('id,prenom,nom,civilite,telephone,email,adresse,adresse_rue,code_postal,ville,raison_sociale,statut,categorie_mpr,created_at').eq('commercial_id', profile.id)
       : { data: [], error: null }
     if (mesProspects.error) setError(prev => [prev, `Prospects : ${mesProspects.error.message}`].filter(Boolean).join(' · '))
     if (taskResult.error) setError(`Tâches : ${taskResult.error.message}`)
@@ -91,7 +93,7 @@ export function TasksPage(): JSX.Element {
       .filter(p => p.joursSansContact >= SEUIL_RELANCE)
       .sort((a, b) => b.joursSansContact - a.joursSansContact))
     const prospectsResult = ids.length
-      ? await supabase.from('prospects').select('id,prenom,nom,telephone,email,adresse,adresse_rue,code_postal,ville,raison_sociale').in('id', ids)
+      ? await supabase.from('prospects').select('id,prenom,nom,civilite,telephone,email,adresse,adresse_rue,code_postal,ville,raison_sociale').in('id', ids)
       : { data: [], error: null }
     if (prospectsResult.error) setError(prev => [prev, `Contacts : ${prospectsResult.error.message}`].filter(Boolean).join(' · '))
     const byId = new Map<string, Prospect>(((prospectsResult.data || []) as Prospect[]).map(p => [p.id, p]))
@@ -162,12 +164,14 @@ export function TasksPage(): JSX.Element {
     return <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 9 }}>
       {phone && <a className="btn btn-sm btn-secondary" href={`tel:${phone}`}><Phone size={14}/> Appeler</a>}
       {phone && <a className="btn btn-sm btn-secondary" href={`sms:${phone}`}><MessageCircle size={14}/> SMS</a>}
+      {prospect?.email && <button type="button" className="btn btn-sm btn-secondary" onClick={() => setEmailPour(prospect)}><Mail size={14}/> E-mail</button>}
       {wa && <a className="btn btn-sm btn-secondary" href={`https://wa.me/${wa}`} target="_blank" rel="noreferrer"><MessageCircle size={14}/> WhatsApp</a>}
       {destination && <a className="btn btn-sm btn-secondary" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`} target="_blank" rel="noreferrer"><Navigation size={14}/> Itinéraire</a>}
     </div>
   }
 
   return <div className="page">
+    {emailPour && <EmailProspectModal prospect={emailPour as any} onClose={() => setEmailPour(null)} />}
     <div className="page-header" style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
       <div><h1 className="page-title">Ma journée</h1><p className="page-subtitle">Vos rendez-vous du jour, les prospects à relancer et vos tâches, avec appel, SMS, WhatsApp et itinéraire en un geste.</p></div>
       <Button variant="secondary" onClick={() => void load()}><RefreshCw size={15}/> Actualiser</Button>
