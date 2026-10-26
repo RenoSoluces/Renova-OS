@@ -796,7 +796,8 @@ export function DevisPage({
   }), [lignes, produits, aides, conf, totaux.montantTTC, categorieRevenus, current, entreprise])
   const blocsConformite = pointsConformite.filter(x => x.gravite === 'bloc')
   // Un devis sous le prix plancher doit être validé par la direction : un commercial ne peut pas le faire signer.
-  const nonRentableBloquant = rentabilite.niveau === 'non_rentable' && !isAdmin
+  // Seule la remise du commercial bloque : un prix catalogue déjà sous le plancher est signalé à la direction, pas au commercial.
+  const nonRentableBloquant = rentabilite.niveau === 'non_rentable' && totaux.remiseHT > 0 && !isAdmin
   const signatureBloquee = (blocsConformite.length > 0 || nonRentableBloquant) && !isAdmin
   const aMontantCEE = aides.some(a => a.type === 'cee')
 
@@ -1464,7 +1465,7 @@ export function DevisPage({
                 </div>
                 <p className="rentab-msg">
                   {rentabilite.niveau === 'non_rentable'
-                    ? <>Le total est {euro(rentabilite.ecartPlancherHT)} sous le prix plancher. {isAdmin ? 'Vous pouvez le valider en connaissance de cause.' : 'Réduisez la remise : la signature est bloquée tant que la direction n’a pas validé ce prix.'}</>
+                    ? <>Le total est {euro(rentabilite.ecartPlancherHT)} sous le prix plancher. {isAdmin ? (totaux.remiseHT > 0 ? 'Vous pouvez le valider en connaissance de cause.' : 'Les prix du catalogue sont sous le plancher : corrigez-les dans Catalogue → Tarification.') : totaux.remiseHT > 0 ? 'Réduisez la remise : la signature est bloquée tant que la direction n’a pas validé ce prix.' : 'Les prix catalogue de ce produit sont à revoir : la direction est informée.'}</>
                     : rentabilite.niveau === 'sous_conseille'
                       ? <>Le devis reste rentable, mais la marge est entamée. Remise encore possible : {euro(rentabilite.remiseMaxRestanteHT)} HT.</>
                       : <>Prix conforme au tarif conseillé. Remise encore possible avant le plancher : {euro(rentabilite.remiseMaxRestanteHT)} HT.</>}
