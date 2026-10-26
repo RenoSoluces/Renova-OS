@@ -65,7 +65,7 @@ export function TasksPage(): JSX.Element {
     setError('')
     const [taskResult, eventResult] = await Promise.all([
       supabase.from('tasks').select('id,prospect_id,titre,description,type,priorite,assigne,due_at,done,done_at,created_at').order('done', { ascending: true }).order('due_at', { ascending: true, nullsFirst: false }),
-      supabase.from('planning_events').select('id,titre,date,heure,type,prospect_id,adresse,notes,user_id').gte('date', todayLocal()).order('date', { ascending: true }).order('heure', { ascending: true }).limit(40),
+      supabase.from('planning_events').select('id,titre,date,heure,type,prospect_id,adresse,notes,user_id').neq('source', 'google').gte('date', todayLocal()).order('date', { ascending: true }).order('heure', { ascending: true }).limit(40),
     ])
     // Mes prospects avant signature, pour repérer ceux qui n'ont plus de nouvelles.
     const mesProspects = profile?.id
