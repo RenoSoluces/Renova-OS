@@ -1,0 +1,15 @@
+.pm-voile { position: fixed; inset: 0; z-index: 1150; background: rgba(11, 25, 20, .45); backdrop-filter: blur(6px); display: flex; align-items: center; justify-content: center; padding: 16px; animation: fadeIn .2s ease; }
+.pm-pop { width: 100%; max-width: 520px; max-height: calc(100dvh - 32px); overflow: auto; background: var(--c-bg-alt, #fff); border-radius: 20px; padding: 20px; box-shadow: var(--sh-xl); display: flex; flex-direction: column; gap: 12px; animation: slideUp .3s ease; }
+.pm-tete { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
+.pm-tete h3 { margin: 0; font-size: 18px; letter-spacing: -.02em; }
+.pm-tete p { margin: 3px 0 0; font-size: 13px; color: var(--c-text-muted); }
+.pm-tete button { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; color: var(--c-text-muted); flex: none; }
+.pm-modeles { display: flex; gap: 6px; flex-wrap: wrap; }
+.pm-modeles button { border: 1.5px solid var(--c-border); border-radius: 999px; padding: 7px 12px; font-size: 13px; font-weight: 600; color: var(--c-text-secondary); }
+.pm-modeles button.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; }
+.pm-texte { border: 1px solid var(--c-border); border-radius: 12px; padding: 12px; font-size: 14px; line-height: 1.5; resize: vertical; background: #fff; font-family: inherit; }
+.pm-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.pm-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; padding: 0 12px; border-radius: 12px; border: 1px solid var(--c-border); background: var(--c-bg-alt, #fff); font-weight: 600; font-size: 14px; color: var(--c-text); text-decoration: none; }
+.pm-btn.principal { grid-column: 1 / -1; background: var(--c-primary); border-color: var(--c-primary); color: #fff; min-height: 52px; }
+.pm-btn.whatsapp { background: #25D366; border-color: #25D366; color: #fff; }
+@media (max-width: 560px) { .pm-actions { grid-template-columns: 1fr; } }
