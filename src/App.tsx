@@ -52,7 +52,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   prospection_terrain: { title: 'Prospection Terrain', subtitle: 'Tournées de porte-à-porte sur la carte' },
   prospection: { title: 'Prospection Téléphone', subtitle: 'Import des leads, appels et suivi des résultats' },
   pipeline: { title: 'Pipeline commercial', subtitle: 'Visualisez les étapes de votre portefeuille de prospects' },
-  a_traiter: { title: 'À traiter', subtitle: 'Appels, relances, rendez-vous et actions commerciales' },
+  a_traiter: { title: 'Ma journée', subtitle: 'Rendez-vous, appels, relances en retard et itinéraires' },
   courrier: { title: 'Mon courrier', subtitle: 'Connexion Gmail professionnelle à configurer' },
   facturation: { title: 'Facturation client', subtitle: 'Acomptes, démarrage du chantier et soldes' },
   visites: { title: 'Visites techniques', subtitle: 'Audits énergétiques sur site' },
