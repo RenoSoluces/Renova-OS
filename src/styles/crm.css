@@ -372,3 +372,37 @@
 .invit-notif .btn-primary { background: #fff; color: var(--c-primary, #1B4332); border-color: #fff; }
 .invit-notif-fermer { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: #fff; opacity: .8; cursor: pointer; }
 .invit-notif-fermer:hover { opacity: 1; background: rgba(255,255,255,.12); }
+
+/* Relevé de pose (VT section 11) */
+.rp { display: flex; flex-direction: column; gap: 16px; }
+.rp-intro { margin: 0; display: flex; gap: 8px; align-items: center; color: var(--c-text-secondary); font-size: 14px; }
+.rp-onglets { display: flex; gap: 6px; flex-wrap: wrap; }
+.rp-onglet { display: flex; align-items: center; gap: 8px; border: 1.5px solid var(--c-border); background: var(--c-bg-alt); border-radius: var(--r-pill); padding: 8px 14px; font-weight: 600; font-size: 14px; color: var(--c-text); min-height: 42px; }
+.rp-onglet small { display: inline-flex; align-items: center; gap: 2px; font-size: 11.5px; font-weight: 700; color: var(--c-warning); background: #fdf0dc; border-radius: var(--r-pill); padding: 2px 7px; }
+.rp-onglet small.ok { color: var(--c-success); background: var(--c-primary-50); }
+.rp-onglet.on { border-color: var(--c-primary); background: var(--c-primary); color: #fff; }
+.rp-onglet.on small { background: rgba(255,255,255,.18); color: #fff; }
+.rp-ajout { border: 1.5px dashed var(--c-border-dark); background: none; border-radius: var(--r-pill); padding: 8px 14px; font-weight: 600; font-size: 13.5px; color: var(--c-info); display: inline-flex; align-items: center; gap: 4px; min-height: 42px; }
+.rp-choix { display: flex; flex-wrap: wrap; gap: 6px; padding: 12px; background: var(--c-bg-soft); border-radius: var(--r-md); }
+.rp-choix button { border: 1px solid var(--c-border); background: var(--c-bg-alt); border-radius: var(--r-pill); padding: 7px 12px; font-size: 13.5px; }
+.rp-vide { padding: 24px; text-align: center; color: var(--c-text-muted); border: 1.5px dashed var(--c-border); border-radius: var(--r-lg); }
+.rp-corps { display: flex; flex-direction: column; gap: 18px; background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--r-lg); padding: 20px; }
+.rp-champ { display: flex; flex-direction: column; gap: 8px; }
+.rp-label { font-size: 14px; font-weight: 700; color: var(--c-text); display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px; }
+.rp-label small { flex-basis: 100%; font-weight: 400; color: var(--c-text-muted); font-size: 12.5px; }
+.rp-oblig { color: var(--c-error); }
+.rp-options { display: flex; flex-wrap: wrap; gap: 6px; }
+.rp-option { border: 1.5px solid var(--c-border); background: var(--c-bg-alt); border-radius: var(--r-md); padding: 9px 14px; font-size: 14px; color: var(--c-text); min-height: 44px; transition: all .12s; }
+.rp-option.on { background: var(--c-primary); border-color: var(--c-primary); color: #fff; font-weight: 600; }
+.rp-nombre { display: flex; align-items: center; gap: 8px; max-width: 220px; }
+.rp-nombre input, .rp-champ textarea { border: 1.5px solid var(--c-border); border-radius: var(--r-md); padding: 10px 12px; font-size: 15px; width: 100%; background: var(--c-bg-alt); }
+.rp-nombre span { color: var(--c-text-secondary); font-weight: 600; }
+.rp-photos { display: flex; flex-direction: column; gap: 6px; border-top: 1px dashed var(--c-border); padding-top: 16px; }
+.rp-photo { display: flex; align-items: center; gap: 10px; text-align: left; border: 1px solid var(--c-border-light); background: var(--c-bg); border-radius: var(--r-md); padding: 10px 12px; font-size: 14px; min-height: 44px; }
+.rp-case { width: 22px; height: 22px; border-radius: 6px; border: 2px solid var(--c-border-dark); display: grid; place-items: center; flex: none; color: #fff; }
+.rp-photo.on { border-color: var(--c-primary-300); background: var(--c-primary-50); }
+.rp-photo.on .rp-case { background: var(--c-success); border-color: var(--c-success); }
+.rp-note { color: var(--c-text-muted); font-size: 12px; }
+.rp-retirer { align-self: flex-start; background: none; border: none; color: var(--c-text-muted); font-size: 12.5px; text-decoration: underline; padding: 0; }
+.rp-option.on:hover, .rp-option.on:focus { background: var(--c-primary-600); color: #fff; }
+.rp-option:not(.on):hover { border-color: var(--c-primary-300); }

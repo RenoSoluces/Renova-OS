@@ -87,10 +87,18 @@ export function produitVisiteById(id: string | null | undefined): ProduitVisite 
   return PRODUITS_VISITE.find(p => p.id === id)
 }
 
-/** Sections d'audit actives pour une visite donnée : 1 et 2 toujours, + celles du produit ciblé si applicable. */
-export function sectionsPourVisite(typeVisite: string | undefined, produitCible: string | null | undefined): number[] {
-  if (typeVisite !== 'produit') return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  const produit = produitVisiteById(produitCible)
-  if (!produit) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
-  return [1, 2, ...produit.sectionsSupplementaires]
+/**
+ * Sections actives pour une visite : 1 et 2 toujours, + celles des produits ciblés (VT produit, un ou
+ * plusieurs produits), ou toutes pour l'audit complet. La section 11 (relevé de pose) est toujours proposée.
+ */
+export function sectionsPourVisite(typeVisite: string | undefined, produitCible: string | null | undefined, produitsCibles?: string[] | null): number[] {
+  if (typeVisite !== 'produit') return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  const produits = [...new Set([produitCible, ...(produitsCibles || [])].filter(Boolean) as string[])].map(produitVisiteById).filter(Boolean) as ProduitVisite[]
+  if (!produits.length) return [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+  return [...new Set([1, 2, ...produits.flatMap(p => p.sectionsSupplementaires), 11])].sort((a, b) => a - b)
+}
+
+/** Produits ciblés par une visite (le produit principal puis les autres). */
+export function produitsDeLaVisite(produitCible: string | null | undefined, produitsCibles?: string[] | null): string[] {
+  return [...new Set([produitCible, ...(produitsCibles || [])].filter(Boolean) as string[])]
 }

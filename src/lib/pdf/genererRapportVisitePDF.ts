@@ -1,4 +1,5 @@
 import jsPDF from "jspdf";
+import { releveDe } from "../visites/relevePose";
 import autoTable from "jspdf-autotable";
 import type { Prospect, Visite, AuditData, Entreprise } from "../../types";
 import type { Batiment3CL } from "../3cl/batiment3CL";
@@ -548,6 +549,43 @@ export function genererRapportVisitePDF(
       if (photovoltaique.alerteMasquesImportants) {
         doc.text("⚠ Masques solaires importants relevés — la production réelle pourrait être inférieure à cette estimation.", marge, y);
         y += 5;
+      }
+      y += 3;
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Relevé de pose (informations chantier pour l'équipe d'installation)
+  // ---------------------------------------------------------------
+  const relevePose = auditData.releve_pose;
+  if (relevePose && relevePose.produits?.length) {
+    for (const produit of relevePose.produits) {
+      const def = releveDe(produit);
+      const valeurs = relevePose.releves?.[produit] || {};
+      if (!def) continue;
+      titreSection(`Relevé de pose — ${def.label}`);
+      for (const champ of def.champs) {
+        const v = String(valeurs[champ.id] ?? "").trim();
+        if (champ.type === "texte" && v) {
+          sautDePageSiNecessaire(10);
+          doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(80);
+          doc.text(champ.label, marge, y); y += 4.5;
+          doc.setFont("helvetica", "normal"); doc.setTextColor(20);
+          const lignes = doc.splitTextToSize(v, pageWidth - 2 * marge);
+          sautDePageSiNecessaire(lignes.length * 4.2);
+          doc.text(lignes, marge, y); y += lignes.length * 4.2 + 2;
+        } else {
+          ligneCle(champ.label, v ? `${v}${champ.unite ? ` ${champ.unite}` : ""}` : champ.obligatoire ? "À relever" : null);
+        }
+      }
+      const photos = def.photos.map((ph, i) => `${valeurs[`photo_${i}`] === "oui" ? "[x]" : "[ ]"} ${ph}`);
+      ligneCle("Photos", photos.length ? photos[0] : null);
+      for (const ph of photos.slice(1)) ligneCle("", ph);
+      if (valeurs.remarques?.trim()) {
+        const lignes = doc.splitTextToSize(`Remarques : ${valeurs.remarques.trim()}`, pageWidth - 2 * marge);
+        sautDePageSiNecessaire(lignes.length * 4.2 + 2);
+        doc.setFont("helvetica", "italic"); doc.setFontSize(9); doc.setTextColor(40);
+        doc.text(lignes, marge, y); y += lignes.length * 4.2 + 2;
       }
       y += 3;
     }

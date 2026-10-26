@@ -79,6 +79,12 @@ export const SECTIONS: SectionDef[] = [
       { id: 0, label: 'Toiture & production' },
     ],
   },
+  {
+    id: 11, label: 'Relevé de pose', short: 'Relevé de pose',
+    etapes: [
+      { id: 0, label: 'Chantier' },
+    ],
+  },
 ]
 
 const NAV_GROUPS = [
@@ -86,6 +92,7 @@ const NAV_GROUPS = [
   { label: 'L\'enveloppe', sections: [3, 4, 5, 6] },
   { label: 'Les systèmes', sections: [7, 8, 9] },
   { label: 'Production d\'énergie', sections: [10] },
+  { label: 'Installation', sections: [11] },
 ]
 
 interface WizardShellProps {
