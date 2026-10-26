@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronLeft, ChevronRight, Check, Phone, Mail, MapPin,
   Pencil, Trash2, Zap, Home, Wrench, User, Users, Wallet, ArrowRight,
   AlertTriangle, FileText, Calendar, LayoutGrid, List as ListIcon,
-  Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download,
+  Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download, CalendarDays,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Prospect, CrmTask } from '../types'
@@ -18,6 +18,7 @@ import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { EmailProspectModal } from '../components/crm/EmailProspectModal'
+import { ImportRdvGoogleModal } from '../components/crm/ImportRdvGoogleModal'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { resolveDocumentRows } from '../lib/storage/documentUrl'
@@ -156,6 +157,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [selected, setSelected] = useState<Prospect | null>(null)
   const [wizardOpen, setWizardOpen] = useState(false)
   const [emailOuvert, setEmailOuvert] = useState(false)
+  const [importGoogle, setImportGoogle] = useState(false)
   const [wizardStep, setWizardStep] = useState(1)
   const [form, setForm] = useState({ ...EMPTY_FORM })
   const [saving, setSaving] = useState(false)
@@ -1128,11 +1130,15 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 <LayoutGrid size={15} /> Pipeline
               </button>
             </div>
+            <Button variant="secondary" onClick={() => setImportGoogle(true)}>
+              <CalendarDays size={16} /> Importer mes RDV Google
+            </Button>
             <Button variant="primary" onClick={openWizard}>
               <Plus size={18} /> Nouveau prospect
             </Button>
           </div>
         </div>
+        {importGoogle && <ImportRdvGoogleModal onClose={() => setImportGoogle(false)} onImporte={() => { void fetchProspects() }} />}
 
         {view === 'liste' && (
           <section className="dashboard-kpis page-kpi-strip">

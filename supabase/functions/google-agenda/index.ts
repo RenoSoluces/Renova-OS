@@ -7,6 +7,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
  * GET  ?code=…&state=…                 → retour de Google : enregistre la connexion puis renvoie vers l'app
  * POST { action: 'synchroniser' }      → envoie les RDV Renova OS vers Google et importe les événements Google
  * POST { action: 'deconnecter' }       → révoque l'accès et oublie la connexion
+ * POST { action: 'lister_rdv', jours } → RDV Google passés (hors RDV créés par Renova OS), pour import en prospects
  *
  * verify_jwt = false : Google rappelle cette adresse sans session Supabase. Les actions POST vérifient
  * elles-mêmes la session ; le retour de Google est protégé par un « state » signé (HMAC) et daté.
@@ -30,7 +31,7 @@ const cors = (origin: string | null) => ({
 const json = (body: unknown, status: number, origin: string | null) =>
   new Response(JSON.stringify(body), { status, headers: { ...cors(origin), 'Content-Type': 'application/json' } })
 
-const env = (k: string) => Deno.env.get(k) || ''
+const env = (k: string) => (Deno.env.get(k) || '').trim()
 const urlFonction = () => `${env('SUPABASE_URL')}/functions/v1/google-agenda`
 
 /* ------------------------------------------------------------------ state signé */
@@ -208,23 +209,28 @@ Deno.serve(async (req: Request) => {
     const url = new URL(req.url)
     const state = await verifier(url.searchParams.get('state') || '').catch(() => null)
     const retour = state?.retour && ORIGINES_APP.some(o => String(state.retour).startsWith(o)) ? String(state.retour) : `${ORIGINES_APP[0]}/app/planning`
-    const rediriger = (statut: string) => Response.redirect(`${retour}${retour.includes('?') ? '&' : '?'}google=${statut}`, 302)
-    if (!state || url.searchParams.get('error')) return rediriger(url.searchParams.get('error') === 'access_denied' ? 'refuse' : 'erreur')
+    const rediriger = (statut: string, detail = '') => {
+      if (detail) console.error(`[google-agenda] connexion : ${detail}`)
+      return Response.redirect(`${retour}${retour.includes('?') ? '&' : '?'}google=${statut}${detail ? `&detail=${encodeURIComponent(detail.slice(0, 160))}` : ''}`, 302)
+    }
+    if (url.searchParams.get('error')) return rediriger(url.searchParams.get('error') === 'access_denied' ? 'refuse' : 'erreur', `Google : ${url.searchParams.get('error')}`)
+    if (!state) return rediriger('erreur', 'Lien de connexion expiré ou invalide, recommencez.')
     const code = url.searchParams.get('code')
-    if (!code) return rediriger('erreur')
+    if (!code) return rediriger('erreur', 'Google n’a pas renvoyé de code d’autorisation.')
     const r = await fetch('https://oauth2.googleapis.com/token', {
       method: 'POST',
       headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
       body: new URLSearchParams({ code, client_id: env('GOOGLE_CLIENT_ID'), client_secret: env('GOOGLE_CLIENT_SECRET'), redirect_uri: urlFonction(), grant_type: 'authorization_code' }),
     })
-    const jetons = await r.json()
-    if (!r.ok || !jetons.access_token) return rediriger('erreur')
+    const jetons = await r.json().catch(() => ({}))
+    if (!r.ok || !jetons.access_token) return rediriger('erreur', `Échange du code refusé par Google : ${jetons.error || r.status}${jetons.error_description ? ` (${jetons.error_description})` : ''}`)
     let email: string | null = null
     try { email = JSON.parse(new TextDecoder().decode(deB64url(String(jetons.id_token).split('.')[1]))).email || null } catch { /* facultatif */ }
     const { data: existante } = await admin.from('google_agenda_connexions').select('refresh_token').eq('user_id', state.uid).maybeSingle()
     const refresh = jetons.refresh_token || existante?.refresh_token
-    if (!refresh) return rediriger('erreur')
-    await admin.from('google_agenda_connexions').upsert({ user_id: state.uid, google_email: email, refresh_token: refresh, connecte_le: new Date().toISOString(), derniere_erreur: null })
+    if (!refresh) return rediriger('erreur', 'Google n’a pas fourni d’accès permanent : retirez Renova OS de votre compte Google (myaccount.google.com/permissions) puis reconnectez.')
+    const { error: errEnregistrement } = await admin.from('google_agenda_connexions').upsert({ user_id: state.uid, google_email: email, refresh_token: refresh, connecte_le: new Date().toISOString(), derniere_erreur: null })
+    if (errEnregistrement) return rediriger('erreur', `Enregistrement de la connexion impossible : ${errEnregistrement.message}`)
     await synchroniser(admin, state.uid).catch(() => null)
     return rediriger('ok')
   }
@@ -234,7 +240,7 @@ Deno.serve(async (req: Request) => {
   const { data: auth } = await admin.auth.getUser(jeton)
   if (!auth?.user) return json({ error: 'Session utilisateur invalide.' }, 401, origin)
   const userId = auth.user.id
-  let body: { action?: string; retour?: string } = {}
+  let body: { action?: string; retour?: string; jours?: number } = {}
   try { body = await req.json() } catch { /* corps vide */ }
 
   if (body.action === 'demarrer') {
@@ -251,6 +257,42 @@ Deno.serve(async (req: Request) => {
   if (body.action === 'synchroniser') {
     const resultat = await synchroniser(admin, userId)
     return json(resultat, 'erreur' in resultat ? 400 : 200, origin)
+  }
+
+  if (body.action === 'lister_rdv') {
+    const { data: connexion } = await admin.from('google_agenda_connexions').select('refresh_token,calendar_id,google_email').eq('user_id', userId).maybeSingle()
+    if (!connexion) return json({ erreur: 'Connectez d’abord votre Google Agenda.' }, 400, origin)
+    let acces: string
+    try { acces = await jetonAcces(connexion.refresh_token) } catch (e) {
+      return json({ erreur: (e as Error).message === 'ACCES_REVOQUE' ? 'L’accès à Google Agenda a été retiré : reconnectez votre agenda.' : (e as Error).message }, 400, origin)
+    }
+    const jours = Math.min(Math.max(Number(body.jours) || 365, 7), 730)
+    const agenda = encodeURIComponent(connexion.calendar_id || 'primary')
+    const maintenant = new Date()
+    const rdv: unknown[] = []
+    let pageToken = ''
+    do {
+      const params = new URLSearchParams({
+        timeMin: new Date(maintenant.getTime() - jours * 86400000).toISOString(), timeMax: maintenant.toISOString(),
+        singleEvents: 'true', orderBy: 'startTime', maxResults: '250',
+      })
+      if (pageToken) params.set('pageToken', pageToken)
+      const r = await google(acces, `/calendars/${agenda}/events?${params}`)
+      if (!r.ok) return json({ erreur: `Lecture de Google Agenda impossible (${r.status}).` }, 502, origin)
+      for (const g of r.data?.items || []) {
+        if (g.status === 'cancelled' || g.extendedProperties?.private?.renova_id || !g.start) continue
+        const local = g.start.dateTime ? enLocal(g.start.dateTime) : { date: g.start.date, heure: '' }
+        rdv.push({
+          id: g.id, titre: g.summary || '', date: local.date, heure: local.heure || null,
+          lieu: g.location || '', description: String(g.description || '').slice(0, 3000),
+          participants: (g.attendees || []).filter((a: any) => !a.self && a.email && !String(a.email).endsWith('calendar.google.com'))
+            .map((a: any) => ({ email: a.email, nom: a.displayName || '' })),
+        })
+        if (rdv.length >= 1500) break
+      }
+      pageToken = rdv.length >= 1500 ? '' : (r.data?.nextPageToken || '')
+    } while (pageToken)
+    return json({ rdv: rdv.reverse() }, 200, origin)
   }
 
   if (body.action === 'deconnecter') {
