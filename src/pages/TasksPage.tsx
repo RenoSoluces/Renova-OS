@@ -3,6 +3,7 @@ import { CalendarClock, CheckCircle2, Circle, Phone, Mail, Calendar, RefreshCw, 
 import { useAuth } from '../lib/auth/AuthContext'
 import { normalizeStatut } from '../lib/crm/constants'
 import { EmailProspectModal } from '../components/crm/EmailProspectModal'
+import { InvitationNotifications } from '../components/InvitationNotifications'
 import { supabase } from '../lib/supabase'
 import type { CrmTask, Prospect } from '../types'
 import { Button } from '../components/ui/Button'
@@ -172,6 +173,7 @@ export function TasksPage(): JSX.Element {
 
   return <div className="page">
     {emailPour && <EmailProspectModal prospect={emailPour as any} onClose={() => setEmailPour(null)} />}
+    <InvitationNotifications />
     <div className="page-header" style={{display:'flex',justifyContent:'space-between',gap:12,alignItems:'center',flexWrap:'wrap'}}>
       <div><h1 className="page-title">Ma journée</h1><p className="page-subtitle">Vos rendez-vous du jour, les prospects à relancer et vos tâches, avec appel, SMS, WhatsApp et itinéraire en un geste.</p></div>
       <Button variant="secondary" onClick={() => void load()}><RefreshCw size={15}/> Actualiser</Button>

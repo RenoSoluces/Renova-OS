@@ -1,3 +1,4 @@
+import { CLE_PUBLIQUE_VAPID } from '../lib/push'
 import { useState, useEffect } from 'react'
 import { User, Building2, Plug, Bell, Save, ScrollText, RefreshCw, Plus, Image as ImageIcon, Sun, Users, Trash2 } from 'lucide-react'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
@@ -59,7 +60,7 @@ export function ParametresPage() {
   const [pushEnabled, setPushEnabled] = useState(false)
   const [pushBusy, setPushBusy] = useState(false)
   const [pushMessage, setPushMessage] = useState('')
-  const vapidPublicKey = import.meta.env.VITE_VAPID_PUBLIC_KEY || ''
+  const vapidPublicKey = CLE_PUBLIQUE_VAPID
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<any[]>([])
   const [ancienCommercialForm, setAncienCommercialForm] = useState({ nom_complet: '', email: '', telephone: '', notes: '' })
@@ -114,7 +115,7 @@ export function ParametresPage() {
       }, { onConflict: 'endpoint' })
       if (error) throw error
       setPushEnabled(true)
-      setPushMessage('Ce navigateur est enregistré pour recevoir les notifications Renova OS. L’envoi côté serveur reste à configurer.')
+      setPushMessage('Ce navigateur recevra désormais les notifications Renova OS : récap du matin, relances de devis, nouveaux prospects et messages.')
     } catch (error) {
       setPushMessage(error instanceof Error ? error.message : 'Impossible d’activer les notifications push.')
     } finally {
