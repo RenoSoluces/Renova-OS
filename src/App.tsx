@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { DashboardPage } from './pages/DashboardPage'
+const PilotagePage = lazy(() => import('./pages/PilotagePage').then(m => ({ default: m.PilotagePage })))
 const ProspectsPage = lazy(() => import('./pages/ProspectsPage').then(m => ({ default: m.ProspectsPage })))
 const VisitesPage = lazy(() => import('./pages/VisitesPage').then(m => ({ default: m.VisitesPage })))
 const SimulationsPage = lazy(() => import('./pages/SimulationsPage').then(m => ({ default: m.SimulationsPage })))
@@ -73,6 +74,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   installateurs: { title: 'Installateurs', subtitle: 'Répertoire des partenaires techniques et installateurs' },
   challenges: { title: 'Challenges & classements', subtitle: 'Challenges et classements isolés par société' },
   performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },
+  pilotage: { title: 'Pilotage équipe', subtitle: 'Activité, transformation et points d’attention de l’équipe' },
   sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
   organisation: { title: 'Organigramme', subtitle: 'Structure des entreprises et équipes' },
   solaire: { title: 'Simulateur solaire', subtitle: 'Production, autoconsommation et rentabilité photovoltaïque' },
@@ -233,6 +235,7 @@ function AppContent() {
           {page === 'partenaires' && <ApporteursPage />}
           {page === 'installateurs' && (['admin','manager','partner_admin','company_admin'].includes(profile?.role || '') ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction et aux responsables autorisés.</strong></div></div>)}
           {page === 'challenges' && <ChallengesPage />}
+          {page === 'pilotage' && (profile.role === 'admin' || profile.role === 'manager' ? <PilotagePage onNavigate={navigate} /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction.</strong></div></div>)}
           {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'organisation' && <OrganisationPage />}

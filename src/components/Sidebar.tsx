@@ -2,6 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
+  Gauge,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -43,6 +44,7 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
     { key: 'partenaires', label: 'Mon réseau — apporteurs', icon: Users },
     { key: 'challenges', label: 'Challenges & classements', icon: Trophy },
     { key: 'installateurs', label: 'Installateurs', icon: Building2 },
+    { key: 'pilotage', label: 'Pilotage équipe', icon: Gauge },
     { key: 'performance', label: 'Performances & CA', icon: BarChart3 },
     { key: 'activite', label: 'Historique & activités', icon: History },
     { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
@@ -105,7 +107,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         {NAV_GROUPS(prospectCount).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'performance' && item.key !== 'sante_systeme') || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'installateurs' || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
+            {group.items.filter(item => (item.key !== 'performance' && item.key !== 'sante_systeme' && item.key !== 'pilotage') || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'pilotage' || ['admin','manager'].includes(profile?.role || '')).filter(item => item.key !== 'installateurs' || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
               const Icon = item.icon
               return (
                 <button
