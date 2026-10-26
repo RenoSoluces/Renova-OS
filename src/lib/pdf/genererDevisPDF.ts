@@ -196,13 +196,25 @@ export function genererDevisPDF(
 
   // CGV de l'émetteur, en annexe paginée
   const cgvBrutes=safe(devis.emetteur_cgv||entreprise?.conditions_generales_devis||"").trim();
-  const matchBordereau=cgvBrutes.match(/BORDEREAU DE RÉTRACTATION/i);
+  // Titre seul sur sa ligne, en majuscules : ne pas confondre avec « le bordereau de rétractation » dans le texte.
+  const matchBordereau=cgvBrutes.match(/^\s*BORDEREAU DE RÉTRACTATION\s*$/m);
   const cgv=matchBordereau?.index!==undefined?cgvBrutes.slice(0,matchBordereau.index).trim():cgvBrutes;
   const bordereau=matchBordereau?.index!==undefined?cgvBrutes.slice(matchBordereau.index).trim():"";
   if(cgv){
     const paragraphs=cgv.split(/\n\s*\n/).map(p=>p.trim()).filter(Boolean).filter(p=>!/^CONDITIONS GÉNÉRALES DE VENTE$/i.test(p));
     doc.addPage();fil(doc,C.vert);doc.rect(0,0,PW,16,"F");doc.setFont("helvetica","bold");doc.setFontSize(11);txt(doc,C.blanc);doc.text("CONDITIONS GÉNÉRALES DE VENTE",M,10.2,{charSpace:1});y=25;
-    for(const p of paragraphs){doc.setFont("helvetica",/^Article\s+\d+/i.test(p)?"bold":"normal");doc.setFontSize(8);txt(doc,/^Article\s+\d+/i.test(p)?C.vert:[60,68,63]);const rows=doc.splitTextToSize(p,W) as string[];const h=rows.length*3.7+4;if(y+h>PH-18){doc.addPage();fil(doc,C.vert);doc.rect(0,0,PW,16,"F");doc.setFont("helvetica","bold");doc.setFontSize(10);txt(doc,C.blanc);doc.text("CONDITIONS GÉNÉRALES DE VENTE (SUITE)",M,10.2);y=25;}doc.text(rows,M,y);y+=h;}
+    const suite=()=>{doc.addPage();fil(doc,C.vert);doc.rect(0,0,PW,16,"F");doc.setFont("helvetica","bold");doc.setFontSize(10);txt(doc,C.blanc);doc.text("CONDITIONS GÉNÉRALES DE VENTE (SUITE)",M,10.2);y=25;};
+    for(const p of paragraphs){
+      // « Article n – Titre » sur la première ligne : titre en gras, corps en texte courant.
+      const estArticle=/^Article\s+\d+/i.test(p);const [premiere,...reste]=p.split(/\n/);
+      const titre=estArticle?premiere.trim():"";const corps=estArticle?reste.join(" ").trim():p.replace(/\n/g," ");
+      doc.setFontSize(8);doc.setFont("helvetica","normal");const rows=corps?doc.splitTextToSize(corps,W) as string[]:[];
+      const h=(titre?4.6:0)+rows.length*3.7+4;if(y+Math.min(h,30)>PH-18)suite();
+      if(titre){doc.setFont("helvetica","bold");txt(doc,C.vert);doc.text(titre,M,y);y+=4.6;}
+      doc.setFont("helvetica","normal");txt(doc,[60,68,63]);
+      for(const r of rows){if(y>PH-18)suite(),doc.setFont("helvetica","normal"),doc.setFontSize(8),txt(doc,[60,68,63]);doc.text(r,M,y);y+=3.7;}
+      y+=4;
+    }
   }
   if(bordereau){
     doc.addPage();const bx=M,by=30,bh=215;doc.setFont("helvetica","normal");doc.setFontSize(7.5);txt(doc,C.gris);doc.text("DÉCOUPER SUIVANT LES POINTILLÉS",M,22,{charSpace:.8});
