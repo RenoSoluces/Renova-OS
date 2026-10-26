@@ -2,7 +2,11 @@ import { cleanupOutdatedCaches, createHandlerBoundToURL, precacheAndRoute } from
 import { NavigationRoute, registerRoute } from 'workbox-routing'
 import { clientsClaim } from 'workbox-core'
 
-self.skipWaiting()
+// Une nouvelle version attend que l'utilisateur choisisse « Mettre à jour » (ou que l'appli soit fermée) :
+// plus de rechargement surprise au retour sur l'application après un déploiement.
+self.addEventListener('message', (event) => {
+  if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting()
+})
 clientsClaim()
 cleanupOutdatedCaches()
 precacheAndRoute(self.__WB_MANIFEST)
