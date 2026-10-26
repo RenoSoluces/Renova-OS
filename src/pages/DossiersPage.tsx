@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
+import { alertesDossier, etapesDossier, type Aide } from '../lib/dossiers/suiviAides'
+import { SuiviAidesPanel } from '../components/dossiers/SuiviAidesPanel'
 import {
   Plus,
   FolderOpen,
@@ -85,6 +87,8 @@ export function DossiersPage({
 
   const [detail, setDetail] = useState<DossierAvecRelations | null>(null)
   const [pieces, setPieces] = useState<DocumentPiece[]>([])
+  const [signatureDevisDetail, setSignatureDevisDetail] = useState<string | null>(null)
+  const [piecesParDossier, setPiecesParDossier] = useState<Record<string, any[]>>({})
   const [detailStatut, setDetailStatut] = useState('')
   const [detailDateInstallation, setDetailDateInstallation] = useState('')
   const [savingStatut, setSavingStatut] = useState(false)
@@ -126,6 +130,14 @@ export function DossiersPage({
 
         setRows((data || []) as DossierAvecRelations[])
         setLoading(false)
+      })
+
+    // Pièces de tous les dossiers, pour signaler ceux qui ont une alerte d'aide (pièce, échéance).
+    supabase.from('documents').select('dossier_id,type,nom,recu,url,obligatoire,etape,demande_le').not('dossier_id', 'is', null).limit(10000)
+      .then(({ data }) => {
+        const parDossier: Record<string, any[]> = {}
+        for (const doc of data || []) (parDossier[(doc as any).dossier_id] ||= []).push(doc)
+        setPiecesParDossier(parDossier)
       })
 
     // La commission d'un dossier est celle générée automatiquement (barème)
@@ -271,10 +283,12 @@ export function DossiersPage({
     setUploadError('')
     setDetailMessage('')
 
-    const [{ data }, { data: factures }] = await Promise.all([
+    const [{ data }, { data: factures }, { data: devisSigne }] = await Promise.all([
       supabase.from('documents').select('*').eq('dossier_id', d.id).order('created_at'),
       supabase.from('dossier_facturation').select('*').eq('dossier_id', d.id).order('ordre').order('created_at'),
+      d.devis_id ? supabase.from('devis').select('signature_date').eq('id', d.devis_id).maybeSingle() : Promise.resolve({ data: null }),
     ])
+    setSignatureDevisDetail((devisSigne as any)?.signature_date || null)
 
     setPieces(await resolveDocumentRows((data || []) as DocumentPiece[]))
     setFacturation((factures || []) as DossierFacturation[])
@@ -287,6 +301,17 @@ export function DossiersPage({
       taux_tva: '20',
       declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
     })
+  }
+
+  /** Recharge les pièces et le suivi des aides du dossier ouvert. */
+  async function rechargerSuivi() {
+    if (!detail) return
+    const [{ data: docs }, { data: dossier }] = await Promise.all([
+      supabase.from('documents').select('*').eq('dossier_id', detail.id).order('created_at'),
+      supabase.from('dossiers').select('aides,suivi_aides').eq('id', detail.id).maybeSingle(),
+    ])
+    setPieces(await resolveDocumentRows((docs || []) as DocumentPiece[]))
+    if (dossier) setDetail(d => d ? { ...d, ...(dossier as any) } : d)
   }
 
   async function enregistrerConfigurationFacturation() {
@@ -995,6 +1020,12 @@ export function DossiersPage({
                         >
                           {d.statut || '—'}
                         </span>
+                        {(() => {
+                          const aides = ((d as any).aides || []) as Aide[]
+                          if (!aides.length) return null
+                          const n = alertesDossier(etapesDossier({ aides, suivi: (d as any).suivi_aides || {}, installation: d.date_installation, installationPrevue: (d as any).date_installation_prevue, pieces: piecesParDossier[d.id] || [] })).length
+                          return n ? <span className="badge badge-error" style={{ marginLeft: 6 }} title="Alertes sur le suivi des aides">{n} alerte{n > 1 ? 's' : ''} aides</span> : <span className="badge badge-success" style={{ marginLeft: 6 }}>Aides à jour</span>
+                        })()}
                       </td>
 
                       <td>
@@ -1380,6 +1411,15 @@ export function DossiersPage({
                 <div style={{display:'flex',justifyContent:'space-between',paddingTop:8,fontWeight:700}}><span>Total des échéances non annulées</span><span>{euro(facturation.filter(x=>x.statut!=='annulee').reduce((s,x)=>s+Number(x.montant_ht||0),0))} HT</span></div>
               </div>}
             </div>}
+
+            <SuiviAidesPanel
+              key={detail.id}
+              dossier={detail as any}
+              prospect={detail.prospect as any}
+              signatureDevis={signatureDevisDetail}
+              pieces={pieces as any}
+              onChange={() => void rechargerSuivi()}
+            />
 
             {/* ÉTAT DOSSIER */}
 
