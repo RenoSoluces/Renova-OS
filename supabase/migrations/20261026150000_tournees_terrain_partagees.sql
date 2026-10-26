@@ -1,0 +1,4 @@
+-- Déjà appliqué sur Supabase le 26/10/2026 (migration « tournees_terrain_partagees »).
+-- Tables tournees / tournee_portes (RLS : le commercial écrit les siennes ; lui, son manager direct,
+-- la direction de son entreprise et le Grand Admin les lisent) et fonction classement_terrain().
+-- Voir le contenu complet dans l'historique des migrations Supabase.

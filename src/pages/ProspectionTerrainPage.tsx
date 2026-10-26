@@ -1,13 +1,14 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapPinned, Plus, LocateFixed, Search, X, Navigation, CheckCircle2, CalendarCheck, DoorClosed, ThumbsDown, ThumbsUp,
-  Map as CarteIcone, List, RotateCcw, Trash2, Flag, CloudOff, Loader2,
+  Map as CarteIcone, List, RotateCcw, Trash2, Flag, CloudOff, Cloud, Loader2,
 } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { CarteTournee } from '../components/terrain/CarteTournee'
 import {
   RESULTATS_PORTE, adresseDepuisPosition, chercherAdresses, couleurResultat, creerPorte, ecrireTournees, libelleResultat, lireTournees,
-  nouvelleTournee, statsTournee, synchroniserPorte,
+  nouvelleTournee, statsTournee, synchroniserPorte, chargerTourneesServeur, fusionnerTournees, envoyerTournee, signatureTournee,
+  classementTerrain, debutSemaine, type LigneClassement,
   type AdresseBan, type Porte, type ResultatPorte, type StockageTournees,
 } from '../lib/terrain/tournees'
 
@@ -22,7 +23,11 @@ export function ProspectionTerrainPage(): JSX.Element {
   const [position, setPosition] = useState<{ lat: number; lng: number } | null>(null)
   const [recentrage, setRecentrage] = useState(0)
   const [vue, setVue] = useState<'carte' | 'liste'>('carte')
-  const [onglet, setOnglet] = useState<'portes' | 'repasser'>('portes')
+  const [onglet, setOnglet] = useState<'portes' | 'repasser' | 'classement'>('portes')
+  const [classement, setClassement] = useState<LigneClassement[] | null>(null)
+  const [sauvegarde, setSauvegarde] = useState<'attente' | 'ok' | 'hors_ligne' | 'erreur'>('attente')
+  const envoyees = useRef<Map<string, string>>(new Map())
+  const serveurCharge = useRef(false)
   const [message, setMessage] = useState('')
   const [localisation, setLocalisation] = useState(false)
   const [sync, setSync] = useState(false)
@@ -35,6 +40,48 @@ export function ProspectionTerrainPage(): JSX.Element {
   // Le profil arrive après le premier rendu : on relit alors les tournées de ce commercial.
   useEffect(() => { if (profile?.id) setStock(lireTournees(profile.id)) }, [profile?.id])
   useEffect(() => { if (profile?.id) ecrireTournees(profile.id, stock) }, [stock, profile?.id])
+
+  // Récupère les tournées enregistrées en base (autre appareil, réinstallation…) et les fusionne.
+  useEffect(() => {
+    if (!profile?.id) return
+    let annule = false
+    serveurCharge.current = false
+    void chargerTourneesServeur(profile.id).then(serveur => {
+      if (annule) return
+      if (serveur === null) { setSauvegarde(navigator.onLine ? 'erreur' : 'hors_ligne'); serveurCharge.current = true; return }
+      envoyees.current = new Map(serveur.map(t => [t.id, signatureTournee(t)]))
+      setStock(s => {
+        const fusion = fusionnerTournees(s.tournees.filter(t => t.portes.length || t.id === s.courante), serveur)
+        return { tournees: fusion.length ? fusion : s.tournees, courante: fusion.some(t => t.id === s.courante) ? s.courante : (fusion[0]?.id ?? s.courante) }
+      })
+      serveurCharge.current = true
+    })
+    return () => { annule = true }
+  }, [profile?.id])
+
+  // Envoie en base les tournées modifiées, 1,5 s après la dernière saisie (et au retour du réseau).
+  const envoyer = useCallback(async () => {
+    if (!profile?.id || !serveurCharge.current) return
+    if (!navigator.onLine) { setSauvegarde('hors_ligne'); return }
+    const aEnvoyer = stock.tournees.filter(t => (t.portes.length || envoyees.current.has(t.id)) && envoyees.current.get(t.id) !== signatureTournee(t))
+    if (!aEnvoyer.length) { setSauvegarde('ok'); return }
+    for (const t of aEnvoyer) {
+      const erreur = await envoyerTournee(t, profile.id)
+      if (erreur) { setSauvegarde('erreur'); return }
+      envoyees.current.set(t.id, signatureTournee(t))
+    }
+    setSauvegarde('ok')
+  }, [stock.tournees, profile?.id])
+
+  useEffect(() => {
+    const minuteur = window.setTimeout(() => { void envoyer() }, 1500)
+    return () => window.clearTimeout(minuteur)
+  }, [envoyer])
+
+  useEffect(() => {
+    if (onglet !== 'classement') return
+    void classementTerrain(debutSemaine()).then(setClassement)
+  }, [onglet, stock.tournees])
 
   const majTournee = useCallback((fn: (t: typeof tournee) => typeof tournee) => {
     setStock(s => ({ ...s, tournees: s.tournees.map(t => t.id === s.courante ? fn(t) : t) }))
@@ -57,10 +104,10 @@ export function ProspectionTerrainPage(): JSX.Element {
   }, [stock.tournees, profile])
 
   useEffect(() => {
-    const retour = () => { void synchroniser() }
+    const retour = () => { void synchroniser(); void envoyer() }
     window.addEventListener('online', retour)
     return () => window.removeEventListener('online', retour)
-  }, [synchroniser])
+  }, [synchroniser, envoyer])
 
   /* ----- Ajout d'une porte ----- */
   function ouvrirNouvelle(lat: number, lng: number, adresse?: AdresseBan | null) {
@@ -171,7 +218,27 @@ export function ProspectionTerrainPage(): JSX.Element {
         <div className="tr-onglets" role="tablist">
           <button type="button" role="tab" aria-selected={onglet === 'portes'} className={onglet === 'portes' ? 'on' : ''} onClick={() => setOnglet('portes')}>Portes <b>{tournee.portes.length}</b></button>
           <button type="button" role="tab" aria-selected={onglet === 'repasser'} className={onglet === 'repasser' ? 'on' : ''} onClick={() => setOnglet('repasser')}>À repasser <b>{absents.length}</b></button>
+          <button type="button" role="tab" aria-selected={onglet === 'classement'} className={onglet === 'classement' ? 'on' : ''} onClick={() => setOnglet('classement')}>Classement</button>
         </div>
+        <div className={`tr-sauvegarde ${sauvegarde}`}>
+          {sauvegarde === 'ok' && <><Cloud size={13} /> Tournée sauvegardée</>}
+          {sauvegarde === 'attente' && <><Cloud size={13} /> Sauvegarde…</>}
+          {sauvegarde === 'hors_ligne' && <><CloudOff size={13} /> Hors ligne : enregistré sur l’appareil</>}
+          {sauvegarde === 'erreur' && <><CloudOff size={13} /> Sauvegarde en ligne impossible, nouvel essai automatique</>}
+        </div>
+        {onglet === 'classement' ? (
+          <div className="tr-classement">
+            <p className="tr-classement-titre">Cette semaine (depuis lundi)</p>
+            {classement === null ? <p className="tr-liste-vide">Classement indisponible hors ligne.</p>
+              : classement.length === 0 ? <p className="tr-liste-vide">Aucune porte frappée cette semaine pour l’instant.</p>
+              : <ol>{classement.map((l, i) => (
+                <li key={l.commercial_id} className={l.commercial_id === profile?.id ? 'moi' : ''}>
+                  <span className="tr-rang">{i + 1}</span>
+                  <span className="tr-classement-nom">{l.nom_complet || 'Commercial'}{l.commercial_id === profile?.id ? ' (vous)' : ''}</span>
+                  <span className="tr-classement-chiffres"><b>{l.rdv}</b> RDV · {l.interesses} int. · {l.portes} portes</span>
+                </li>))}</ol>}
+          </div>
+        ) : (
         <div className="tr-liste">
           {(onglet === 'portes' ? tournee.portes.slice().reverse() : absents).map(p => {
             const Icone = ICONES_RESULTAT[p.resultat]
@@ -190,6 +257,7 @@ export function ProspectionTerrainPage(): JSX.Element {
           {(onglet === 'portes' ? tournee.portes.length === 0 : absents.length === 0) && (
             <p className="tr-liste-vide">{onglet === 'portes' ? 'Aucune porte pour le moment.' : 'Aucun absent à repasser. Bravo !'}</p>)}
         </div>
+        )}
       </aside>
     </div>
 
