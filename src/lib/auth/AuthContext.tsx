@@ -38,11 +38,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [profileError, setProfileError] = useState<string | null>(null)
   const requestId = useRef(0)
+  /** Utilisateur dont le profil est déjà chargé (évite les rechargements au retour sur l'onglet). */
+  const utilisateurCharge = useRef<string | null>(null)
   const [lienMotDePasse, setLienMotDePasse] = useState(typeLienAuth === 'invite' || typeLienAuth === 'recovery')
 
-  const loadProfile = useCallback(async (userId: string) => {
+  const loadProfile = useCallback(async (userId: string, enArrierePlan = false) => {
     const currentRequest = ++requestId.current
-    setLoading(true)
+    // Rechargement en arrière-plan : on garde l'application affichée.
+    if (!enArrierePlan) setLoading(true)
     setProfileError(null)
     try {
       // Keep the app usable against databases that have not yet received
@@ -84,7 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshProfile = useCallback(async () => {
     const userId = session?.user.id
-    if (userId) await loadProfile(userId)
+    if (userId) await loadProfile(userId, true)
   }, [session?.user.id, loadProfile])
 
   useEffect(() => {
@@ -94,11 +97,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'PASSWORD_RECOVERY') setLienMotDePasse(true)
       setSession(nextSession)
       if (nextSession) {
+        // Au retour sur l'onglet, Supabase renouvelle le jeton (TOKEN_REFRESHED, parfois SIGNED_IN) :
+        // le profil du même utilisateur est déjà chargé, on ne le recharge pas — sinon l'écran de
+        // chargement remplace l'application et la page en cours est perdue.
+        const memeUtilisateur = utilisateurCharge.current === nextSession.user.id
+        if (memeUtilisateur && event !== 'USER_UPDATED') return
+        utilisateurCharge.current = nextSession.user.id
         // Defer database work until after the auth callback returns.
         Promise.resolve().then(() => {
-          if (active) void loadProfile(nextSession.user.id)
+          if (active) void loadProfile(nextSession.user.id, memeUtilisateur)
         })
       } else {
+        utilisateurCharge.current = null
         requestId.current += 1
         setProfile(null)
         setProfileError(null)
@@ -133,8 +143,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
       setSession(data.session)
-      if (data.session) void loadProfile(data.session.user.id)
-      else setLoading(false)
+      if (data.session) {
+        // Déjà pris en charge par l'événement INITIAL_SESSION : pas de second chargement.
+        if (utilisateurCharge.current === data.session.user.id) return
+        utilisateurCharge.current = data.session.user.id
+        void loadProfile(data.session.user.id)
+      } else setLoading(false)
     }).catch((error: unknown) => {
       if (!active) return
       console.error('[RENOVA OS] Vérification de session impossible:', error)
@@ -163,6 +177,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (error) return { error: traduireErreur(error.message) }
     if (data.session) {
       setSession(data.session)
+      utilisateurCharge.current = data.session.user.id
       await loadProfile(data.session.user.id)
     }
     return { error: null }

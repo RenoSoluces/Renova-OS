@@ -141,7 +141,7 @@ function AppContent() {
     if (!session) return
     verifierRelances(profile?.nom_complet || null).then(() => setNotifRefresh(n => n + 1))
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session])
+  }, [session?.user.id])
 
   const pageTitle = PAGE_TITLES[page]
 
