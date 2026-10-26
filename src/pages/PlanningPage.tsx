@@ -8,6 +8,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { euro } from '../lib/crm/constants'
 import { AbonnementAgenda } from '../components/agenda/AbonnementAgenda'
+import { ConnexionGoogleAgenda } from '../components/agenda/ConnexionGoogleAgenda'
 
 const TYPES = [
   { value: 'visite', label: 'Visite technique (VT)' },
@@ -204,6 +205,7 @@ export function PlanningPage() {
         </div>
       </div>
 
+      <ConnexionGoogleAgenda onSynchronise={() => { void fetchEvents() }} />
       <AbonnementAgenda />
 
       {isAdmin && commerciaux.length > 0 && (
@@ -267,7 +269,7 @@ export function PlanningPage() {
                               <MapPin size={14} /> {e.adresse || '—'}
                             </div>
                             <div className="flex items-center gap-2" style={{ flexWrap: 'wrap' }}>
-                              <span className={`badge ${TYPE_BADGE[e.type] || 'badge-neutral'}`}>{e.type}</span>
+                              <span className={`badge ${TYPE_BADGE[e.type] || 'badge-neutral'}`}>{e.type === 'google' ? 'Google' : e.type}</span>
                               {isAdmin && (
                                 <span className="badge badge-neutral flex items-center gap-1">
                                   <UserIcon size={11} /> {commercial?.nom_complet || 'Non attribué'}

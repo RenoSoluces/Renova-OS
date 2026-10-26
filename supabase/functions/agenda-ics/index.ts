@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
   const depuis = new Date(Date.now() - 60 * 86400000).toISOString().slice(0, 10)
   const { data: evenements, error } = await admin.from('planning_events')
     .select('id,titre,date,heure,type,adresse,notes,prospect_id,created_at')
-    .eq('user_id', acces.user_id).gte('date', depuis).order('date').limit(1000)
+    .eq('user_id', acces.user_id).neq('source', 'google').gte('date', depuis).order('date').limit(1000)
   if (error) return new Response('Agenda indisponible', { status: 500 })
 
   const prospectIds = [...new Set((evenements || []).map(e => e.prospect_id).filter(Boolean))] as string[]

@@ -17,4 +17,9 @@ export const typeLienAuth: string | null = (() => {
   }
 })()
 
+/** Paramètres de l'URL d'arrivée, lus avant que l'app ne réécrive l'adresse (/app/…). */
+export const parametresArrivee: URLSearchParams = (() => {
+  try { return new URLSearchParams(window.location.search) } catch { return new URLSearchParams() }
+})()
+
 export const supabase = createClient(supabaseUrl, supabaseAnonKey)

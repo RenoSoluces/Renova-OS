@@ -1,6 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react'
 import type { Session } from '@supabase/supabase-js'
-import { supabase, typeLienAuth } from '../supabase'
+import { supabase, typeLienAuth, parametresArrivee } from '../supabase'
 
 export interface Profile {
   id: string
@@ -109,14 +109,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     // Lien d'invitation Renova OS : ?token_hash=…&type=invite|magiclink|recovery → on valide le jeton.
     const valider = async () => {
       try {
-        const params = new URLSearchParams(window.location.search)
+        const params = parametresArrivee
         const tokenHash = params.get('token_hash')
         const type = params.get('type') as 'invite' | 'magiclink' | 'recovery' | 'signup' | 'email' | null
         if (tokenHash && type) {
           const { error } = await supabase.auth.verifyOtp({ token_hash: tokenHash, type })
           if (error) setProfileError('Ce lien d’activation a expiré ou a déjà été utilisé. Demandez une nouvelle invitation.')
           if (type === 'invite' || type === 'recovery') setLienMotDePasse(true)
-          window.history.replaceState(null, '', window.location.pathname)
+          params.delete('token_hash')
         }
       } catch (error) {
         console.error('[RENOVA OS] Validation du lien impossible:', error)

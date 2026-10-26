@@ -1,0 +1,4 @@
+-- Déjà appliqué sur Supabase le 26/10/2026 (migration « google_agenda_synchronisation »).
+-- Tables google_agenda_connexions (jeton Google par utilisateur, accès serveur uniquement) et
+-- google_agenda_suppressions ; colonnes planning_events.google_event_id / source ('renova' | 'google') ;
+-- déclencheur mémorisant les RDV supprimés ; fonction etat_google_agenda() pour l'interface.
