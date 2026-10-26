@@ -22,7 +22,6 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
   { label: 'Ma Journée', items: [
     { key: 'a_traiter', label: 'À traiter', icon: ClipboardCheck },
     { key: 'planning', label: 'Agenda ', icon: Calendar },
-    { key: 'courrier', label: 'Mon courrier', icon: Mail },
   ] },
   { label: 'Ventes', items: [
     { key: 'prospects', label: 'Prospects', icon: Users, badge: prospectCount },
