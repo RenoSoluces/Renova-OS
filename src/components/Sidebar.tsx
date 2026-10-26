@@ -20,7 +20,7 @@ interface SidebarProps {
 const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = (prospectCount) => [
   { label: 'Accueil', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
   { label: 'Ma Journée', items: [
-    { key: 'a_traiter', label: 'À traiter', icon: ClipboardCheck },
+    { key: 'a_traiter', label: 'Ma journée', icon: ClipboardCheck },
     { key: 'planning', label: 'Agenda ', icon: Calendar },
   ] },
   { label: 'Ventes', items: [
