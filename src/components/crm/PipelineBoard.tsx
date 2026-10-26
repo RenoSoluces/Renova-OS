@@ -37,14 +37,13 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
       // plus fiable quel que soit le statut enregistré en base.
       const { data: commissions, error } = await supabase
         .from('commissions')
-        .select('reference_type, reference_id, statut, date_paiement_commercial, date_paiement_societe')
+        .select('reference_type, reference_id, statut, date_paiement_commercial')
 
       if (error || cancelled) return
 
       const paid = (commissions || []).filter(c =>
         c.statut === 'payee' ||
-        !!c.date_paiement_commercial ||
-        !!c.date_paiement_societe
+        !!c.date_paiement_commercial
       )
 
       const devisIds = paid

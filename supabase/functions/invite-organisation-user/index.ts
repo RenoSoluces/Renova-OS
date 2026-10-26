@@ -1,9 +1,24 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+/**
+ * Invitation d'un membre (commercial, manager, dirigeant partenaire…).
+ *
+ * L'e-mail par défaut de Supabase (noreply@mail.app.supabase.io) arrive souvent en courrier indésirable,
+ * voire pas du tout, et son quota est très faible. Cette fonction :
+ *  1. crée le compte (ou réutilise un compte invité qui ne s'est jamais connecté),
+ *  2. génère un lien d'activation,
+ *  3. envoie un e-mail Renova OS via Resend si RESEND_API_KEY et MAIL_FROM sont configurés,
+ *  4. renvoie toujours le lien à l'administrateur, qui peut le transmettre lui-même (e-mail, SMS, WhatsApp…).
+ *
+ * Le lien pointe directement vers l'application (?token_hash=…&type=…) : l'app valide le jeton
+ * avec verifyOtp. Il ne dépend donc pas de la liste des URL de redirection autorisées de Supabase Auth.
+ */
+
 const allowedOrigins = new Set([
   'https://renova-os.netlify.app',
   'http://localhost:5173',
   'http://127.0.0.1:5173',
+  ...(Deno.env.get('APP_ORIGINS') || '').split(',').map(o => o.trim()).filter(Boolean),
 ])
 
 function response(body: unknown, status = 200, origin: string | null = null) {
@@ -29,6 +44,49 @@ type InviteBody = {
 
 const staffRoles = new Set(['commercial', 'apporteur', 'teleconseiller'])
 const leadershipRoles = new Set(['partner_admin', 'company_admin', 'manager', 'commercial_manager'])
+
+const ROLE_LIBELLES: Record<string, string> = {
+  admin: 'Grand Admin',
+  manager: 'Manager',
+  commercial_manager: 'Responsable commercial',
+  partner_admin: 'Dirigeant partenaire',
+  company_admin: 'Dirigeant',
+  commercial: 'Commercial',
+  apporteur: "Apporteur d'affaires",
+  teleconseiller: 'Téléconseiller',
+}
+
+const echapper = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
+
+function emailInvitation(p: { nom: string; invitePar: string; organisation: string; role: string; lien: string }) {
+  const prenom = echapper(p.nom.split(' ')[0] || p.nom)
+  return `<!doctype html><html lang="fr"><body style="margin:0;background:#F6F8F7;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
+<table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E3E9E5">
+<tr><td style="background:#1B4332;padding:22px 28px;color:#ffffff;font-size:20px;font-weight:bold">Renova OS</td></tr>
+<tr><td style="padding:28px">
+<p style="font-size:16px;margin:0 0 14px">Bonjour ${prenom},</p>
+<p style="font-size:15px;line-height:1.55;margin:0 0 14px">${echapper(p.invitePar)} vous invite à rejoindre <b>${echapper(p.organisation)}</b> sur Renova OS, en tant que <b>${echapper(p.role)}</b>.</p>
+<p style="font-size:15px;line-height:1.55;margin:0 0 22px">Cliquez sur le bouton ci-dessous pour activer votre compte et choisir votre mot de passe.</p>
+<p style="margin:0 0 26px"><a href="${p.lien}" style="display:inline-block;background:#1B4332;color:#ffffff;text-decoration:none;font-weight:bold;padding:14px 26px;border-radius:10px">Activer mon compte</a></p>
+<p style="font-size:12.5px;line-height:1.5;color:#6B7A72;margin:0">Si le bouton ne fonctionne pas, copiez ce lien dans votre navigateur :<br><span style="word-break:break-all">${p.lien}</span></p>
+<p style="font-size:12.5px;line-height:1.5;color:#6B7A72;margin:14px 0 0">Ce lien est personnel et sa durée de validité est limitée. Si vous n’attendiez pas cette invitation, ignorez cet e-mail.</p>
+</td></tr></table></td></tr></table></body></html>`
+}
+
+async function envoyerViaResend(destinataire: string, sujet: string, html: string): Promise<string | null> {
+  const resendApiKey = Deno.env.get('RESEND_API_KEY')
+  const mailFrom = Deno.env.get('MAIL_FROM')
+  if (!resendApiKey || !mailFrom) return 'non_configure'
+  const reponse = await fetch('https://api.resend.com/emails', {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ from: mailFrom, to: [destinataire], subject: sujet, html }),
+  })
+  if (reponse.ok) return null
+  const detail = await reponse.json().catch(() => ({}))
+  return detail?.message || detail?.error || `Resend a répondu ${reponse.status}`
+}
 
 Deno.serve(async (req: Request) => {
   const origin = req.headers.get('Origin')
@@ -98,7 +156,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: organisation, error: orgError } = await adminClient
     .from('organisations')
-    .select('id, type, actif')
+    .select('id, nom, type, actif')
     .eq('id', organisationId)
     .maybeSingle()
 
@@ -132,17 +190,39 @@ Deno.serve(async (req: Request) => {
   }
 
   const redirectTo = Deno.env.get('APP_REDIRECT_URL') || 'https://renova-os.netlify.app/'
-  const { data: inviteData, error: inviteError } = await adminClient.auth.admin.inviteUserByEmail(email, {
-    data: { nom_complet: nomComplet },
-    redirectTo,
-  })
+  const metadata = { nom_complet: nomComplet, mot_de_passe_a_definir: true }
 
-  if (inviteError || !inviteData.user) {
-    return response({ error: inviteError?.message || 'Invitation impossible.' }, 400, origin)
+  // Compte déjà créé ? On ne renvoie une invitation qu'à un compte qui ne s'est jamais connecté.
+  const { data: profilExistant } = await adminClient.from('profiles').select('id, organisation_id').eq('email', email).maybeSingle()
+  let userId: string | null = null
+  let renvoi = false
+  if (profilExistant) {
+    const { data: existant } = await adminClient.auth.admin.getUserById(profilExistant.id)
+    if (existant?.user?.last_sign_in_at) {
+      return response({ error: 'Ce membre a déjà activé son compte. Il peut utiliser « Mot de passe oublié » sur l’écran de connexion.' }, 409, origin)
+    }
+    if (!isGlobalAdmin && profilExistant.organisation_id !== caller.organisation_id) {
+      return response({ error: 'Cette adresse est déjà rattachée à une autre entreprise.' }, 409, origin)
+    }
+    userId = profilExistant.id
+    renvoi = true
+    await adminClient.auth.admin.updateUserById(userId, { user_metadata: metadata })
   }
 
-  // The existing on_auth_user_created trigger creates a basic profile. Replace its
-  // default role and attach the user to the approved organisation immediately.
+  // Lien d'activation : « invite » pour un nouveau compte, « magiclink » pour un renvoi.
+  const { data: lienData, error: lienError } = await adminClient.auth.admin.generateLink(
+    renvoi
+      ? { type: 'magiclink', email, options: { redirectTo } }
+      : { type: 'invite', email, options: { data: metadata, redirectTo } },
+  )
+  if (lienError || !lienData?.user || !lienData.properties?.hashed_token) {
+    return response({ error: lienError?.message || 'Impossible de générer le lien d’invitation.' }, 400, origin)
+  }
+  userId = lienData.user.id
+  const typeLien = renvoi ? 'magiclink' : 'invite'
+  const lien = `${redirectTo.replace(/\/?$/, '/')}?token_hash=${encodeURIComponent(lienData.properties.hashed_token)}&type=${typeLien}`
+
+  // Le déclencheur on_auth_user_created crée un profil de base : on fixe rôle et entreprise.
   const { error: profileError } = await adminClient
     .from('profiles')
     .update({
@@ -152,15 +232,34 @@ Deno.serve(async (req: Request) => {
       organisation_id: organisationId,
       manager_id: managerId,
     })
-    .eq('id', inviteData.user.id)
+    .eq('id', userId)
 
   if (profileError) {
-    await adminClient.auth.admin.deleteUser(inviteData.user.id)
+    if (!renvoi) await adminClient.auth.admin.deleteUser(userId)
     return response({ error: 'Le profil n’a pas pu être configuré. L’invitation a été annulée.' }, 500, origin)
   }
 
+  // Envoi de l'e-mail via Resend (expéditeur de l'entreprise). Pas de repli sur l'e-mail Supabase :
+  // il générerait un nouveau jeton et invaliderait le lien renvoyé à l'administrateur.
+  const html = emailInvitation({
+    nom: nomComplet,
+    invitePar: caller.nom_complet || 'Votre responsable',
+    organisation: organisation.nom,
+    role: ROLE_LIBELLES[requestedRole] || requestedRole,
+    lien,
+  })
+  const erreurResend = await envoyerViaResend(email, `${caller.nom_complet || 'Renova OS'} vous invite sur Renova OS`, html)
+  const emailEnvoye = erreurResend === null
+  const canal: 'resend' | 'aucun' = emailEnvoye ? 'resend' : 'aucun'
+  const detailEnvoi: string | null = erreurResend && erreurResend !== 'non_configure' ? erreurResend : null
+
   return response({
     success: true,
-    user: { id: inviteData.user.id, email, nom_complet: nomComplet, role: requestedRole },
+    renvoi,
+    email_envoye: emailEnvoye,
+    canal,
+    detail_envoi: detailEnvoi,
+    lien,
+    user: { id: userId, email, nom_complet: nomComplet, role: requestedRole },
   }, 201, origin)
 })
