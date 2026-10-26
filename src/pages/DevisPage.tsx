@@ -16,6 +16,12 @@ import {
 } from '../lib/devis/calculDevis'
 import { calculAideMPR, determinerProfilMPR, ProfilMPR, LABEL_PROFIL } from '../lib/aides/baremeMaPrimeRenov'
 import { prixProduitPourZone } from '../lib/catalogue/prixParZone'
+import { analyserRentabilite, descriptionConsommables } from '../lib/devis/rentabilite'
+
+/** Lignes de prestation ajoutées automatiquement avec un produit (reconnues par leur libellé). */
+const PREFIXES_ASSOCIES = ['Pose', 'Dépose et évacuation', 'Évacuation des déchets', 'Consommables']
+const estLigneAssociee = (designation: string, produit: string) =>
+  PREFIXES_ASSOCIES.some(prefixe => designation === `${prefixe} — ${produit}`)
 import { estimerPrimeCEE } from '../lib/aides/calculAidesCEE'
 import { telechargerDevisPDF } from '../lib/pdf/genererDevisPDF'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -189,7 +195,7 @@ export function DevisPage({
       for (let from = 0; ; from += pageSize) {
         const { data, error } = await supabase
           .from('catalogue_produits')
-          .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
+          .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht,prix_conseille_ht,prix_plancher_ht,consommables_detail')
           .eq('actif', true)
           .order('id', { ascending: true })
           .range(from, from + pageSize - 1)
@@ -643,8 +649,8 @@ export function DevisPage({
         id: `tmp_${Date.now()}_${Math.random()}`,
         devis_id: current!.id,
         produit_id: null,
-        designation: `Évacuation des déchets — ${produit.nom}`,
-        description: '',
+        designation: `Dépose et évacuation — ${produit.nom}`,
+        description: 'Dépose de l’ancien équipement, évacuation et traitement des déchets en filière agréée.',
         caracteristiques: {},
         quantite: qte,
         prix_unitaire_ht: produit.forfait_evacuation_ht,
@@ -660,7 +666,7 @@ export function DevisPage({
         devis_id: current!.id,
         produit_id: null,
         designation: `Consommables — ${produit.nom}`,
-        description: 'Coût des consommables associé à la fourniture et à la pose du produit.',
+        description: descriptionConsommables(produit.consommables_detail),
         caracteristiques: {},
         quantite: qte,
         prix_unitaire_ht: produit.forfait_consommables_ht || 0,
@@ -727,10 +733,7 @@ export function DevisPage({
       if (cible?.produit_id && patch.quantite !== undefined) {
         return updated.map(l => {
           if (l.produit_id) return l
-          const estPoseOuEvacuation =
-            l.designation === `Pose — ${cible.designation}` ||
-            l.designation === `Évacuation des déchets — ${cible.designation}`
-          if (!estPoseOuEvacuation) return l
+          if (!estLigneAssociee(l.designation, cible.designation)) return l
           const u = { ...l, quantite: patch.quantite! }
           u.montant_ht = calculMontantLigneHT(u)
           return u
@@ -744,11 +747,7 @@ export function DevisPage({
     setLignes(ls => {
       const cible = ls.find(l => l.id === id)
       if (cible?.produit_id) {
-        return ls.filter(l =>
-          l.id !== id &&
-          l.designation !== `Pose — ${cible.designation}` &&
-          l.designation !== `Évacuation des déchets — ${cible.designation}`
-        )
+        return ls.filter(l => l.id !== id && (l.produit_id || !estLigneAssociee(l.designation, cible.designation)))
       }
       return ls.filter(l => l.id !== id)
     })
@@ -776,6 +775,8 @@ export function DevisPage({
   }
 
   const totaux = useMemo(() => calculTotauxDevis(lignes, remiseValeur, remiseType), [lignes, remiseValeur, remiseType])
+  const produitsParId = useMemo(() => new Map(produits.map(pr => [pr.id, pr])), [produits])
+  const rentabilite = useMemo(() => analyserRentabilite(lignes, produitsParId, totaux.montantHT), [lignes, produitsParId, totaux.montantHT])
   const lignesAvecCategorie = useMemo(() => {
     let categorieCourante = 'autre'
     return lignes.map(l => {
@@ -794,7 +795,9 @@ export function DevisPage({
     devis: { dateValidite: current?.date_validite, dateDevis: current?.created_at?.slice(0, 10), dateSignature: current?.signature_date },
   }), [lignes, produits, aides, conf, totaux.montantTTC, categorieRevenus, current, entreprise])
   const blocsConformite = pointsConformite.filter(x => x.gravite === 'bloc')
-  const signatureBloquee = blocsConformite.length > 0 && !isAdmin
+  // Un devis sous le prix plancher doit être validé par la direction : un commercial ne peut pas le faire signer.
+  const nonRentableBloquant = rentabilite.niveau === 'non_rentable' && !isAdmin
+  const signatureBloquee = (blocsConformite.length > 0 || nonRentableBloquant) && !isAdmin
   const aMontantCEE = aides.some(a => a.type === 'cee')
 
   /** Un admin peut passer outre les points bloquants, après confirmation explicite. */
@@ -820,6 +823,8 @@ export function DevisPage({
       montant_ttc: totaux.montantTTC,
       montant_aides: totalAides,
       reste_a_charge: resteACharge,
+      niveau_rentabilite: rentabilite.analysable ? rentabilite.niveau : null,
+      plancher_ht: rentabilite.analysable ? rentabilite.plancherHT : null,
       date_validite: current.date_validite,
       conditions_paiement: current.conditions_paiement,
       conformite_devis: conf,
@@ -1190,10 +1195,10 @@ export function DevisPage({
           )}
           {!estSigne && (
             <>
-              <Button variant="primary" onClick={ouvrirSignature} disabled={saving || lignes.length === 0 || signatureBloquee} title={signatureBloquee ? `${blocsConformite.length} point(s) à corriger avant signature` : undefined}>
+              <Button variant="primary" onClick={ouvrirSignature} disabled={saving || lignes.length === 0 || signatureBloquee} title={signatureBloquee ? (nonRentableBloquant ? 'Devis sous le prix plancher : réduisez la remise ou faites valider par la direction' : `${blocsConformite.length} point(s) à corriger avant signature`) : undefined}>
                 <PenTool size={16} /> Signer sur tablette
               </Button>
-              <Button variant="secondary" onClick={envoyerSignature} disabled={saving || lignes.length === 0 || signatureBloquee} title={signatureBloquee ? `${blocsConformite.length} point(s) à corriger avant envoi` : undefined}>
+              <Button variant="secondary" onClick={envoyerSignature} disabled={saving || lignes.length === 0 || signatureBloquee} title={signatureBloquee ? (nonRentableBloquant ? 'Devis sous le prix plancher : réduisez la remise ou faites valider par la direction' : `${blocsConformite.length} point(s) à corriger avant envoi`) : undefined}>
                 <Send size={16} /> Envoyer pour signature électronique
               </Button>
             </>
@@ -1308,7 +1313,14 @@ export function DevisPage({
                             <td className={marqueBad ? 'bad' : ''}>{l.produit_id ? <input className="cell" placeholder="Marque" disabled={estSigne} value={String(l.caracteristiques?.Marque || '')} onChange={e => updateLigne(l.id, { caracteristiques: { ...(l.caracteristiques || {}), Marque: e.target.value } })} /> : null}</td>
                             <td className={refBad ? 'bad' : ''}>{l.produit_id ? <input className="cell" placeholder="Référence" disabled={estSigne} value={String(l.caracteristiques?.Référence || '')} onChange={e => updateLigne(l.id, { caracteristiques: { ...(l.caracteristiques || {}), Référence: e.target.value } })} /> : null}</td>
                             <td><input className="cell n" type="number" min={0} step="0.01" disabled={estSigne} value={l.quantite} onChange={e => updateLigne(l.id, { quantite: parseFloat(e.target.value) || 0 })} /></td>
-                            {isAdmin && <td><input className="cell n" type="number" min={0} step="0.01" disabled={estSigne} value={l.prix_unitaire_ht} onChange={e => updateLigne(l.id, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })} /></td>}
+                            {isAdmin && <td>{(() => {
+                              const pr = l.produit_id ? produitsParId.get(l.produit_id) : undefined
+                              const sous = !!pr?.prix_plancher_ht && l.prix_unitaire_ht < Number(pr.prix_plancher_ht) - 0.005
+                              return <>
+                                <input className={`cell n${sous ? ' sous-plancher' : ''}`} type="number" min={0} step="0.01" disabled={estSigne} value={l.prix_unitaire_ht} onChange={e => updateLigne(l.id, { prix_unitaire_ht: parseFloat(e.target.value) || 0 })} title={pr?.prix_plancher_ht ? `Conseillé ${euro(Number(pr.prix_conseille_ht) || 0)} · plancher ${euro(Number(pr.prix_plancher_ht))}` : undefined} />
+                                {pr?.prix_conseille_ht ? <div className={`cell-aide${sous ? ' alerte' : ''}`}>{sous ? 'Sous plancher' : `Conseillé ${euro(Number(pr.prix_conseille_ht))}`}</div> : null}
+                              </>
+                            })()}</td>}
                             <td className="nw num">{l.tva_taux} %</td>
                             <td className="nw num"><strong>{euro(l.montant_ht)}</strong></td>
                             <td>{!estSigne && <button className="iconbtn" title="Retirer la ligne" onClick={() => removeLigne(l.id)}><Trash2 size={15} /></button>}</td>
@@ -1435,6 +1447,35 @@ export function DevisPage({
                 <input type="date" value={current?.date_validite ? current.date_validite.slice(0, 10) : ''} onChange={e => setCurrent(c => c ? { ...c, date_validite: e.target.value || null } : c)} disabled={estSigne} />
               </label>
             </div>
+            {rentabilite.analysable && lignes.length > 0 && (
+              <div className={`rentab rentab-${rentabilite.niveau}`} role={rentabilite.niveau === 'non_rentable' ? 'alert' : 'status'}>
+                <div className="rentab-tete">
+                  <span className="rentab-pastille" aria-hidden="true" />
+                  <b>{rentabilite.niveau === 'non_rentable' ? 'Devis non rentable' : rentabilite.niveau === 'sous_conseille' ? 'Sous le prix conseillé' : 'Devis rentable'}</b>
+                  <span className="rentab-jauge" aria-hidden="true">
+                    <span style={{ width: `${Math.max(4, Math.min(100, rentabilite.conseilleHT > rentabilite.plancherHT ? ((rentabilite.montantHT - rentabilite.plancherHT) / (rentabilite.conseilleHT - rentabilite.plancherHT)) * 100 : 100))}%` }} />
+                  </span>
+                </div>
+                <div className="rentab-chiffres">
+                  <div><span>Total HT</span><b className="num">{euro(rentabilite.montantHT)}</b></div>
+                  <div><span>Prix conseillé</span><b className="num">{euro(rentabilite.conseilleHT)}</b></div>
+                  <div><span>Prix plancher</span><b className="num">{euro(rentabilite.plancherHT)}</b></div>
+                  <div><span>{rentabilite.niveau === 'non_rentable' ? 'Manque' : 'Remise encore possible'}</span><b className="num">{euro(rentabilite.niveau === 'non_rentable' ? rentabilite.ecartPlancherHT : rentabilite.remiseMaxRestanteHT)}</b></div>
+                </div>
+                <p className="rentab-msg">
+                  {rentabilite.niveau === 'non_rentable'
+                    ? <>Le total est {euro(rentabilite.ecartPlancherHT)} sous le prix plancher. {isAdmin ? 'Vous pouvez le valider en connaissance de cause.' : 'Réduisez la remise : la signature est bloquée tant que la direction n’a pas validé ce prix.'}</>
+                    : rentabilite.niveau === 'sous_conseille'
+                      ? <>Le devis reste rentable, mais la marge est entamée. Remise encore possible : {euro(rentabilite.remiseMaxRestanteHT)} HT.</>
+                      : <>Prix conforme au tarif conseillé. Remise encore possible avant le plancher : {euro(rentabilite.remiseMaxRestanteHT)} HT.</>}
+                </p>
+                {isAdmin && rentabilite.lignesSousPlancher.length > 0 && (
+                  <ul className="rentab-lignes">
+                    {rentabilite.lignesSousPlancher.map((l, i) => <li key={i}>{l.designation} : {euro(l.prix)} pour un plancher de {euro(l.plancher)}</li>)}
+                  </ul>
+                )}
+              </div>
+            )}
             <label className="lab" style={{ marginTop: 14 }}>Conditions de paiement
               <textarea rows={2} value={current?.conditions_paiement || ''} onChange={e => setCurrent(c => c ? { ...c, conditions_paiement: e.target.value } : c)} disabled={estSigne} />
             </label>

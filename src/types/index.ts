@@ -515,6 +515,11 @@ export interface Produit {
   forfait_pose_ht: number
   forfait_evacuation_ht: number
   forfait_consommables_ht?: number
+  /** Prix de vente conseillé HT (prix d'achat × coefficient de la catégorie). */
+  prix_conseille_ht?: number | null
+  /** Prix plancher HT : en dessous, la vente n'est plus rentable. */
+  prix_plancher_ht?: number | null
+  consommables_detail?: { libelle: string; quantite?: number; unite?: string; prix_ht: number }[]
   tva_taux: number
   eligible_mpr: boolean
   eligible_cee: boolean
