@@ -1,0 +1,6 @@
+-- Déjà appliqué sur Supabase le 26/10/2026 (migration « notifications_push_serveur »).
+-- Les clés VAPID et le secret d'appel sont stockés dans Supabase Vault (noms : renova_vapid_private_key,
+-- renova_vapid_public_key, renova_cron_secret) — jamais dans le dépôt.
+-- Contenu : extension pg_net ; fonction lire_secret_serveur (service_role uniquement) ; table push_journal ;
+-- fonction appeler_notifications_push ; déclencheur notifications_push (après insertion d'une notification) ;
+-- tâche pg_cron « renova_notifications_horaires » (chaque heure à :30).

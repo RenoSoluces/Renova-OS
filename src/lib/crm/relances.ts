@@ -20,10 +20,14 @@ function joursDepuis(date: string): number {
  * déploiement que pour la synchronisation des dispositifs d'aides).
  */
 export async function verifierRelances(auteur: string | null) {
-  await Promise.all([verifierDevisSansReponse(auteur), verifierTachesEnRetard()])
+  // Les relances de devis (J+3, J+7) sont désormais créées côté serveur, chaque heure,
+  // par la fonction notifications-push : seule la vérification des tâches reste ici.
+  void auteur
+  await verifierTachesEnRetard()
 }
 
-async function verifierDevisSansReponse(auteur: string | null) {
+// Conservée pour référence ; remplacée par la relance serveur J+3 / J+7.
+export async function verifierDevisSansReponse(auteur: string | null) {
   const { data: devisEnvoyes } = await supabase
     .from('devis')
     .select('id, numero, prospect_id, statut, created_at, prospect:prospects(nom, prenom, commercial_id)')

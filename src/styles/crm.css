@@ -362,3 +362,13 @@
 .import-g-prenom { display: flex; align-items: center; gap: 2px; }
 .import-g-prenom button { flex-shrink: 0; width: 22px; height: 22px; border: 0; border-radius: 6px; background: none; color: var(--c-text-muted); cursor: pointer; font-size: 13px; }
 .import-g-prenom button:hover { background: var(--c-bg-soft); color: var(--c-primary); }
+
+/* Invitation à activer les notifications */
+.invit-notif { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border-radius: var(--r-lg, 14px); background: linear-gradient(120deg, var(--c-primary, #1B4332), var(--c-primary-400, #2D6A4F)); color: #fff; box-shadow: var(--sh-md); }
+.invit-notif-icone { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: rgba(255,255,255,.16); }
+.invit-notif-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
+.invit-notif-texte strong { font-size: 14px; }
+.invit-notif-texte span { opacity: .88; }
+.invit-notif .btn-primary { background: #fff; color: var(--c-primary, #1B4332); border-color: #fff; }
+.invit-notif-fermer { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: #fff; opacity: .8; cursor: pointer; }
+.invit-notif-fermer:hover { opacity: 1; background: rgba(255,255,255,.12); }
