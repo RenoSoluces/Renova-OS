@@ -167,3 +167,37 @@
 .acc-btn.whatsapp { background: #25D366; border-color: #25D366; color: #fff; }
 .acc-btn.whatsapp:hover { background: #1ebe5b; }
 @media (max-width: 640px) { .acc { padding: 18px 16px; } .acc-grille { grid-template-columns: 1fr; } .acc-mdp { grid-template-columns: 1fr; } .acc-partage { grid-template-columns: 1fr; } }
+
+/* Accès créés : état de connexion et renvoi des identifiants */
+.acl { padding: 20px 22px; margin-bottom: 18px; border-radius: 16px; }
+.acl-tete { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: 6px 14px; margin-bottom: 12px; }
+.acl-tete h2 { margin: 0; font-size: 17px; letter-spacing: -.01em; }
+.acl-tete h2 span { margin-left: 4px; padding: 1px 8px; border-radius: 999px; background: var(--c-bg, #f3f6f4); font-size: 12.5px; color: var(--c-text-muted); }
+.acl-tete p { display: inline-flex; align-items: center; gap: 6px; margin: 0; font-size: 13px; color: #9a5b00; }
+.acl-vide { display: flex; align-items: center; gap: 8px; }
+.acl-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.acl-liste li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--c-border, #e2e9e5); border-radius: 12px; background: var(--c-bg-alt, #fff); }
+.acl-icone { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #eef4f1; color: #1b4332; }
+.acl-icone.partenaire { background: #eaf2fb; color: #1d5e9e; }
+.acl-icone.apporteur { background: #fdf3e4; color: #9a5b00; }
+.acl-qui { display: grid; min-width: 0; }
+.acl-qui b, .acl-qui small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.acl-qui b { font-size: 14.5px; }
+.acl-qui small { font-size: 12.5px; color: var(--c-text-muted); }
+.acl-role { padding: 3px 9px; border-radius: 999px; background: var(--c-bg, #f3f6f4); font-size: 12px; font-weight: 600; color: var(--c-text-muted); white-space: nowrap; }
+.acl-etat { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 600; white-space: nowrap; }
+.acl-etat.ok { color: #1f7a4d; }
+.acl-etat.attente { color: #9a5b00; }
+.acl-action { white-space: nowrap; }
+.acl-modale { text-align: left; display: grid; gap: 12px; }
+.acl-modale h3, .acl-modale .acc-sous { text-align: center; }
+.acl-explication { margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--c-text-muted); }
+.acl-mdp { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.acl-mdp input.mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; letter-spacing: .02em; }
+.acl-valider { justify-content: center; width: 100%; }
+@media (max-width: 760px) {
+  .acl { padding: 16px 14px; }
+  .acl-liste li { grid-template-columns: 36px minmax(0, 1fr) auto; grid-template-areas: 'i q r' 'i e e' 'a a a'; row-gap: 6px; }
+  .acl-icone { grid-area: i; } .acl-qui { grid-area: q; } .acl-role { grid-area: r; } .acl-etat { grid-area: e; }
+  .acl-action { grid-area: a; justify-content: center; width: 100%; }
+}

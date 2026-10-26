@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { LIBELLES_ACCES, genererMotDePasse, messageAcces, motDePasseValide, numeroWhatsApp, type TypeAcces } from '../../lib/reseau/acces'
 
-interface AccesCree {
+export interface AccesCree {
   type: TypeAcces
   prenom: string
   nomComplet: string
@@ -14,6 +14,8 @@ interface AccesCree {
   lien: string
   entreprise: string
   emailEnvoye: boolean
+  /** Identifiants renvoyés à un compte existant (nouveau mot de passe). */
+  renvoi?: boolean
 }
 
 /** Création d'un accès (apporteur, partenaire, commercial) puis partage des identifiants en un geste. */
@@ -138,7 +140,7 @@ export function CreerAccesReseau({ onCree }: { onCree?: () => void }) {
   )
 }
 
-function PartageAcces({ acces, invitePar, onFermer }: { acces: AccesCree; invitePar: string; onFermer: () => void }) {
+export function PartageAcces({ acces, invitePar, onFermer }: { acces: AccesCree; invitePar: string; onFermer: () => void }) {
   const initial = useMemo(() => messageAcces({ prenom: acces.prenom, type: acces.type, email: acces.email, motDePasse: acces.motDePasse, lien: acces.lien, entreprise: acces.entreprise, invitePar }), [acces, invitePar])
   const [message, setMessage] = useState(initial)
   const [copie, setCopie] = useState<string | null>(null)
@@ -160,7 +162,7 @@ function PartageAcces({ acces, invitePar, onFermer }: { acces: AccesCree; invite
       <div className="acc-pop">
         <button type="button" className="acc-fermer" onClick={onFermer} aria-label="Fermer"><X size={18} /></button>
         <div className="acc-ok"><Check size={26} strokeWidth={2.6} /></div>
-        <h3>Accès créé pour {acces.nomComplet}</h3>
+        <h3>{acces.renvoi ? 'Nouvel accès pour' : 'Accès créé pour'} {acces.nomComplet}</h3>
         <p className="acc-sous">{LIBELLES_ACCES[acces.type].label} · {acces.entreprise}{acces.emailEnvoye ? ' · e-mail d’invitation envoyé' : ''}</p>
 
         <div className="acc-identifiants">
