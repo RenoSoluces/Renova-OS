@@ -279,3 +279,11 @@
 .invitation-lien-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .invitation-lien-actions .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
 .invitation-lien p { margin: 0; font-size: 12px; color: var(--c-text-muted); }
+
+/* Ma journée */
+.journee-fiche { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--c-bg-soft, #F3F6F4); font-size: 12.5px; color: var(--c-text-secondary, #4A5751); display: flex; flex-direction: column; gap: 3px; }
+.journee-fiche svg { vertical-align: -2px; margin-right: 3px; }
+.journee-relance { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-bottom: 1px solid var(--c-border, #e5e7eb); }
+.journee-relance:last-child { border-bottom: 0; }
+.journee-resultats { display: flex; flex-wrap: wrap; gap: 7px; margin-top: 8px; }
+.journee-resultats .btn, .journee-relance .btn-primary { display: inline-flex; align-items: center; gap: 6px; }
