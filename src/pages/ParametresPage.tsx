@@ -1,4 +1,5 @@
 import { CLE_PUBLIQUE_VAPID } from '../lib/push'
+import { genererCGV, mentionsManquantes } from '../lib/devis/cgvModele'
 import { useState, useEffect } from 'react'
 import { User, Building2, Plug, Bell, Save, ScrollText, RefreshCw, Plus, Image as ImageIcon, Sun, Users, Trash2 } from 'lucide-react'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
@@ -423,11 +424,36 @@ export function ParametresPage() {
                 </div>
 
                 <div>
-                  <div className="field-label" style={{ marginBottom: 6 }}>Conditions générales (affichées en pied de devis)</div>
+                  <div className="field-label" style={{ marginBottom: 6 }}>Mentions obligatoires des CGV</div>
+                  <div className="grid grid-2 gap-3 mb-3">
+                    <FloatInput label="Médiateur de la consommation (nom)" value={entreprise.mediateur_nom || ''} onChange={v => setEntreprise({ ...entreprise, mediateur_nom: v })} />
+                    <FloatInput label="Site du médiateur" value={entreprise.mediateur_site || ''} onChange={v => setEntreprise({ ...entreprise, mediateur_site: v })} />
+                    <FloatInput label="Assureur décennale" value={entreprise.assureur_decennale || ''} onChange={v => setEntreprise({ ...entreprise, assureur_decennale: v })} />
+                    <FloatInput label="N° de contrat décennale" value={entreprise.police_decennale || ''} onChange={v => setEntreprise({ ...entreprise, police_decennale: v })} />
+                    <FloatInput label="Zone / activités couvertes" value={entreprise.couverture_decennale || ''} onChange={v => setEntreprise({ ...entreprise, couverture_decennale: v })} />
+                  </div>
+                  {mentionsManquantes(entreprise).length > 0 && (
+                    <p className="text-xs" style={{ color: '#8A5A00', background: '#FFF6E0', padding: '8px 10px', borderRadius: 8, margin: '0 0 10px' }}>
+                      À compléter avant d’envoyer des devis : {mentionsManquantes(entreprise).join(', ')}. Ces mentions sont obligatoires pour une vente à un particulier.
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <div className="field-label" style={{ marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, flexWrap: 'wrap' }}>
+                    <span>Conditions générales de vente (annexées à chaque devis, avec le bordereau de rétractation)</span>
+                    <button type="button" className="btn btn-secondary btn-sm" onClick={() => {
+                      if (entreprise.conditions_generales_devis?.trim() && !confirm('Remplacer le texte actuel par le modèle Renova OS, complété avec les informations de l’entreprise ?')) return
+                      setEntreprise({ ...entreprise, conditions_generales_devis: genererCGV(entreprise) })
+                    }}>Générer le modèle de CGV</button>
+                  </div>
+                  <p className="text-xs text-muted" style={{ margin: '0 0 8px' }}>
+                    Modèle rédigé pour la rénovation énergétique chez les particuliers (démarchage, rétractation, aides, garanties). Faites-le valider par votre conseil juridique ; vous pouvez le modifier librement. Pensez à enregistrer.
+                  </p>
                   <textarea
                     value={entreprise.conditions_generales_devis || ''}
                     onChange={e => setEntreprise({ ...entreprise, conditions_generales_devis: e.target.value })}
-                    rows={6}
+                    rows={12}
                     style={{ width: '100%', padding: 10, border: '1px solid var(--c-border)', borderRadius: 8, fontFamily: 'inherit', fontSize: 13 }}
                     placeholder="Conditions de paiement, garanties, mentions légales obligatoires (rétractation, TVA, RGE)…"
                   />

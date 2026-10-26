@@ -459,6 +459,11 @@ export interface Entreprise {
   escompte_defaut?: string
   taux_cee_eur_par_mwh_cumac: number
   conditions_generales_devis: string
+  mediateur_nom?: string
+  mediateur_site?: string
+  assureur_decennale?: string
+  police_decennale?: string
+  couverture_decennale?: string
   devis_duree_validite_jours: number
   devis_conditions_paiement_defaut: string
   pv_prix_achat_evite_eur_kwh: number
