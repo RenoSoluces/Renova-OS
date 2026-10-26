@@ -38,11 +38,15 @@ import { LoginPage } from './pages/LoginPage'
 import { DefinirMotDePassePage } from './pages/DefinirMotDePassePage'
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import React from 'react'
+import { signalerErreur } from './lib/fiabilite/rapportErreurs'
 
 class AppErrorBoundary extends React.Component<React.PropsWithChildren, { hasError: boolean; message: string }> {
   state = { hasError: false, message: '' }
   static getDerivedStateFromError(error: unknown) { return { hasError: true, message: error instanceof Error ? error.message : 'Erreur inattendue' } }
-  componentDidCatch(error: unknown) { console.error('[RENOVA OS] Erreur interface:', error) }
+  componentDidCatch(error: unknown, info: React.ErrorInfo) {
+    console.error('[RENOVA OS] Erreur interface:', error)
+    void signalerErreur(error, { source: 'écran interrompu', composants: (info.componentStack || '').slice(0, 1500) })
+  }
   render() {
     if (!this.state.hasError) return this.props.children
     return <div className="page" style={{minHeight:'100vh',display:'flex',alignItems:'center',justifyContent:'center'}}><div className="card card-pad" style={{maxWidth:560,textAlign:'center'}}><AlertTriangle size={32} style={{color:'var(--c-warning,#e8a317)',marginBottom:12}}/><h2>Une erreur a interrompu cet écran</h2><p className="text-muted">Renova OS a évité une page blanche. Recharge l'écran pour reprendre.</p><p className="text-muted" style={{fontSize:12}}>{this.state.message}</p><button className="btn btn-primary" onClick={() => window.location.reload()}><RefreshCw size={15}/> Recharger</button></div></div>

@@ -3,6 +3,7 @@ import { AlertTriangle, CheckCircle2, RefreshCw, ShieldCheck } from 'lucide-reac
 import { fetchSystemHealth, type SystemHealth } from '../lib/systemHealth'
 import { Button } from '../components/ui/Button'
 import { useAuth } from '../lib/auth/AuthContext'
+import { ErreursApplication } from '../components/fiabilite/ErreursApplication'
 
 const LABELS: Record<keyof SystemHealth, string> = {
   vt_a_qualifier: 'VT terminées sans qualification',
@@ -19,10 +20,11 @@ export function SystemHealthPage() {
   const [health, setHealth] = useState<SystemHealth | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [actualisation, setActualisation] = useState(0)
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
 
   async function load() {
-    setLoading(true); setError('')
+    setLoading(true); setError(''); setActualisation(n => n + 1)
     const result = await fetchSystemHealth()
     if (result.error) setError(result.error.message)
     setHealth(result.data)
@@ -52,5 +54,6 @@ export function SystemHealthPage() {
         </div>
       })}
     </div>
+    <ErreursApplication actualisation={actualisation} />
   </div>
 }

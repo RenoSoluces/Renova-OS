@@ -18,6 +18,9 @@ import './styles/espace-apporteur.css'
 import './styles/prospects.css'
 import './index.css'
 import './styles/premium.css'
+import { installerRapportErreurs } from './lib/fiabilite/rapportErreurs'
+
+installerRapportErreurs()
 import App from './App'
 import { MiseAJourDisponible } from './components/MiseAJourDisponible'
 import { AuthProvider } from './lib/auth/AuthContext'
