@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import { AlertOctagon, CheckCircle2, Circle, Clock3, ListPlus, Mail, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { BoutonEspaceClient } from '../partage/BoutonEspaceClient'
+import { BoutonRelance } from '../partage/BoutonRelance'
 import { alertesDossier, etapesDossier, messageDemandePieces, piecesAAjouter, type Aide, type Etape, type PieceDossier, type SuiviAides } from '../../lib/dossiers/suiviAides'
 
 interface Props {
@@ -132,6 +133,7 @@ export function SuiviAidesPanel({ dossier, prospect, signatureDevis, pieces, onC
         <div className="sa-actions">
           {aAjouter.length > 0 && <button type="button" className="sa-btn" onClick={() => void ajouterPieces()} disabled={occupe}><ListPlus size={15} /> Ajouter les {aAjouter.length} pièce(s) obligatoire(s) manquante(s) à la liste</button>}
           {manquantes.length > 0 && <button type="button" className="sa-btn prim" onClick={() => void demanderAuClient()} disabled={occupe || !prospect?.email}><Mail size={15} /> Demander les pièces au client</button>}
+          {dossier.prospect_id && manquantes.length > 0 && <BoutonRelance prospect={{ id: dossier.prospect_id, prenom: prospect?.prenom, telephone: prospect?.telephone, email: prospect?.email }} contexte="pieces" infos={{ pieces: manquantes.filter(p => !['facture', 'cee_offre', 'mpr_depot', 'mpr_accord', 'attestation_honneur', 'note_dimensionnement', 'certificat_rge', 'photos'].includes(p.type || '')).map(p => p.nom) }} espace={{ dossierId: dossier.id }} className="sa-btn" libelle="Relancer par SMS / WhatsApp" />}
           {dossier.prospect_id && <BoutonEspaceClient prospect={{ id: dossier.prospect_id, prenom: prospect?.prenom, telephone: (prospect as any)?.telephone, email: prospect?.email }} dossierId={dossier.id} motif="pieces" className="sa-btn" libelle="Espace client (dépôt en ligne)" />}
           {!prospect?.email && manquantes.length > 0 && <small className="sa-note">Ajoutez l’e-mail du client pour lui demander les pièces.</small>}
         </div>
