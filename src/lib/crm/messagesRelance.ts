@@ -2,7 +2,7 @@
  * Messages de relance prêts à envoyer par SMS ou WhatsApp (ou e-mail), selon la situation.
  * Courts, polis, signés du prénom du commercial : faits pour être envoyés tels quels en un geste.
  */
-export type ContexteRelance = 'relance' | 'rdv' | 'devis' | 'pieces' | 'apres_rdv'
+export type ContexteRelance = 'relance' | 'rdv' | 'devis' | 'pieces' | 'apres_rdv' | 'installation'
 
 export interface InfosRelance {
   prenomClient?: string | null
@@ -15,6 +15,8 @@ export interface InfosRelance {
   numeroDevis?: string | null
   pieces?: string[]
   lienEspace?: string | null
+  installateur?: string | null
+  dureeJours?: number | null
 }
 
 export interface ModeleMessage { id: string; label: string; message: string }
@@ -44,6 +46,11 @@ export function modelesRelance(contexte: ContexteRelance, i: InfosRelance): Mode
         { id: 'confirmation', label: 'Confirmer le RDV', message: `${bonjour}, je vous confirme notre rendez-vous ${quand(i) || 'prévu'} pour votre projet. Pensez à avoir votre dernier avis d’impôt et une facture d’énergie sous la main. À très vite !${fin}` },
         { id: 'route', label: 'En route', message: `${bonjour}, je suis en route pour notre rendez-vous, j’arrive dans une vingtaine de minutes.${fin}` },
         { id: 'retard', label: 'Léger retard', message: `${bonjour}, je vais avoir une dizaine de minutes de retard pour notre rendez-vous, toutes mes excuses. À tout de suite.${fin}` },
+      ]
+    case 'installation':
+      return [
+        { id: 'date', label: 'Date de pose', message: `${bonjour}, bonne nouvelle : l’installation de votre équipement est prévue ${quand(i) || 'prochainement'}${i.dureeJours && i.dureeJours > 1 ? ` (environ ${i.dureeJours} jours de travaux)` : ''}${i.installateur ? `, réalisée par ${i.installateur}` : ''}. Merci de prévoir un accès dégagé aux zones de travaux. Je reste à votre disposition.${fin}` },
+        { id: 'veille', label: 'Rappel la veille', message: `${bonjour}, petit rappel : l’équipe d’installation intervient chez vous ${quand(i) || 'demain'}. À bientôt !${fin}` },
       ]
     case 'apres_rdv':
       return [
