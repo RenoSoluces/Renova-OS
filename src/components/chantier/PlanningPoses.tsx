@@ -8,6 +8,7 @@ import { SignaturePad } from '../shared/SignaturePad'
 import { genererPVReceptionPDF } from '../../lib/pdf/genererPVReceptionPDF'
 import { uploadDocument } from '../../lib/storage/uploadDocument'
 import { setProspectStatus } from '../../lib/crm/workflow'
+import { entrepriseCourante } from '../../lib/organisation/entrepriseCourante'
 
 interface DossierPose {
   id: string; reference: string | null; statut: string | null; montant_total: number | null; prospect_id: string | null; devis_id: string | null
@@ -170,7 +171,7 @@ function ModaleReception({ dossier, installateur, onFermer, onFait }: { dossier:
     try {
       const [{ data: lignes }, { data: entreprise }] = await Promise.all([
         dossier.devis_id ? supabase.from('devis_lignes').select('designation,produit_id').eq('devis_id', dossier.devis_id).order('ordre') : Promise.resolve({ data: [] as any[] }),
-        supabase.from('entreprises').select('raison_sociale').limit(1).maybeSingle(),
+        entrepriseCourante('raison_sociale'),
       ])
       const doc = genererPVReceptionPDF({
         entreprise: entreprise?.raison_sociale || 'Entreprise', reference: dossier.reference || '', client: nomClient(dossier), adresse: adresse(dossier),

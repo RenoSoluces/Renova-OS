@@ -28,6 +28,7 @@ import { Button } from '../components/ui/Button'
 import { euro } from '../lib/crm/constants'
 import { jsPDF } from 'jspdf'
 import '../styles/commissions.css'
+import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
 
 const TYPES: Record<CommissionType, string> = {
   vt: 'Visite technique',
@@ -97,6 +98,7 @@ function echeanceRemainingAmount(c: CommissionWithCommercial, target: PaymentTar
 
 export function CommissionsPage() {
   const { profile } = useAuth()
+  const nomSociete = useNomEntreprise() || 'la société'
   const admin =
     profile?.role === 'admin' || profile?.role === 'manager'
   const canReviewFactures = ['admin', 'manager', 'super_admin', 'partner', 'partner_admin', 'company_admin'].includes(profile?.role || '')
@@ -334,7 +336,7 @@ export function CommissionsPage() {
 
 
   /*
-   * COMMISSION POTENTIELLE RENO SOLUCES
+   * COMMISSION POTENTIELLE SOCIÉTÉ
    */
   const renovaEnAttente = useMemo(() => filteredRows.filter(r => r.statut !== 'annulee').reduce((sum, r) => sum + echeanceRemainingAmount(r, 'societe'), 0), [filteredRows])
 
@@ -565,7 +567,7 @@ export function CommissionsPage() {
       if (buyerError) throw buyerError
       if (!buyer || !buyer.raison_sociale?.trim() || !buyer.siret?.trim() || !buyer.adresse?.trim() ||
           !buyer.code_postal?.trim() || !buyer.ville?.trim()) {
-        alert('Les informations légales de Reno Soluces sont incomplètes. Un administrateur doit compléter SIRET, adresse, code postal et ville dans Paramètres avant de générer une facture.')
+        alert(`Les informations légales de ${nomSociete} sont incomplètes. Un administrateur doit compléter SIRET, adresse, code postal et ville dans Paramètres avant de générer une facture.`)
         return
       }
       const { data: numbered, error: numberError } = await supabase.rpc('attribuer_numero_facture_commission', {
@@ -888,7 +890,7 @@ export function CommissionsPage() {
   async function openEcheances(c: CommissionWithCommercial, target: PaymentTarget) {
     setEcheanceCommission(c)
     setEcheanceTarget(target)
-    setEcheanceForm({ libelle: target === 'societe' ? 'Paiement Reno Soluces' : 'Paiement commercial', montant: '', date_prevue: '' })
+    setEcheanceForm({ libelle: target === 'societe' ? `Paiement ${nomSociete}` : 'Paiement commercial', montant: '', date_prevue: '' })
     const { data, error } = await supabase.from('commission_echeances').select('*').eq('commission_id', c.id).eq('beneficiaire', target).order('ordre').order('created_at')
     if (error) { alert(`Impossible de charger les échéances : ${error.message}`); return }
     setEcheances(data || [])
@@ -901,13 +903,13 @@ export function CommissionsPage() {
     setEcheanceSaving(true)
     const { data, error } = await supabase.from('commission_echeances').insert({
       commission_id: echeanceCommission.id, beneficiaire: echeanceTarget,
-      libelle: echeanceForm.libelle.trim() || (echeanceTarget === 'societe' ? 'Paiement Reno Soluces' : 'Paiement commercial'),
+      libelle: echeanceForm.libelle.trim() || (echeanceTarget === 'societe' ? `Paiement ${nomSociete}` : 'Paiement commercial'),
       montant, date_prevue: echeanceForm.date_prevue || null, ordre: echeances.length,
     }).select('*').single()
     setEcheanceSaving(false)
     if (error) { alert(`Erreur ajout échéance : ${error.message}`); return }
     if (data) setEcheances(prev => [...prev, data])
-    setEcheanceForm({ libelle: echeanceTarget === 'societe' ? 'Paiement Reno Soluces' : 'Paiement commercial', montant: '', date_prevue: '' })
+    setEcheanceForm({ libelle: echeanceTarget === 'societe' ? `Paiement ${nomSociete}` : 'Paiement commercial', montant: '', date_prevue: '' })
     load()
   }
   async function toggleEcheancePaid(e: any) {
@@ -1046,7 +1048,7 @@ export function CommissionsPage() {
     const label =
       target === 'commercial'
         ? 'commercial'
-        : 'Reno Soluces'
+        : `${nomSociete}`
 
     if (
       !confirm(
@@ -1340,7 +1342,7 @@ export function CommissionsPage() {
                           const { data, error } = await supabase.functions.invoke('send-commission-invoice', { body: { factureId: f.id } })
                           await chargerFacturesCommission()
                           if (error || data?.error) alert(`Nouvelle tentative d’envoi impossible : ${error?.message || data?.error}`)
-                          else alert('E-mail de la facture envoyé à Reno Soluces.')
+                          else alert(`E-mail de la facture envoyé à ${nomSociete}.`)
                         }}>Réessayer l’envoi</Button>}
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && (!f.numero_facture_emise || !f.date_emission || !f.pdf_storage_path) && <span className="text-sm text-muted">PDF requis avant soumission</span>}
                         {(f.statut === 'a_preparer' || f.statut === 'refusee') && f.numero_facture_emise && f.date_emission && f.pdf_storage_path && <Button size="sm" variant="primary" onClick={async () => {
@@ -1349,10 +1351,10 @@ export function CommissionsPage() {
                           const { data: sendResult, error: sendError } = await supabase.functions.invoke('send-commission-invoice', { body: { factureId: f.id } })
                           await chargerFacturesCommission()
                           if (sendError || sendResult?.error) {
-                            alert(`Facture soumise à validation, mais l’e-mail n’a pas pu être envoyé : ${sendError?.message || sendResult?.error}. Vérifie l’adresse de Reno Soluces dans Paramètres ; tu pourras réessayer après correction.`)
+                            alert(`Facture soumise à validation, mais l’e-mail n’a pas pu être envoyé : ${sendError?.message || sendResult?.error}. Vérifie l’adresse de ${nomSociete} dans Paramètres ; tu pourras réessayer après correction.`)
                             return
                           }
-                          alert('Facture soumise et envoyée par e-mail à Reno Soluces.')
+                          alert(`Facture soumise et envoyée par e-mail à ${nomSociete}.`)
                         }}>{f.statut === 'refusee' ? 'Corriger et resoumettre' : 'Soumettre'}</Button>}
                       </div>
                     </div>
@@ -1432,7 +1434,7 @@ export function CommissionsPage() {
                 </div>
 
                 <div className="kpi-tile-label">
-                  Commission potentielle Reno Soluces
+                  Commission potentielle {nomSociete}
                   en cours
                 </div>
               </div>
@@ -1458,7 +1460,7 @@ export function CommissionsPage() {
                 </div>
 
                 <div className="kpi-tile-label">
-                  Total potentiel Reno Soluces
+                  Total potentiel {nomSociete}
                 </div>
               </div>
 
@@ -1474,7 +1476,7 @@ export function CommissionsPage() {
                 </div>
 
                 <div className="kpi-tile-label">
-                  Reno Soluces payé
+                  {nomSociete} payé
                 </div>
               </div>
             </div>
@@ -1744,7 +1746,7 @@ export function CommissionsPage() {
 
                 <span>
                   {admin
-                    ? 'Paiement Reno Soluces'
+                    ? `Paiement ${nomSociete}`
                     : 'Générée le'}
                 </span>
 
@@ -1996,7 +1998,7 @@ export function CommissionsPage() {
                                 commercial
                               </Button>
 
-                              <Button variant="ghost" size="sm" onClick={() => openEcheances(c, 'societe')}>Échéancier Reno Soluces</Button>
+                              <Button variant="ghost" size="sm" onClick={() => openEcheances(c, 'societe')}>Échéancier {nomSociete}</Button>
 
                               <Button
                                 variant="ghost"
@@ -2011,7 +2013,7 @@ export function CommissionsPage() {
                                 {c.date_paiement_societe
                                   ? 'Modifier'
                                   : 'Payer'}{' '}
-                                Reno Soluces
+                                {nomSociete}
                               </Button>
 
                               {c.date_paiement_commercial && (
@@ -2249,7 +2251,7 @@ export function CommissionsPage() {
                           ? ` + ${r.pourcentage_commercial}%`
                           : ''}
 
-                        {admin && <div className="text-sm text-muted">Reno Soluces : {euro(r.montant_societe)}</div>}
+                        {admin && <div className="text-sm text-muted">{nomSociete} : {euro(r.montant_societe)}</div>}
                       </span>
 
                       <span className="flex items-center gap-1">
@@ -2457,7 +2459,7 @@ export function CommissionsPage() {
           />
 
           <FloatInput
-            label="Commission potentielle Reno Soluces (€)"
+            label={`Commission potentielle ${nomSociete} (€)`}
             type="number"
             value={
               form.montant_societe
@@ -2610,7 +2612,7 @@ export function CommissionsPage() {
         </div>
         <div style={{ marginTop: 16 }}>
           <FloatInput
-            label="Commission Reno Soluces (€)"
+            label={`Commission ${nomSociete} (€)`}
             type="number"
             min="0"
             step="0.01"
@@ -2644,7 +2646,7 @@ export function CommissionsPage() {
           paymentTarget ===
           'commercial'
             ? 'Commercial'
-            : 'Reno Soluces'
+            : `${nomSociete}`
         }`}
         footer={
           <>
@@ -2700,7 +2702,7 @@ export function CommissionsPage() {
                     paymentCommission?.montant_commercial,
                   ),
                 )}`
-              : `Commission potentielle Reno Soluces : ${euro(
+              : `Commission potentielle ${nomSociete} : ${euro(
                   amount(
                     paymentCommission?.montant_societe,
                   ),
@@ -2719,7 +2721,7 @@ export function CommissionsPage() {
           }
         />
       </Modal>
-      <Modal open={echeanceModal} onClose={() => setEcheanceModal(false)} title={`Échéancier — ${echeanceTarget === 'societe' ? 'Reno Soluces' : 'commercial'}`}>
+      <Modal open={echeanceModal} onClose={() => setEcheanceModal(false)} title={`Échéancier — ${echeanceTarget === 'societe' ? `${nomSociete}` : 'commercial'}`}>
         <div className="card-pad">
           <div className="text-sm text-muted" style={{marginBottom:14}}>Total prévu : <strong>{euro(echeanceExpected)}</strong> · Échéances : <strong>{euro(echeanceTotal)}</strong> · Payé : <strong>{euro(echeancePaid)}</strong> · Reste : <strong>{euro(Math.max(0,echeanceExpected-echeancePaid))}</strong></div>
           <div style={{display:'grid',gridTemplateColumns:'1.5fr 1fr 1fr auto',gap:8,alignItems:'end'}}>

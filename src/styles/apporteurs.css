@@ -201,3 +201,12 @@
   .acl-icone { grid-area: i; } .acl-qui { grid-area: q; } .acl-role { grid-area: r; } .acl-etat { grid-area: e; }
   .acl-action { grid-area: a; justify-content: center; width: 100%; }
 }
+
+/* Organigramme : état d'accès et invitation par mot de passe provisoire */
+.org-attente { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 600; color: #9a5b00; white-space: nowrap; }
+.org-mdp { display: grid; grid-template-columns: 1fr auto auto; gap: 6px; }
+.org-mdp input { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+.org-mdp-ok { display: inline-flex; align-items: center; gap: 4px; color: #1f7a4d; }
+@media (max-width: 640px) { .org-mdp { grid-template-columns: 1fr auto; } .org-mdp > button:last-child { grid-column: 1 / -1; } }
+.org-mdp-champ { grid-column: span 2; }
+@media (max-width: 720px) { .org-mdp-champ { grid-column: auto; } }

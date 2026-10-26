@@ -7,6 +7,7 @@ import { genererFacturePDF } from '../lib/pdf/genererFacturePDF'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import type { Devis, DevisLigne, Entreprise, Prospect } from '../types'
+import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 type DevisClient = Devis & { prospect?: Prospect | null; lignes?: DevisLigne[] }
 type FactureClient = {
@@ -39,7 +40,7 @@ export function FacturationPage(): JSX.Element {
     setLoading(true)
     const invoiceResult = await supabase.from('factures_clients').select('*').order('created_at',{ascending:false})
     const quoteResult = await supabase.from('devis').select('*').eq('statut','signe').order('created_at',{ascending:false})
-    const companyResult = await supabase.from('entreprises').select('*').limit(1).maybeSingle()
+    const companyResult = await entrepriseCourante('*')
     const prospectResult = await supabase.from('prospects').select('*')
     if (invoiceResult.error) setError(`Chargement des factures impossible : ${invoiceResult.error.message}`)
     if (quoteResult.error) setError(`Chargement des devis signés impossible : ${quoteResult.error.message}`)
@@ -106,7 +107,7 @@ export function FacturationPage(): JSX.Element {
     setSaving(true);setError('')
     try{
       const numResult=await supabase.rpc('next_client_invoice_number')
-      const companyResult=await supabase.from('entreprises').select('*').limit(1).maybeSingle()
+      const companyResult=await entrepriseCourante('*')
       if(numResult.error||!numResult.data)throw new Error(`Numéro de facture indisponible : ${numResult.error?.message||'aucun numéro renvoyé'}. Appliquez la migration factures_clients.`)
       const company=companyResult.data as Entreprise|null
       const numero=String(numResult.data);const now=new Date()

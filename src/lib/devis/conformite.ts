@@ -245,7 +245,7 @@ export const CATEGORIES_MPR_PAR_GESTE = ['pac_air_eau', 'pac_geothermie']
 
 /**
  * true  : une aide MaPrimeRénov' sur une catégorie hors parcours par geste (ex. isolation) BLOQUE le devis.
- * false : simple information (barèmes internes Reno Soluces conservés, à confirmer auprès de l'Anah / France Rénov').
+ * false : simple information (barèmes internes conservés, à confirmer auprès de l'Anah / France Rénov').
  */
 export const MPR_GESTE_STRICT = false
 
@@ -676,7 +676,7 @@ export function controlerDevis(ctx: ContexteConformite): PointConformite[] {
   if (aMPR) {
     const eligibles = lignesProduit.filter(x => x.p!.categorie && CATEGORIES_MPR_PAR_GESTE.includes(x.p!.categorie))
     if (!eligibles.length)
-      add('MaPrimeRénov’', MPR_GESTE_STRICT ? 'bloc' : 'info', 'Aucune ligne éligible au parcours par geste depuis le 01/09/2026 (PAC de chauffage, raccordement réseau, dépose de cuve fioul, audit)' + (MPR_GESTE_STRICT ? '' : ' : barème interne Reno Soluces appliqué, à confirmer auprès de l’Anah / France Rénov’'))
+      add('MaPrimeRénov’', MPR_GESTE_STRICT ? 'bloc' : 'info', 'Aucune ligne éligible au parcours par geste depuis le 01/09/2026 (PAC de chauffage, raccordement réseau, dépose de cuve fioul, audit)' + (MPR_GESTE_STRICT ? '' : ' : barème interne appliqué, à confirmer auprès de l’Anah / France Rénov’'))
     for (const x of lignesProduit) {
       if (x.p!.categorie && CATEGORIES_MPR_PAR_GESTE.includes(x.p!.categorie)) continue
       if (ficheDuProduit(x.p) || x.p!.eligible_mpr)

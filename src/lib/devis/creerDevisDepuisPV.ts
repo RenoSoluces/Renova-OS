@@ -4,6 +4,7 @@ import { prixProduitPourZone } from '../catalogue/prixParZone'
 import { COLONNES_CATALOGUE } from '../catalogue/chargerCatalogue'
 import type { Produit } from '../../types'
 import type { ResultatSimulationPV } from '../photovoltaique/calculProduction'
+import { entrepriseCourante } from '../organisation/entrepriseCourante'
 
 export interface CreerDevisDepuisPVParams {
   prospectId: string
@@ -28,7 +29,7 @@ export async function creerDevisDepuisPV(params: CreerDevisDepuisPVParams): Prom
   const { prospectId, visiteId, simulation, origine } = params
   if (!prospectId) return { devisId: null, error: 'Aucun prospect associé à cette visite.' }
 
-  const { data: entreprise } = await supabase.from('entreprises').select('id, devis_duree_validite_jours, devis_conditions_paiement_defaut').limit(1).maybeSingle()
+  const { data: entreprise } = await entrepriseCourante('id, devis_duree_validite_jours, devis_conditions_paiement_defaut')
   const { data: prospect } = await supabase.from('prospects').select('code_postal').eq('id', prospectId).maybeSingle()
 
   const { data: produitsCatalogue } = await supabase

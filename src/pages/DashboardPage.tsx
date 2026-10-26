@@ -37,6 +37,7 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { TodayTasksWidget } from '../components/crm/TodayTasksWidget'
 import { AdminDashboard } from '../components/dashboard/AdminDashboard'
 import { CommercialDashboard } from '../components/dashboard/CommercialDashboard'
+import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 export function DashboardPage({
   onNavigate,
@@ -109,11 +110,7 @@ export function DashboardPage({
 
       agendaQuery,
 
-      supabase
-        .from('entreprises')
-        .select('*')
-        .limit(1)
-        .maybeSingle(),
+      entrepriseCourante('*'),
 
       supabase
         .from('commissions_safe')

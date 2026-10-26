@@ -42,9 +42,9 @@ export function ListeAcces({ actualisation }: { actualisation: number }) {
 
   const charger = useCallback(async () => {
     const { data } = await supabase.rpc('acces_reseau')
-    setAcces((data || []) as AccesReseau[])
+    setAcces(((data || []) as AccesReseau[]).filter(a => a.organisation_id === profile?.organisation_id))
     setChargement(false)
-  }, [])
+  }, [profile?.organisation_id])
   useEffect(() => { void charger() }, [charger, actualisation])
 
   if (!chargement && acces.length === 0) return null
@@ -96,7 +96,9 @@ export function ListeAcces({ actualisation }: { actualisation: number }) {
   )
 }
 
-function ModaleRenvoi({ acces, onFermer, onRenvoye }: { acces: AccesReseau; onFermer: () => void; onRenvoye: (a: AccesCree) => void }) {
+export function ModaleRenvoi({ acces, onFermer, onRenvoye }: { acces: AccesReseau; onFermer: () => void; onRenvoye: (a: AccesCree) => void }) {
+  const { profile } = useAuth()
+  const monOrganisation = profile?.organisation_id || null
   const [motDePasse, setMotDePasse] = useState(() => genererMotDePasse())
   const [telephone, setTelephone] = useState(acces.telephone || '')
   const [envoi, setEnvoi] = useState(false)
@@ -126,6 +128,7 @@ function ModaleRenvoi({ acces, onFermer, onRenvoye }: { acces: AccesReseau; onFe
       type, prenom: nomComplet.split(' ')[0], nomComplet, email: data.user.email, telephone: telephone.trim(),
       motDePasse, lien: data.lien, entreprise: data.organisation?.nom || acces.organisation_nom || 'Renova OS',
       emailEnvoye: !!data.email_envoye, renvoi: true,
+      autreEntreprise: !!acces.organisation_id && acces.organisation_id !== monOrganisation,
     })
   }
 

@@ -15,6 +15,7 @@ import {
 } from '../lib/photovoltaique/simulateurSolaire'
 import { CourbeRentabilite, DonutAutoconsommation, GraphiqueMensuel, SchemaToiture, euro, kwh } from '../components/solaire/Visuels'
 import type { Entreprise, Prospect } from '../types'
+import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 interface Props {
   onCreateDevis?: (devisId: string) => void
@@ -80,7 +81,7 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
 
   useEffect(() => {
     supabase.from('prospects').select('*').order('nom').then(({ data }) => setProspects((data || []) as Prospect[]))
-    supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => { if (data) setEntreprise(data as Entreprise) })
+    entrepriseCourante('*').then(({ data }) => { if (data) setEntreprise(data as Entreprise) })
   }, [])
 
   useEffect(() => {
@@ -129,8 +130,8 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
     if (resultat.prixManquant) { setMessage({ type: 'erreur', texte: 'Renseignez le prix du kWh avant d’éditer le PDF.' }); return }
     setAction('pdf'); setMessage(null)
     try {
-      // Logo de l'entreprise (Paramètres) ; à défaut, le logo Reno Soluces fourni avec l'application.
-      const logo = (entreprise?.logo_url && (await versDataUrl(entreprise.logo_url))) || (await versDataUrl('/Logo RenoSoluces.png'))
+      // Logo de l'entreprise de l'utilisateur (Paramètres) ; sans logo, le PDF n'en affiche aucun.
+      const logo = entreprise?.logo_url ? await versDataUrl(entreprise.logo_url) : null
       const doc = genererSimulationSolairePDF(resultat, entree, prospect, entreprise, logo)
       const nom = `simulation-solaire-${(prospect?.nom || 'client').toLowerCase().replace(/[^a-z0-9]+/g, '-')}.pdf`
       doc.save(nom)

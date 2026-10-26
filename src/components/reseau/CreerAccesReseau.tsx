@@ -16,6 +16,8 @@ export interface AccesCree {
   emailEnvoye: boolean
   /** Identifiants renvoyés à un compte existant (nouveau mot de passe). */
   renvoi?: boolean
+  /** Compte d'une autre entreprise : message neutre (voir messageAcces). */
+  autreEntreprise?: boolean
 }
 
 /** Création d'un accès (apporteur, partenaire, commercial) puis partage des identifiants en un geste. */
@@ -76,6 +78,7 @@ export function CreerAccesReseau({ onCree }: { onCree?: () => void }) {
       type, prenom: prenom.trim() || nomComplet.split(' ')[0], nomComplet, email: data.user.email, telephone: telephone.trim(),
       motDePasse: data.mode === 'mot_de_passe' ? motDePasse : null, lien: data.lien,
       entreprise: data.organisation?.nom || societe || 'Renova OS', emailEnvoye: !!data.email_envoye,
+      autreEntreprise: !!data.organisation?.id && data.organisation.id !== profile?.organisation_id,
     })
     setPrenom(''); setNom(''); setEmail(''); setTelephone(''); setSociete(''); setMotDePasse(genererMotDePasse())
     onCree?.()
@@ -101,8 +104,8 @@ export function CreerAccesReseau({ onCree }: { onCree?: () => void }) {
 
         <div className="acc-grille">
           {type === 'partenaire' && (
-            <label className="field acc-large"><span className="field-label">Société partenaire *</span>
-              <input list="acc-societes" value={societe} onChange={e => setSociete(e.target.value)} placeholder="Ex. Primy Solutions" />
+            <label className="field acc-large"><span className="field-label">Nom de l’entreprise *</span>
+              <input list="acc-societes" value={societe} onChange={e => setSociete(e.target.value)} placeholder="Ex. Durand Rénovation" />
               <datalist id="acc-societes">{organisations.filter(o => o.type === 'partenaire').map(o => <option key={o.id} value={o.nom} />)}</datalist>
             </label>
           )}
@@ -141,7 +144,7 @@ export function CreerAccesReseau({ onCree }: { onCree?: () => void }) {
 }
 
 export function PartageAcces({ acces, invitePar, onFermer }: { acces: AccesCree; invitePar: string; onFermer: () => void }) {
-  const initial = useMemo(() => messageAcces({ prenom: acces.prenom, type: acces.type, email: acces.email, motDePasse: acces.motDePasse, lien: acces.lien, entreprise: acces.entreprise, invitePar }), [acces, invitePar])
+  const initial = useMemo(() => messageAcces({ prenom: acces.prenom, type: acces.type, email: acces.email, motDePasse: acces.motDePasse, lien: acces.lien, entreprise: acces.entreprise, invitePar, autreEntreprise: acces.autreEntreprise }), [acces, invitePar])
   const [message, setMessage] = useState(initial)
   const [copie, setCopie] = useState<string | null>(null)
   const partageNatif = typeof navigator !== 'undefined' && typeof navigator.share === 'function'

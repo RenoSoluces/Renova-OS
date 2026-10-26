@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
   const adminClient = createClient(supabaseUrl, serviceRoleKey)
   const { data: userData, error: userError } = await adminClient.auth.getUser(token)
   if (userError || !userData.user) return json({ error: 'Session utilisateur invalide.' }, 401)
-  const { data: profile, error: profileError } = await adminClient.from('profiles').select('role').eq('id', userData.user.id).maybeSingle()
+  const { data: profile, error: profileError } = await adminClient.from('profiles').select('role,organisation_id').eq('id', userData.user.id).maybeSingle()
   if (profileError || !profile || !['admin', 'manager'].includes(profile.role)) return json({ error: 'Envoi réservé à l’administration.' }, 403)
 
   let payload: { storagePath?: string; recipient?: string; invoiceNumber?: string; partnerName?: string; dossierId?: string }
@@ -44,8 +44,14 @@ Deno.serve(async (req) => {
   let binary = ''
   for (let i = 0; i < bytes.length; i += 0x8000) binary += String.fromCharCode(...bytes.subarray(i, Math.min(i + 0x8000, bytes.length)))
   const content = btoa(binary)
-  const subject = `Facture ${invoiceNumber} — Reno Soluces`
-  const html = `<p>Bonjour${partnerName ? ` ${String(partnerName).replace(/[<>]/g, '')}` : ''},</p><p>Veuillez trouver en pièce jointe la facture <strong>${String(invoiceNumber).replace(/[<>]/g, '')}</strong> émise par Reno Soluces${dossierId ? ` (référence ${String(dossierId).slice(0, 8)})` : ''}.</p><p>Merci de votre confiance.</p><p>Reno Soluces</p>`
+  // Émetteur : l'entreprise de l'utilisateur qui envoie (aucun nom d'entreprise codé en dur).
+  const [{ data: emetteur }, { data: org }] = await Promise.all([
+    adminClient.from('entreprises').select('raison_sociale').eq('organisation_id', profile.organisation_id || '').order('created_at').limit(1).maybeSingle(),
+    adminClient.from('organisations').select('nom').eq('id', profile.organisation_id || '').maybeSingle(),
+  ])
+  const nomEmetteur = String(emetteur?.raison_sociale || org?.nom || '').replace(/[<>]/g, '').trim()
+  const subject = `Facture ${invoiceNumber}${nomEmetteur ? ` — ${nomEmetteur}` : ''}`
+  const html = `<p>Bonjour${partnerName ? ` ${String(partnerName).replace(/[<>]/g, '')}` : ''},</p><p>Veuillez trouver en pièce jointe la facture <strong>${String(invoiceNumber).replace(/[<>]/g, '')}</strong>${nomEmetteur ? ` émise par ${nomEmetteur}` : ''}${dossierId ? ` (référence ${String(dossierId).slice(0, 8)})` : ''}.</p><p>Merci de votre confiance.</p>${nomEmetteur ? `<p>${nomEmetteur}</p>` : ''}`
   const resendResponse = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },

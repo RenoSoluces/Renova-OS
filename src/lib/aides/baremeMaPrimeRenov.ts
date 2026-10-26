@@ -161,7 +161,7 @@ export const BAREME_GESTES_MPR: BaremeGeste[] = [
     plafondDepenseEligible: 75,
     conditionsTechniques: "R ≥ 7 m².K/W (BAR-EN-101, à vérifier selon fiche applicable)",
     eligibleParcoursGeste: false, // hors parcours par geste pour les dossiers déposés à partir du 01/09/2026 (décret 2026-822)
-    note: "Barème 2026 transmis par Reno Soluces ; profil Rose non éligible en geste seul.",
+    note: "Barème 2026 ; profil Rose non éligible en geste seul.",
   },
   {
     id: "isolation_combles_amenages",

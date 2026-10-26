@@ -1,7 +1,11 @@
 import { useEffect, useMemo, useState, type ReactNode, type FormEvent } from 'react'
-import { Building2, Network, UserRound, RefreshCw, Copy, Mail, MessageCircle, Check } from 'lucide-react'
+import { Building2, Network, UserRound, RefreshCw, Clock, KeyRound, Wand2, Eye, EyeOff, Check } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
+import { genererMotDePasse, motDePasseValide } from '../lib/reseau/acces'
+import { PartageAcces, type AccesCree } from '../components/reseau/CreerAccesReseau'
+import { ModaleRenvoi, typeAccesDuRole, type AccesReseau } from '../components/reseau/ListeAcces'
+import '../styles/apporteurs.css'
 
 type Organisation = { id: string; nom: string; type: string }
 type Member = { id: string; nom_complet: string; role: string; organisation_id: string | null; manager_id: string | null }
@@ -10,7 +14,7 @@ const ROLE_LABELS: Record<string, string> = {
   admin: 'Grand Admin',
   manager: 'Manager',
   commercial_manager: 'Responsable commercial',
-  partner_admin: 'Dirigeant partenaire',
+  partner_admin: 'Dirigeant',
   company_admin: 'Direction',
   commercial: 'Commercial',
   apporteur: "Apporteur d'affaires",
@@ -30,8 +34,12 @@ export function OrganisationPage() {
   const [inviteManagerId, setInviteManagerId] = useState('')
   const [inviteLoading, setInviteLoading] = useState(false)
   const [inviteMessage, setInviteMessage] = useState('')
-  const [invitation, setInvitation] = useState<{ email: string; nom: string; lien: string; emailEnvoye: boolean; renvoi: boolean } | null>(null)
-  const [lienCopie, setLienCopie] = useState(false)
+  const [motDePasse, setMotDePasse] = useState(() => genererMotDePasse())
+  const [voirMdp, setVoirMdp] = useState(true)
+  const [inviteTelephone, setInviteTelephone] = useState('')
+  const [partage, setPartage] = useState<AccesCree | null>(null)
+  const [acces, setAcces] = useState<Map<string, AccesReseau>>(new Map())
+  const [renvoiPour, setRenvoiPour] = useState<AccesReseau | null>(null)
   const [newOrganisationName, setNewOrganisationName] = useState('')
   const [creatingOrganisation, setCreatingOrganisation] = useState(false)
   const [organisationMessage, setOrganisationMessage] = useState('')
@@ -41,10 +49,12 @@ export function OrganisationPage() {
   async function load() {
     setLoading(true)
     setError('')
-    const [orgResult, memberResult] = await Promise.all([
+    const [orgResult, memberResult, accesResult] = await Promise.all([
       supabase.from('organisations').select('id, nom, type').eq('actif', true).order('nom'),
       supabase.from('profiles').select('id, nom_complet, role, organisation_id, manager_id').order('nom_complet'),
+      supabase.rpc('acces_reseau'),
     ])
+    setAcces(new Map(((accesResult.data || []) as AccesReseau[]).map(a => [a.id, a])))
     if (orgResult.error || memberResult.error) {
       setError("Impossible de charger l'organigramme. Vérifiez les droits de votre compte.")
       setOrganisations([])
@@ -85,7 +95,7 @@ export function OrganisationPage() {
         { value: 'admin', label: 'Grand Admin' },
         { value: 'manager', label: 'Manager interne' },
         { value: 'commercial_manager', label: 'Responsable commercial' },
-        { value: 'partner_admin', label: 'Dirigeant partenaire' },
+        { value: 'partner_admin', label: 'Dirigeant (autre entreprise)' },
         { value: 'company_admin', label: 'Direction' },
         { value: 'commercial', label: 'Commercial' },
         { value: 'apporteur', label: "Apporteur d'affaires" },
@@ -133,10 +143,9 @@ export function OrganisationPage() {
 
   async function inviteMember(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!motDePasseValide(motDePasse)) { setInviteMessage('Mot de passe provisoire : 12 caractères minimum, avec majuscule, minuscule, chiffre et caractère spécial.'); return }
     setInviteLoading(true)
     setInviteMessage('')
-    setInvitation(null)
-    setLienCopie(false)
     const nomInvite = inviteName.trim()
     const { data, error: inviteError } = await supabase.functions.invoke('invite-organisation-user', {
       body: {
@@ -145,6 +154,9 @@ export function OrganisationPage() {
         role: inviteRole,
         organisation_id: isGlobalAdmin ? inviteOrganisationId : profile?.organisation_id,
         manager_id: inviteManagerId || null,
+        mode: 'mot_de_passe',
+        mot_de_passe: motDePasse,
+        telephone: inviteTelephone.trim() || undefined,
       },
     })
     if (inviteError || !data?.success) {
@@ -155,12 +167,16 @@ export function OrganisationPage() {
       }
       setInviteMessage(detail || "Invitation impossible. Vérifiez l'adresse e-mail puis réessayez.")
     } else {
-      setInvitation({ email: data.user.email, nom: nomInvite, lien: data.lien, emailEnvoye: !!data.email_envoye, renvoi: !!data.renvoi })
-      setInviteMessage(data.email_envoye
-        ? `${data.renvoi ? 'Invitation renvoyée' : 'Invitation envoyée'} à ${data.user.email}. Vous pouvez aussi lui transmettre le lien ci-dessous.`
-        : `Compte ${data.renvoi ? 'réactivé' : 'créé'} pour ${data.user.email}. Aucun e-mail automatique n'est configuré : envoyez-lui le lien ci-dessous.`)
+      setPartage({
+        type: typeAccesDuRole(inviteRole), prenom: nomInvite.split(' ')[0], nomComplet: nomInvite, email: data.user.email,
+        telephone: inviteTelephone.trim(), motDePasse, lien: data.lien, entreprise: data.organisation?.nom || 'Renova OS',
+        emailEnvoye: !!data.email_envoye, renvoi: !!data.renvoi,
+        autreEntreprise: !!data.organisation?.id && data.organisation.id !== profile?.organisation_id,
+      })
       setInviteName('')
       setInviteEmail('')
+      setInviteTelephone('')
+      setMotDePasse(genererMotDePasse())
       await load()
     }
     setInviteLoading(false)
@@ -170,16 +186,21 @@ export function OrganisationPage() {
     if (seen.has(member.id)) return null
     const nextSeen = new Set(seen)
     nextSeen.add(member.id)
+    const etat = acces.get(member.id)
     const children = (membersByOrg[member.organisation_id || 'unassigned'] || [])
       .filter(candidate => candidate.manager_id === member.id)
     return (
       <li key={member.id} style={{ listStyle: 'none', marginTop: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, border: '1px solid var(--border, #d9e0e7)', borderRadius: 10, padding: '10px 12px', background: 'var(--surface, #fff)' }}>
           <div style={{ width: 34, height: 34, borderRadius: 9, display: 'grid', placeItems: 'center', background: 'var(--primary-50, #eef5f1)', color: 'var(--primary-700, #245b45)', flexShrink: 0 }}><UserRound size={17} /></div>
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontWeight: 600 }}>{member.nom_complet || 'Utilisateur sans nom'}</div>
             <div className="text-muted" style={{ fontSize: 12 }}>{ROLE_LABELS[member.role] || member.role}</div>
           </div>
+          {etat && !etat.active && <span className="org-attente"><Clock size={13} /> Jamais connecté</span>}
+          {etat && !etat.active && peutRenvoyer(member) && (
+            <button type="button" className="btn btn-primary btn-sm" onClick={() => setRenvoiPour(etat)}><KeyRound size={14} /> Renvoyer l’accès</button>
+          )}
         </div>
         {children.length > 0 && (
           <ul style={{ margin: '0 0 0 18px', padding: '0 0 0 14px', borderLeft: '1px solid var(--border, #d9e0e7)' }}>
@@ -188,6 +209,13 @@ export function OrganisationPage() {
         )}
       </li>
     )
+  }
+
+  function peutRenvoyer(member: Member) {
+    if (member.id === profile?.id) return false
+    if (isGlobalAdmin) return true
+    if (isCompanyLeader) return member.organisation_id === profile?.organisation_id
+    return member.manager_id === profile?.id
   }
 
   if (!['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') && !hasDirectReports) {
@@ -258,31 +286,26 @@ export function OrganisationPage() {
                   .map(member => <option key={member.id} value={member.id}>{member.nom_complet} — {ROLE_LABELS[member.role] || member.role}</option>)}
               </select>
             </label>
+            <label style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+              Téléphone (pour WhatsApp)
+              <input className="pipeline-inline-input" type="tel" inputMode="tel" value={inviteTelephone} onChange={e => setInviteTelephone(e.target.value)} placeholder="06 12 34 56 78" maxLength={30} />
+            </label>
+            <label className="org-mdp-champ" style={{ display: 'grid', gap: 5, fontSize: 12 }}>
+              Mot de passe provisoire
+              <span className="org-mdp">
+                <input className="pipeline-inline-input" type={voirMdp ? 'text' : 'password'} value={motDePasse} onChange={e => setMotDePasse(e.target.value)} spellCheck={false} autoComplete="new-password" />
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setVoirMdp(v => !v)} aria-label={voirMdp ? 'Masquer' : 'Afficher'}>{voirMdp ? <EyeOff size={14} /> : <Eye size={14} />}</button>
+                <button type="button" className="btn btn-secondary btn-sm" onClick={() => setMotDePasse(genererMotDePasse())}><Wand2 size={14} /> Générer</button>
+              </span>
+              <small className={motDePasseValide(motDePasse) ? 'org-mdp-ok' : 'text-muted'}>{motDePasseValide(motDePasse) ? <><Check size={12} /> Conforme · à changer à la première connexion</> : '12 car. min · 1 maj · 1 chiffre · 1 spécial'}</small>
+            </label>
             <div>
               <button className="btn btn-primary" type="submit" disabled={inviteLoading || (isGlobalAdmin && !inviteOrganisationId) || !roleOptions.some(role => role.value === inviteRole)}>
-                {inviteLoading ? 'Envoi…' : 'Envoyer l’invitation'}
+                {inviteLoading ? 'Création…' : 'Créer et partager l’accès'}
               </button>
             </div>
           </form>
           {inviteMessage && <p className="text-muted" role="status" style={{ margin: '10px 0 0', fontSize: 13 }}>{inviteMessage}</p>}
-          {invitation && (
-            <div className="invitation-lien">
-              <div className="invitation-lien-titre">Lien d’activation de {invitation.nom || invitation.email}</div>
-              <code>{invitation.lien}</code>
-              <div className="invitation-lien-actions">
-                <button type="button" className="btn btn-secondary btn-sm" onClick={() => { void navigator.clipboard?.writeText(invitation.lien).then(() => setLienCopie(true)) }}>
-                  {lienCopie ? <Check size={14} /> : <Copy size={14} />} {lienCopie ? 'Copié' : 'Copier le lien'}
-                </button>
-                <a className="btn btn-secondary btn-sm" href={`mailto:${invitation.email}?subject=${encodeURIComponent('Votre accès Renova OS')}&body=${encodeURIComponent(`Bonjour ${invitation.nom.split(' ')[0] || ''},\n\nVoici votre lien pour activer votre compte Renova OS et choisir votre mot de passe :\n${invitation.lien}\n\nÀ bientôt,\n${profile?.nom_complet || ''}`)}`}>
-                  <Mail size={14} /> Envoyer depuis ma messagerie
-                </a>
-                <a className="btn btn-secondary btn-sm" target="_blank" rel="noreferrer" href={`https://wa.me/?text=${encodeURIComponent(`Bonjour ${invitation.nom.split(' ')[0] || ''}, voici votre lien pour activer votre compte Renova OS : ${invitation.lien}`)}`}>
-                  <MessageCircle size={14} /> WhatsApp
-                </a>
-              </div>
-              <p>Ce lien est personnel et a une durée de validité limitée. S’il a expiré, saisissez à nouveau le nom et l’e-mail du membre : une nouvelle invitation sera générée.</p>
-            </div>
-          )}
         </section>
       )}
       {loading ? <div className="card card-pad">Chargement de l'organigramme…</div> : (
@@ -297,7 +320,7 @@ export function OrganisationPage() {
                   <Building2 size={19} />
                   <div>
                     <h2 style={{ margin: 0, fontSize: 17 }}>{org.nom}</h2>
-                    <div className="text-muted" style={{ fontSize: 12 }}>{org.type === 'interne' ? 'Entreprise interne' : 'Entreprise partenaire'} · {orgMembers.length} membre{orgMembers.length > 1 ? 's' : ''} visible{orgMembers.length > 1 ? 's' : ''}</div>
+                    <div className="text-muted" style={{ fontSize: 12 }}>{isGlobalAdmin ? `${org.type === 'interne' ? 'Entreprise interne' : 'Entreprise distincte'} · ` : ''}{orgMembers.length} membre{orgMembers.length > 1 ? 's' : ''} visible{orgMembers.length > 1 ? 's' : ''}</div>
                   </div>
                 </div>
                 {orgMembers.length === 0 ? <p className="text-muted">Aucun membre visible pour cette entreprise.</p> : (
@@ -311,6 +334,8 @@ export function OrganisationPage() {
           {organisations.length === 0 && <div className="card card-pad">Aucune entreprise visible pour ce compte.</div>}
         </div>
       )}
+      {renvoiPour && <ModaleRenvoi acces={renvoiPour} onFermer={() => setRenvoiPour(null)} onRenvoye={r => { setRenvoiPour(null); setPartage(r); void load() }} />}
+      {partage && <PartageAcces acces={partage} invitePar={profile?.nom_complet || 'Votre contact'} onFermer={() => setPartage(null)} />}
     </div>
   )
 }
