@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText, ShieldCheck, Calculator } from 'lucide-react'
+import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText, ShieldCheck, Calculator, Upload } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -15,6 +15,7 @@ import { LigneFicheFields } from '../components/devis/LigneFicheFields'
 import { Drawer } from '../components/devis/Drawer'
 import '../components/devis/rv.css'
 import { TarificationModal, type RegleTarifaire } from '../components/catalogue/TarificationModal'
+import { ImportTarifsModal } from '../components/catalogue/ImportTarifsModal'
 import { totalConsommables } from '../lib/devis/rentabilite'
 
 const nettoyerDescriptionProduit = (value: string | null | undefined) => String(value || '')
@@ -229,6 +230,7 @@ export function CataloguePage() {
   const [ficheDetail, setFicheDetail] = useState<Produit | null>(null)
   const [filtreAudit, setFiltreAudit] = useState<'aucun' | 'conformite' | 'commercial'>('aucun')
   const [tarifOpen, setTarifOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const [prixAchat, setPrixAchat] = useState<Map<string, number>>(new Map())
   const [regles, setRegles] = useState<Record<string, RegleTarifaire>>({})
   const estAdministrateur = profile?.role === 'admin'
@@ -560,6 +562,7 @@ export function CataloguePage() {
         </div>
         {isAdmin && <div className="page-actions">
           <Button variant="secondary" onClick={() => setTarifOpen(true)}><Calculator size={18} /> Tarification</Button>
+          <Button variant="secondary" onClick={() => setImportOpen(true)}><Upload size={18} /> Importer un tarif</Button>
           <Button variant="secondary" onClick={() => void ajouterCategorie(filtrePublic)}><Plus size={18} /> Ajouter une catégorie</Button>
           <Button variant="primary" onClick={openCreate}><Plus size={18} /> Ajouter un produit</Button>
         </div>}
@@ -1081,6 +1084,7 @@ export function CataloguePage() {
         })()}
       </Drawer>
       {isAdmin && <TarificationModal open={tarifOpen} onClose={() => setTarifOpen(false)} produits={rows} prixAchat={prixAchat} libelles={labelsCategories} peutModifier={estAdministrateur} onApplique={() => void fetchProduits()} />}
+      {isAdmin && <ImportTarifsModal open={importOpen} onClose={() => setImportOpen(false)} produits={rows} prixAchat={prixAchat} peutModifier={estAdministrateur} onApplique={() => void fetchProduits()} />}
     </div>
   )
 }
