@@ -1,5 +1,6 @@
 import { supabase } from '../supabase'
 import type { Profile } from '../auth/AuthContext'
+import { qualifier, resumeReponses, champsProspectDepuisReponses, questionnaireDe } from './questionnaires'
 
 /**
  * Tournées de porte-à-porte.
@@ -36,13 +37,16 @@ export interface Porte {
   dateRdv: string
   passages: number
   prospectId: string | null
+  /** Produit travaillé à cette porte et réponses au questionnaire de qualification. */
+  produit: string | null
+  reponses: Record<string, string>
   /** true tant que la fiche prospect n'a pas pu être créée (hors-ligne). */
   aSynchroniser: boolean
   creeLe: string
   majLe: string
 }
 
-export interface Tournee { id: string; nom: string; date: string; objectif: number; portes: Porte[] }
+export interface Tournee { id: string; nom: string; date: string; objectif: number; produit: string | null; portes: Porte[] }
 export interface StockageTournees { tournees: Tournee[]; courante: string }
 
 const cle = (profilId: string | undefined) => `renova_tournees_v1_${profilId || 'anonyme'}`
@@ -50,7 +54,7 @@ const nouvelId = () => (crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}
 
 export function nouvelleTournee(): Tournee {
   const date = new Date()
-  return { id: nouvelId(), nom: `Tournée du ${date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })}`, date: date.toISOString(), objectif: 40, portes: [] }
+  return { id: nouvelId(), nom: `Tournée du ${date.toLocaleDateString('fr-FR', { day: '2-digit', month: 'long' })}`, date: date.toISOString(), objectif: 40, produit: null, portes: [] }
 }
 
 export function lireTournees(profilId: string | undefined): StockageTournees {
@@ -73,7 +77,7 @@ export function creerPorte(partiel: Partial<Porte> & Pick<Porte, 'lat' | 'lng'>)
   const maintenant = new Date().toISOString()
   return {
     id: nouvelId(), adresse: '', codePostal: '', ville: '', resultat: 'absent', note: '', prenom: '', nom: '', telephone: '', email: '', dateRdv: '',
-    passages: 1, prospectId: null, aSynchroniser: false, creeLe: maintenant, majLe: maintenant, ...partiel,
+    passages: 1, prospectId: null, produit: null, reponses: {}, aSynchroniser: false, creeLe: maintenant, majLe: maintenant, ...partiel,
   }
 }
 
@@ -122,10 +126,15 @@ export async function adresseDepuisPosition(lat: number, lng: number): Promise<A
 /** Crée ou met à jour la fiche prospect d'une porte « intéressé » / « rendez-vous ». Renvoie l'identifiant, ou une erreur. */
 export async function synchroniserPorte(porte: Porte, profil: Profile | null): Promise<{ prospectId: string | null; erreur: string | null }> {
   if (porte.resultat !== 'interesse' && porte.resultat !== 'rdv') return { prospectId: porte.prospectId, erreur: null }
+  const qualif = qualifier(porte.produit, porte.reponses)
+  const resume = resumeReponses(porte.produit, porte.reponses)
+  const questionnaire = questionnaireDe(porte.produit)
   const champs = {
     nom: porte.nom.trim() || 'Contact porte-à-porte', prenom: porte.prenom.trim(), telephone: porte.telephone.trim() || null, email: porte.email.trim() || null,
     adresse: porte.adresse || null, adresse_rue: porte.adresse || null, code_postal: porte.codePostal || null, ville: porte.ville || null,
-    commentaires: porte.note.trim() || null,
+    commentaires: [porte.note.trim(), resume, qualif?.bloquants.length ? `À noter : ${qualif.bloquants.join(' ; ')}` : ''].filter(Boolean).join('\n\n') || null,
+    ...champsProspectDepuisReponses(porte.reponses),
+    ...(qualif && qualif.repondues ? { temperature: porte.resultat === 'rdv' && qualif.temperature === 'froid' && !qualif.bloquants.length ? 'tiede' : qualif.temperature } : {}),
   }
   let prospectId = porte.prospectId
   if (prospectId) {
@@ -133,17 +142,19 @@ export async function synchroniserPorte(porte: Porte, profil: Profile | null): P
     if (error) return { prospectId, erreur: error.message }
   } else {
     const { data, error } = await supabase.from('prospects').insert({
-      ...champs, type_prospect: 'particulier', raison_sociale: null, source: 'Porte-à-porte', statut: 'Nouveau',
-      statut_occupation: 'propriétaire_occupant', nombre_personnes_foyer: 1, zone_ile_de_france: false, fiches_cee: [],
+      // Valeurs par défaut d'abord : les réponses au questionnaire (occupation, foyer…) les remplacent.
+      statut_occupation: 'propriétaire_occupant', nombre_personnes_foyer: 1,
+      ...champs, ...(questionnaire ? { tags: [`Intérêt : ${questionnaire.court}`] } : {}), type_prospect: 'particulier', raison_sociale: null, source: 'Porte-à-porte', statut: 'Nouveau',
+      zone_ile_de_france: false, fiches_cee: [],
       commercial: profil?.nom_complet || null, commercial_id: profil?.id || null,
     }).select('id').single()
     if (error || !data) return { prospectId: null, erreur: error?.message || 'Création du prospect impossible.' }
     prospectId = data.id as string
   }
-  const contenu = `Porte-à-porte : ${libelleResultat(porte.resultat)}${porte.note.trim() ? ` — ${porte.note.trim()}` : ''}`
+  const contenu = [`Porte-à-porte : ${libelleResultat(porte.resultat)}${porte.note.trim() ? ` — ${porte.note.trim()}` : ''}`, resume].filter(Boolean).join('\n')
   await supabase.from('interactions').insert({
     prospect_id: prospectId, type: 'visite', contenu, auteur: profil?.nom_complet || profil?.email || null,
-    meta: { canal: 'terrain', resultat: porte.resultat, lat: porte.lat, lng: porte.lng },
+    meta: { canal: 'terrain', resultat: porte.resultat, lat: porte.lat, lng: porte.lng, produit: porte.produit, reponses: porte.reponses, score: qualif?.score ?? null },
   })
   if (porte.resultat === 'rdv' && porte.dateRdv) {
     await supabase.from('tasks').insert({
@@ -159,32 +170,32 @@ export async function synchroniserPorte(porte: Porte, profil: Profile | null): P
 const estUuid = (id: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)
 
 /** Signature d'une tournée : permet de n'envoyer que les tournées modifiées depuis le dernier envoi. */
-export const signatureTournee = (t: Tournee) => JSON.stringify([t.nom, t.date, t.objectif, t.portes.map(p => [p.id, p.majLe, p.resultat, p.prospectId])])
+export const signatureTournee = (t: Tournee) => JSON.stringify([t.nom, t.date, t.objectif, t.produit, t.portes.map(p => [p.id, p.majLe, p.resultat, p.prospectId])])
 
 type LignePorte = {
   id: string; tournee_id: string; lat: number; lng: number; adresse: string; code_postal: string; ville: string; resultat: ResultatPorte
   note: string; prenom: string; nom: string; telephone: string; email: string; date_rdv: string; passages: number; prospect_id: string | null
-  cree_le: string; maj_le: string
+  cree_le: string; maj_le: string; produit: string | null; reponses: Record<string, string> | null
 }
 
 const versPorte = (l: LignePorte): Porte => ({
   id: l.id, lat: l.lat, lng: l.lng, adresse: l.adresse, codePostal: l.code_postal, ville: l.ville, resultat: l.resultat, note: l.note,
   prenom: l.prenom, nom: l.nom, telephone: l.telephone, email: l.email, dateRdv: l.date_rdv, passages: l.passages,
-  prospectId: l.prospect_id, aSynchroniser: false, creeLe: l.cree_le, majLe: l.maj_le,
+  prospectId: l.prospect_id, produit: l.produit, reponses: l.reponses || {}, aSynchroniser: false, creeLe: l.cree_le, majLe: l.maj_le,
 })
 
 /** Tournées du commercial enregistrées en base (null si la lecture échoue, ex. hors-ligne). */
 export async function chargerTourneesServeur(profilId: string): Promise<Tournee[] | null> {
-  const { data: tournees, error } = await supabase.from('tournees').select('id,nom,date_tournee,objectif')
+  const { data: tournees, error } = await supabase.from('tournees').select('id,nom,date_tournee,objectif,produit')
     .eq('commercial_id', profilId).order('date_tournee', { ascending: false }).limit(60)
   if (error) return null
   if (!tournees?.length) return []
   const { data: portes, error: errPortes } = await supabase.from('tournee_portes')
-    .select('id,tournee_id,lat,lng,adresse,code_postal,ville,resultat,note,prenom,nom,telephone,email,date_rdv,passages,prospect_id,cree_le,maj_le')
+    .select('id,tournee_id,lat,lng,adresse,code_postal,ville,resultat,note,prenom,nom,telephone,email,date_rdv,passages,prospect_id,cree_le,maj_le,produit,reponses')
     .in('tournee_id', tournees.map(t => t.id)).order('cree_le', { ascending: true }).limit(5000)
   if (errPortes) return null
   return tournees.map(t => ({
-    id: t.id, nom: t.nom, date: t.date_tournee, objectif: t.objectif,
+    id: t.id, nom: t.nom, date: t.date_tournee, objectif: t.objectif, produit: t.produit ?? null,
     portes: ((portes || []) as LignePorte[]).filter(p => p.tournee_id === t.id).map(versPorte),
   }))
 }
@@ -202,7 +213,7 @@ export function fusionnerTournees(locales: Tournee[], serveur: Tournee[]): Tourn
       const autre = portes.get(p.id)
       if (!autre || p.majLe >= autre.majLe) portes.set(p.id, p)
     }
-    parId.set(t.id, { ...distante, nom: t.nom || distante.nom, objectif: t.objectif || distante.objectif, portes: [...portes.values()].sort((a, b) => a.creeLe.localeCompare(b.creeLe)) })
+    parId.set(t.id, { ...distante, nom: t.nom || distante.nom, objectif: t.objectif || distante.objectif, produit: t.produit ?? distante.produit ?? null, portes: [...portes.values()].sort((a, b) => a.creeLe.localeCompare(b.creeLe)) })
   }
   return [...parId.values()].sort((a, b) => b.date.localeCompare(a.date))
 }
@@ -210,14 +221,14 @@ export function fusionnerTournees(locales: Tournee[], serveur: Tournee[]): Tourn
 /** Enregistre une tournée et toutes ses portes en base. Renvoie un message d'erreur, ou null. */
 export async function envoyerTournee(t: Tournee, profilId: string): Promise<string | null> {
   if (!estUuid(t.id)) return null // ancienne tournée locale sans identifiant compatible : conservée sur l'appareil
-  const { error } = await supabase.from('tournees').upsert({ id: t.id, commercial_id: profilId, nom: t.nom, date_tournee: t.date, objectif: t.objectif })
+  const { error } = await supabase.from('tournees').upsert({ id: t.id, commercial_id: profilId, nom: t.nom, date_tournee: t.date, objectif: t.objectif, produit: t.produit ?? null })
   if (error) return error.message
   const portes = t.portes.filter(p => estUuid(p.id))
   if (portes.length) {
     const { error: errPortes } = await supabase.from('tournee_portes').upsert(portes.map(p => ({
       id: p.id, tournee_id: t.id, commercial_id: profilId, lat: p.lat, lng: p.lng, adresse: p.adresse, code_postal: p.codePostal, ville: p.ville,
       resultat: p.resultat, note: p.note, prenom: p.prenom, nom: p.nom, telephone: p.telephone, email: p.email, date_rdv: p.dateRdv,
-      passages: p.passages, prospect_id: p.prospectId, cree_le: p.creeLe, maj_le: p.majLe,
+      passages: p.passages, prospect_id: p.prospectId, cree_le: p.creeLe, maj_le: p.majLe, produit: p.produit ?? null, reponses: p.reponses || {},
     })))
     if (errPortes) return errPortes.message
   }

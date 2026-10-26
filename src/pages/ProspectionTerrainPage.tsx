@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   MapPinned, Plus, LocateFixed, Search, X, Navigation, CheckCircle2, CalendarCheck, DoorClosed, ThumbsDown, ThumbsUp,
-  Map as CarteIcone, List, RotateCcw, Trash2, Flag, CloudOff, Cloud, Loader2,
+  Map as CarteIcone, List, RotateCcw, Trash2, Flag, CloudOff, Cloud, Loader2, Lightbulb, Thermometer, AlertTriangle, ChevronDown,
 } from 'lucide-react'
+import { QUESTIONNAIRES, questionnaireDe, qualifier, libelleTemperature, type Temperature } from '../lib/terrain/questionnaires'
 import { useAuth } from '../lib/auth/AuthContext'
 import { CarteTournee } from '../components/terrain/CarteTournee'
 import {
@@ -13,6 +14,7 @@ import {
 } from '../lib/terrain/tournees'
 
 const ICONES_RESULTAT: Record<ResultatPorte, typeof DoorClosed> = { absent: DoorClosed, refus: ThumbsDown, interesse: ThumbsUp, rdv: CalendarCheck }
+const COULEUR_TEMPERATURE: Record<Temperature, string> = { chaud: '#D62828', tiede: '#E8A317', froid: '#3A86C8' }
 const heure = (iso: string) => new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 
 export function ProspectionTerrainPage(): JSX.Element {
@@ -111,7 +113,7 @@ export function ProspectionTerrainPage(): JSX.Element {
 
   /* ----- Ajout d'une porte ----- */
   function ouvrirNouvelle(lat: number, lng: number, adresse?: AdresseBan | null) {
-    setBrouillon(creerPorte({ lat, lng, adresse: adresse?.adresse || '', codePostal: adresse?.codePostal || '', ville: adresse?.ville || '' }))
+    setBrouillon(creerPorte({ lat, lng, adresse: adresse?.adresse || '', codePostal: adresse?.codePostal || '', ville: adresse?.ville || '', produit: tournee.produit ?? null }))
     setSelection(null)
   }
 
@@ -132,7 +134,7 @@ export function ProspectionTerrainPage(): JSX.Element {
     ouvrirNouvelle(lat, lng, await adresseDepuisPosition(lat, lng))
   }
 
-  function modifier(porte: Porte) { setBrouillon(porte); setSelection(porte.id); setVue('carte') }
+  function modifier(porte: Porte) { setBrouillon({ ...porte, produit: porte.produit ?? tournee.produit ?? null, reponses: porte.reponses || {} }); setSelection(porte.id); setVue('carte') }
 
   async function enregistrer(porte: Porte) {
     const existe = tournee.portes.some(p => p.id === porte.id)
@@ -177,6 +179,17 @@ export function ProspectionTerrainPage(): JSX.Element {
         <button type="button" className="tr-bouton-clair" onClick={nouvelle}><RotateCcw size={15} /> Nouvelle tournée</button>
       </div>
     </header>
+
+    <section className="tr-produit" aria-label="Produit travaillé">
+      <div className="tr-produit-tete"><span>Je propose aujourd’hui</span>{questionnaireDe(tournee.produit) && <small>Questionnaire de {questionnaireDe(tournee.produit)!.questions.length} questions à chaque contact</small>}</div>
+      <div className="tr-produit-choix" role="radiogroup">
+        {QUESTIONNAIRES.map(q => (
+          <button key={q.produit} type="button" role="radio" aria-checked={tournee.produit === q.produit} className={tournee.produit === q.produit ? 'on' : ''}
+            onClick={() => majTournee(t => ({ ...t, produit: t.produit === q.produit ? null : q.produit }))}>{q.court}</button>
+        ))}
+      </div>
+      {questionnaireDe(tournee.produit) && <p className="tr-accroche"><Lightbulb size={15} /> {questionnaireDe(tournee.produit)!.accroche}</p>}
+    </section>
 
     <section className="tr-stats" aria-label="Bilan de la tournée">
       <div className="tr-stat gros">
@@ -249,7 +262,7 @@ export function ProspectionTerrainPage(): JSX.Element {
                 <span className="tr-porte-texte">
                   <strong>{p.adresse || 'Adresse non renseignée'}</strong>
                   <small>{[p.codePostal, p.ville].filter(Boolean).join(' ')} · {heure(p.majLe)}{p.passages > 1 ? ` · passage ${p.passages}` : ''}</small>
-                  {(p.nom || p.prenom) && <small>{`${p.prenom} ${p.nom}`.trim()}</small>}
+                  {(p.nom || p.prenom) && <small>{`${p.prenom} ${p.nom}`.trim()}{(() => { const q = qualifier(p.produit, p.reponses); return q && q.repondues ? <span className="tr-temp" style={{ color: COULEUR_TEMPERATURE[q.temperature] }}> · <Thermometer size={11} /> {libelleTemperature(q.temperature)}{questionnaireDe(p.produit) ? ` ${questionnaireDe(p.produit)!.court}` : ''}</span> : null })()}</small>}
                 </span>
                 <span className="tr-porte-etat" style={{ color: couleurResultat(p.resultat) }}>{p.aSynchroniser && <CloudOff size={13} />}<Icone size={15} />{p.resultat === 'absent' && onglet === 'repasser' ? 'Repasser' : libelleResultat(p.resultat)}</span>
               </button>)
@@ -331,7 +344,8 @@ function FeuillePorte({ porte, existe, proche, onFermer, onEnregistrer, onSuppri
               <label><span>E-mail</span><input value={p.email} type="email" onChange={e => maj({ email: e.target.value })} autoComplete="email" /></label>
             </div>
             {p.resultat === 'rdv' && <label className="tr-pleine"><span>Date et heure du rendez-vous</span><input type="datetime-local" value={p.dateRdv} onChange={e => maj({ dateRdv: e.target.value })} /></label>}
-            <p className="tr-aide"><CheckCircle2 size={14} /> Ce contact sera créé dans le CRM avec l’historique de cette visite.</p>
+            <Qualification porte={p} onChange={maj} />
+            <p className="tr-aide"><CheckCircle2 size={14} /> Ce contact sera créé dans le CRM avec l’historique de cette visite et ses réponses.</p>
           </div>)}
 
         <label className="tr-pleine"><span>{p.resultat === 'absent' ? 'Note (créneau pour repasser…)' : 'Note'}</span>
@@ -343,6 +357,47 @@ function FeuillePorte({ porte, existe, proche, onFermer, onEnregistrer, onSuppri
           <button type="button" className="tr-valider" onClick={() => void valider()} disabled={envoi}>{envoi ? <Loader2 size={18} className="spin" /> : <CheckCircle2 size={18} />} Enregistrer</button>
         </div>
       </div>
+    </div>
+  )
+}
+
+/** Questionnaire de qualification du produit travaillé : une touche par réponse, température en direct. */
+function Qualification({ porte, onChange }: { porte: Porte; onChange: (patch: Partial<Porte>) => void }) {
+  const [ouvert, setOuvert] = useState(true)
+  const q = questionnaireDe(porte.produit)
+  const reponses = porte.reponses || {}
+  const qualif = qualifier(porte.produit, reponses)
+  return (
+    <div className="tr-quest">
+      <div className="tr-quest-tete">
+        <label className="tr-quest-produit"><span>Produit</span>
+          <select value={porte.produit || ''} onChange={e => onChange({ produit: e.target.value || null })}>
+            <option value="">Aucun questionnaire</option>
+            {QUESTIONNAIRES.map(x => <option key={x.produit} value={x.produit}>{x.label}</option>)}
+          </select>
+        </label>
+        {qualif && qualif.repondues > 0 && (
+          <span className={`tr-quest-temp t-${qualif.temperature}`}><Thermometer size={14} /> {libelleTemperature(qualif.temperature)} · {qualif.repondues}/{qualif.total}</span>)}
+        {q && <button type="button" className="tr-quest-plier" onClick={() => setOuvert(o => !o)} aria-expanded={ouvert} aria-label={ouvert ? 'Replier le questionnaire' : 'Déplier le questionnaire'}><ChevronDown size={18} style={{ transform: ouvert ? 'rotate(180deg)' : undefined }} /></button>}
+      </div>
+      {qualif && qualif.bloquants.length > 0 && <div className="tr-quest-bloquant"><AlertTriangle size={14} /> {qualif.bloquants.join(' · ')}</div>}
+      {q && ouvert && (
+        <div className="tr-quest-liste">
+          {q.questions.map(question => (
+            <div key={question.id} className="tr-question">
+              <div className="tr-question-label">{question.label}{question.aide && <small>{question.aide}</small>}</div>
+              <div className="tr-options">
+                {question.options.map(o => {
+                  const actif = reponses[question.id] === o.valeur
+                  return <button key={o.valeur} type="button" className={`tr-option${actif ? ' on' : ''}${o.bloquant ? ' bloque' : ''}`} aria-pressed={actif}
+                    onClick={() => onChange({ reponses: { ...reponses, [question.id]: actif ? '' : o.valeur } })}>{o.label}</button>
+                })}
+              </div>
+            </div>
+          ))}
+          <div className="tr-quest-verif"><b>À vérifier au rendez-vous :</b> {q.aVerifier.join(' · ')}</div>
+        </div>
+      )}
     </div>
   )
 }
