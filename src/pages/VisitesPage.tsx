@@ -51,6 +51,7 @@ import Section07Ventilation from '../components/visites/sections/Section07Ventil
 import Section08Chauffage from '../components/visites/sections/Section08Chauffage'
 import Section09ECS from '../components/visites/sections/Section09ECS'
 import Section10Photovoltaique from '../components/visites/sections/Section10Photovoltaique'
+import Section11RelevePose from '../components/visites/sections/Section11RelevePose'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
@@ -64,6 +65,7 @@ import {
 } from '../lib/3cl'
 import {
   PRODUITS_VISITE,
+  produitsDeLaVisite,
   produitVisiteById,
   sectionsPourVisite,
 } from '../lib/3cl/produitsVisite'
@@ -154,6 +156,14 @@ export function VisitesPage({
   const [newProduitId, setNewProduitId] = useState('')
   /** Catégorie de produit de la visite (id d'un parcours PRODUITS_VISITE) ou 'complete' pour l'audit complet. */
   const [newCategorieId, setNewCategorieId] = useState('')
+  /** Autres produits de la même VT (VT multi-produits). */
+  const [newProduitsSupp, setNewProduitsSupp] = useState<string[]>([])
+  const basculerProduitVisite = (id: string) => {
+    if (id === 'complete') { setNewCategorieId('complete'); setNewProduitsSupp([]); setNewProduitId(''); return }
+    const actuels = newCategorieId && newCategorieId !== 'complete' ? [newCategorieId, ...newProduitsSupp] : []
+    const suivants = actuels.includes(id) ? actuels.filter(x => x !== id) : [...actuels, id]
+    setNewCategorieId(suivants[0] || ''); setNewProduitsSupp(suivants.slice(1)); setNewProduitId('')
+  }
   const [createError, setCreateError] = useState<string | null>(null)
 
   const [dpeResult, setDpeResult] = useState<
@@ -412,12 +422,12 @@ export function VisitesPage({
   )
 
   const activeSections = useMemo(() => {
-    const base = sectionsPourVisite(currentVisite?.type_visite, currentVisite?.produit_cible)
+    const base = sectionsPourVisite(currentVisite?.type_visite, currentVisite?.produit_cible, currentVisite?.audit_data?.produits_cibles)
     const prospect = currentVisite?.prospect as Prospect | undefined
     const isTh174 = (prospect?.fiches_cee || []).some(code => code === 'BAR-TH-174' || code === 'BAR TH 174')
     const isPvVisit = currentVisite?.produit_cible === 'photovoltaique'
     return isTh174 && !isPvVisit ? base.filter(id => id !== 10) : base
-  }, [currentVisite?.type_visite, currentVisite?.produit_cible, currentVisite?.prospect])
+  }, [currentVisite?.type_visite, currentVisite?.produit_cible, currentVisite?.prospect, currentVisite?.audit_data?.produits_cibles])
 
   const produitCibleInfo = produitVisiteById(
     currentVisite?.produit_cible,
@@ -573,8 +583,9 @@ export function VisitesPage({
       currentVisite?.type_visite === 'produit' &&
       currentVisite.produit_cible
     ) {
+      const produitsVises = produitsDeLaVisite(currentVisite.produit_cible, currentVisite.audit_data?.produits_cibles)
       travaux = travaux.filter(
-        t => t.id === currentVisite.produit_cible,
+        t => produitsVises.includes(t.id),
       )
     }
 
@@ -866,7 +877,7 @@ export function VisitesPage({
 
       const isTh174 = ((visite.prospect as Prospect | undefined)?.fiches_cee || []).some(code => code === 'BAR-TH-174' || code === 'BAR TH 174')
       const isPvVisit = visite.produit_cible === 'photovoltaique'
-      const sections = sectionsPourVisite(visite.type_visite, visite.produit_cible).filter(id => !(isTh174 && !isPvVisit && id === 10))
+      const sections = sectionsPourVisite(visite.type_visite, visite.produit_cible, visite.audit_data?.produits_cibles).filter(id => !(isTh174 && !isPvVisit && id === 10))
       setCurrentSection(sections[0] || 1)
 
       setCurrentEtape(0)
@@ -1101,7 +1112,7 @@ export function VisitesPage({
       prospect_id: newProspectId,
       date_visite: newDate,
       statut: 'en_cours',
-      audit_data: {},
+      audit_data: produitCible && newProduitsSupp.length ? { produits_cibles: [produitCible, ...newProduitsSupp] } : {},
       type_visite: produitCible ? 'produit' : 'complete',
       produit_cible: produitCible,
       vt_produit_id: newProduitId || null,
@@ -1138,6 +1149,7 @@ export function VisitesPage({
     setNewProspectId('')
     setNewProduitId('')
     setNewCategorieId('')
+    setNewProduitsSupp([])
     setCreateError(null)
 
     startVisite(data as any)
@@ -1147,6 +1159,7 @@ export function VisitesPage({
     newDate,
     newProduitId,
     newCategorieId,
+    newProduitsSupp,
     startVisite,
     fetchVisites,
   ])
@@ -1177,7 +1190,7 @@ export function VisitesPage({
         prospect_id: newProspectId,
         date_visite: newDate,
         statut: 'en_cours',
-        audit_data: importedAuditData,
+        audit_data: produitCible && newProduitsSupp.length ? { ...importedAuditData, produits_cibles: [produitCible, ...newProduitsSupp] } : importedAuditData,
         type_visite: (produitCible ? 'produit' : 'complete') as 'produit' | 'complete',
         produit_cible: produitCible,
         vt_produit_id: newProduitId || null,
@@ -1216,6 +1229,7 @@ export function VisitesPage({
       setNewProspectId('')
           setNewProduitId('')
     setNewCategorieId('')
+    setNewProduitsSupp([])
       setCreateError(null)
 
       startVisite(data as Visite)
@@ -1227,6 +1241,7 @@ export function VisitesPage({
       newDate,
       newProduitId,
       newCategorieId,
+      newProduitsSupp,
       startVisite,
       fetchVisites,
     ],
@@ -1250,6 +1265,7 @@ export function VisitesPage({
       )
           setNewProduitId('')
     setNewCategorieId('')
+    setNewProduitsSupp([])
       setShowNewModal(true)
     }
 
@@ -1361,6 +1377,7 @@ export function VisitesPage({
                 sectionsPourVisite(
                   v.type_visite,
                   v.produit_cible,
+                  v.audit_data?.produits_cibles,
                 )
 
               const progress = (
@@ -1403,6 +1420,7 @@ export function VisitesPage({
                         >
                           {produitInfo?.label ||
                             'Produit ciblé'}
+                          {(v.audit_data?.produits_cibles?.length || 0) > 1 ? ` + ${(v.audit_data!.produits_cibles!.length) - 1}` : ''}
                         </span>
                       )}
                     </div>
@@ -1548,8 +1566,8 @@ export function VisitesPage({
             <div className="vt-create-product-block">
               <div className="vt-create-product-head">
                 <div>
-                  <div className="font-semibold">Catégorie de produit</div>
-                  <div className="text-sm text-muted">Elle détermine les sections à remplir pendant la visite.</div>
+                  <div className="font-semibold">Objet de la visite</div>
+                  <div className="text-sm text-muted">Un ou plusieurs produits (VT ciblée, plus rapide), ou l’audit complet du logement. Le relevé de pose est inclus dans les deux cas.</div>
                 </div>
                 <span className="badge badge-info">Obligatoire</span>
               </div>
@@ -1560,8 +1578,9 @@ export function VisitesPage({
                     <button
                       key={c.id}
                       type="button"
-                      className={`vt-product-option ${newCategorieId === c.id ? 'selected' : ''}`}
-                      onClick={() => { setNewCategorieId(c.id); setNewProduitId('') }}
+                      className={`vt-product-option ${newCategorieId === c.id || newProduitsSupp.includes(c.id) ? 'selected' : ''}`}
+                      aria-pressed={newCategorieId === c.id || newProduitsSupp.includes(c.id)}
+                      onClick={() => basculerProduitVisite(c.id)}
                     >
                       <span className="vt-product-option-icon"><Icone size={17}/></span>
                       <span><strong>{c.label}</strong><small>{c.description}</small></span>
@@ -1572,14 +1591,15 @@ export function VisitesPage({
                 <button
                   type="button"
                   className={`vt-product-option ${newCategorieId === 'complete' ? 'selected' : ''}`}
-                  onClick={() => { setNewCategorieId('complete'); setNewProduitId('') }}
+                  onClick={() => basculerProduitVisite('complete')}
                 >
                   <span className="vt-product-option-icon"><ClipboardList size={17}/></span>
                   <span><strong>Audit complet</strong><small>Toutes les sections : logement, enveloppe, systèmes, production.</small></span>
                   <span className="vt-choice-radio"/>
                 </button>
               </div>
-              {newCategorieId && newCategorieId !== 'complete' && (
+              {newProduitsSupp.length > 0 && <div className="text-sm text-muted" style={{ marginTop: 8 }}>VT multi-produits : {[newCategorieId, ...newProduitsSupp].map(id => produitVisiteById(id)?.label).join(' + ')}</div>}
+              {newCategorieId && newCategorieId !== 'complete' && newProduitsSupp.length === 0 && (
                 <div className="vt-create-product-precise">
                   <FloatSelect
                     label="Produit précis (facultatif)"
@@ -2042,7 +2062,7 @@ export function VisitesPage({
                   activeSections.length - 1
                 ] === 9
                   ? "Terminer l'audit"
-                  : 'Continuer vers Photovoltaïque'}
+                  : activeSections.includes(10) ? 'Continuer vers Photovoltaïque' : 'Continuer vers le relevé de pose'}
               </button>
             </div>
           </div>
@@ -2104,8 +2124,27 @@ export function VisitesPage({
                 className="btn-wall-nav btn-wall-next"
                 onClick={handleNext}
               >
-                Terminer l'audit
+                {activeSections[activeSections.length - 1] === 10 ? "Terminer l'audit" : 'Continuer vers le relevé de pose'}
               </button>
+            </div>
+          </div>
+        )}
+
+        {currentSection === 11 && (
+          <div>
+            <div className="audit-section-title">
+              Section 11 — Relevé de pose
+            </div>
+
+            <Section11RelevePose
+              data={auditData.releve_pose || { produits: [], releves: {} }}
+              produitsVisite={produitsDeLaVisite(currentVisite?.produit_cible, currentVisite?.audit_data?.produits_cibles)}
+              onChange={d => saveSection('releve_pose', d)}
+            />
+
+            <div className="wall-nav-row" style={{ marginTop: 32 }}>
+              <button className="btn-wall-nav btn-wall-prev" onClick={handlePrev}>Précédent</button>
+              <button className="btn-wall-nav btn-wall-next" onClick={handleNext}>Terminer la visite</button>
             </div>
           </div>
         )}

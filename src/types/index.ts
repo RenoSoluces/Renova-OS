@@ -275,6 +275,10 @@ export interface AuditData {
   chauffage?: ChauffageData
   ecs?: EcsData
   photovoltaique?: PhotovoltaiqueData
+  /** Relevé de pose par produit (section 11). */
+  releve_pose?: { produits: string[]; releves: Record<string, Record<string, string>> }
+  /** VT produit portant sur plusieurs produits (le principal reste dans visites.produit_cible). */
+  produits_cibles?: string[]
   completed_sections?: number[]
 }
 
