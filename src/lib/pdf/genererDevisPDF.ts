@@ -173,7 +173,7 @@ export function genererDevisPDF(
   drw(doc,C.vert);doc.setLineWidth(.4);fil(doc,C.blanc);doc.roundedRect(M,y,signW,signH,2,2,"S");drw(doc,C.trait);doc.setLineWidth(.25);doc.roundedRect(M+signW+8,y,signW,signH,2,2,"S");
   doc.setFont("helvetica","bold");doc.setFontSize(9.2);txt(doc,C.ink);doc.text("Le client — Bon pour accord",M+5,y+7);
   doc.setFont("helvetica","normal");doc.setFontSize(7.2);txt(doc,C.gris);doc.text(doc.splitTextToSize("Précédé de la mention manuscrite « Bon pour accord, lu et approuvé », daté et signé.",signW-10),M+5,y+11.5);
-  if(devis.signature_statut==="signe"&&devis.signature_image_data){doc.setFont("helvetica","bold");doc.setFontSize(8);txt(doc,C.ink);doc.text(safe(`Signataire : ${devis.signature_nom_signataire||"—"}`),M+5,y+21);if(devis.signature_date){doc.setFont("helvetica","normal");txt(doc,C.gris);doc.text(`Signé le ${date(devis.signature_date)}`,M+5,y+26);}try{doc.addImage(devis.signature_image_data,"PNG",M+signW-50,y+20,44,26);}catch{}}
+  if(devis.signature_statut==="signe"&&devis.signature_image_data){doc.setFont("helvetica","bold");doc.setFontSize(8);txt(doc,C.ink);doc.text(safe(`Signataire : ${devis.signature_nom_signataire||"—"}`),M+5,y+21);if(devis.signature_date){doc.setFont("helvetica","normal");txt(doc,C.gris);doc.text(`Signé le ${date(devis.signature_date)}`,M+5,y+26);}const consent=(devis as any).signature_audit?.consentements;if(consent){doc.setFontSize(6.6);txt(doc,C.gris);const mentions=[consent.cgv_acceptees?"CGV acceptées":"",consent.bordereau_retractation_remis?"bordereau de rétractation remis":"",consent.execution_avant_fin_retractation?"exécution demandée avant la fin du délai de rétractation":""].filter(Boolean).join(" · ");if(mentions)doc.text(doc.splitTextToSize(safe(mentions),signW-60),M+5,y+31);}try{doc.addImage(devis.signature_image_data,"PNG",M+signW-50,y+20,44,26);}catch{}}
   else{doc.setFont("helvetica","normal");doc.setFontSize(8);txt(doc,C.gris);doc.text("Nom :",M+5,y+24);doc.text("Date :",M+5,y+33);doc.text("Signature :",M+signW/2+4,y+33);drw(doc,C.trait);doc.line(M+16,y+24.5,M+signW-5,y+24.5);doc.line(M+14,y+33.5,M+signW/2-2,y+33.5);}
   doc.setFont("helvetica","bold");doc.setFontSize(9.2);txt(doc,C.ink);doc.text("L’entreprise",M+signW+13,y+7);doc.setFont("helvetica","normal");doc.setFontSize(7.2);txt(doc,C.gris);doc.text("Cachet et signature",M+signW+13,y+11.5);y+=signH+6;
   doc.setFont("helvetica","italic");doc.setFontSize(7.1);txt(doc,C.gris);const withdrawal=doc.splitTextToSize("Pour les contrats conclus à distance ou hors établissement, le délai légal de rétractation applicable est indiqué dans les mentions légales et les conditions générales jointes.",W) as string[];doc.text(withdrawal,M,y);
@@ -233,8 +233,20 @@ export function genererDevisPDF(
   return doc;
 }
 
+async function chargerLogo(devis:Devis):Promise<string|null>{
+  const logoUrl=devis.emetteur_logo_url||"";
+  if(!logoUrl)return null;
+  if(logoUrl.startsWith("data:image"))return null;
+  try{const response=await fetch(logoUrl);const blob=await response.blob();return await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(blob);});}catch{return null}
+}
+
 export async function telechargerDevisPDF(devis:Devis,lignes:DevisLigne[],aides:DevisAide[],prospect:Prospect|null,entreprise:Entreprise|null):Promise<void>{
-  let logoDataUrl:string|null=null;const logoUrl=devis.emetteur_logo_url||"";
-  if(logoUrl&&!logoUrl.startsWith("data:image")){try{const response=await fetch(logoUrl);const blob=await response.blob();logoDataUrl=await new Promise<string>((resolve,reject)=>{const reader=new FileReader();reader.onload=()=>resolve(String(reader.result));reader.onerror=reject;reader.readAsDataURL(blob);});}catch{}}
-  const doc=genererDevisPDF(devis,lignes,aides,prospect,entreprise,logoDataUrl);doc.save(`${devis.numero}.pdf`);
+  const doc=genererDevisPDF(devis,lignes,aides,prospect,entreprise,await chargerLogo(devis));doc.save(`${devis.numero}.pdf`);
+}
+
+/** PDF du devis (CGV et bordereau compris) sous forme de fichier, pour l'archiver ou l'envoyer au client. */
+export async function devisPDFFichier(devis:Devis,lignes:DevisLigne[],aides:DevisAide[],prospect:Prospect|null,entreprise:Entreprise|null):Promise<File>{
+  const doc=genererDevisPDF(devis,lignes,aides,prospect,entreprise,await chargerLogo(devis));
+  const nom=`${devis.numero}${devis.signature_statut==="signe"?"-signe":""}.pdf`;
+  return new File([doc.output("blob")],nom,{type:"application/pdf"});
 }
