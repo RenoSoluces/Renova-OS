@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 import { Button } from '../components/ui/Button'
 import '../styles/apporteurs.css'
+import { CreerAccesReseau } from '../components/reseau/CreerAccesReseau'
 
 type Apporteur = {
   id: string; organisation_id: string; nom: string; contact: string | null
@@ -122,8 +123,10 @@ export function ApporteursPage() {
         <h1 className="page-title">Mon réseau</h1>
         <p className="page-subtitle">Centralisez les personnes qui recommandent des clients et suivez les prochaines actions à mener.</p>
       </div>
-      {canManage && <Button variant="primary" onClick={() => { if (formOpen && !editing) reset(); else { reset(); setFormOpen(true) } setError(''); setSuccess('') }}><Plus size={17}/> Nouvel apporteur</Button>}
+      {canManage && <Button variant="primary" onClick={() => { if (formOpen && !editing) reset(); else { reset(); setFormOpen(true) } setError(''); setSuccess('') }}><Plus size={17}/> Ajouter un contact au carnet</Button>}
     </header>
+
+    <CreerAccesReseau onCree={() => void load()} />
 
     <section className="apporteurs-stats" aria-label="Synthèse du réseau">
       <article className="apporteur-stat"><span className="apporteur-stat-icon"><Users size={18}/></span><div><small>Apporteurs référencés</small><strong>{stats.total}</strong></div></article>
