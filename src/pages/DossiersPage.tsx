@@ -30,6 +30,7 @@ import { jsPDF } from 'jspdf'
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { numeroDevis } from '../lib/devis/numeroDevis'
+import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
 
 const STATUT_BADGE: Record<string, string> = {
   en_cours: 'badge-info',
@@ -71,6 +72,7 @@ export function DossiersPage({
   onInitialProspectHandled,
 }: DossiersPageProps = {}) {
   const { profile } = useAuth()
+  const nomEntreprise = useNomEntreprise()
   const isAdmin =
     profile?.role === 'admin' || profile?.role === 'manager'
   const canViewCompanyCommission = isAdmin || ['super_admin', 'partner_admin', 'company_admin'].includes(profile?.role || '')
@@ -424,7 +426,7 @@ export function DossiersPage({
         ? await supabase.from('entreprises').select('*').eq('organisation_id', detail.destinataire_organisation_id).maybeSingle()
         : { data: null as any }
       if (detail.destinataire_organisation_id && !destinataireEntreprise) {
-        throw new Error('La fiche légale du destinataire est indisponible pour votre compte. Demandez au Grand Admin de vérifier les informations de facturation.')
+        throw new Error('La fiche légale du destinataire est indisponible pour votre compte. Demandez à l’administrateur de vérifier les informations de facturation.')
       }
       const destinataireFacture = destinataireEntreprise ? {
         nom: destinataireEntreprise.raison_sociale,
@@ -546,7 +548,7 @@ export function DossiersPage({
           notes: `Devis interne de suivi de facturation partenaire — facture ${numeroFacture}. Ne constitue pas un devis de travaux client.`,
           origine_interne: true,
           emetteur_type: 'renova_soluces',
-          emetteur_nom_affichage: entreprise?.raison_sociale || 'Reno Soluces',
+          emetteur_nom_affichage: entreprise?.raison_sociale || nomEntreprise,
         }).select('id').single()
         if (devisError || !devis) throw new Error(`Facture PDF générée, mais création du devis interne impossible : ${devisError?.message || 'erreur inconnue'}`)
         devisId = devis.id

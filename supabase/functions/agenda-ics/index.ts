@@ -66,7 +66,7 @@ Deno.serve(async (req: Request) => {
 
   const maintenant = horodatage(new Date())
   const lignes = [
-    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Reno Soluces//Renova OS//FR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
+    'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Renova OS//Agenda//FR', 'CALSCALE:GREGORIAN', 'METHOD:PUBLISH',
     'X-WR-CALNAME:Renova OS', 'X-WR-TIMEZONE:Europe/Paris', 'REFRESH-INTERVAL;VALUE=DURATION:PT1H', 'X-PUBLISHED-TTL:PT1H',
     ...VTIMEZONE,
   ]

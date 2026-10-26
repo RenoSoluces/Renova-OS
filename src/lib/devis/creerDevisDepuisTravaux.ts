@@ -5,6 +5,7 @@ import { prixProduitPourZone } from '../catalogue/prixParZone'
 import { estimerQuantiteTravaux } from '../3cl/analyse/estimerQuantiteTravaux'
 import type { Batiment3CL } from '../3cl/batiment3CL'
 import type { PropositionTravaux } from '../3cl/analyse/proposerTravaux'
+import { entrepriseCourante } from '../organisation/entrepriseCourante'
 
 
 export interface CreerDevisDepuisTravauxParams {
@@ -31,7 +32,7 @@ export async function creerDevisDepuisTravaux(params: CreerDevisDepuisTravauxPar
   const { prospectId, visiteId, batiment, travaux, origine } = params
   if (!prospectId || travaux.length === 0) return { devisId: null, error: 'Aucun travaux sélectionné.' }
 
-  const { data: entreprise } = await supabase.from('entreprises').select('id, devis_duree_validite_jours, devis_conditions_paiement_defaut').limit(1).maybeSingle()
+  const { data: entreprise } = await entrepriseCourante('id, devis_duree_validite_jours, devis_conditions_paiement_defaut')
   const { data: prospect } = await supabase.from('prospects').select('code_postal').eq('id', prospectId).maybeSingle()
 
   const categoriesRecherchees = [...new Set(

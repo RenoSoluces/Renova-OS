@@ -58,7 +58,7 @@ Deno.serve(async (req) => {
     .limit(1)
     .maybeSingle()
   if (companyError || !company?.email || !company.email.includes('@')) {
-    const message = 'Adresse e-mail destinataire de Reno Soluces manquante dans Paramètres.'
+    const message = 'Adresse e-mail de l’entreprise destinataire manquante dans Paramètres.'
     await admin.from('commission_factures').update({ email_erreur: message, updated_at: new Date().toISOString() }).eq('id', invoice.id)
     return json({ error: message }, 422)
   }
@@ -87,7 +87,7 @@ Deno.serve(async (req) => {
     body: JSON.stringify({
       from: mailFrom,
       to: [company.email],
-      subject: `Facture de commission ${safeNumber} — ${safeName || 'Apporteur Reno Soluces'}`,
+      subject: `Facture de commission ${safeNumber} — ${safeName || 'Apporteur'}`,
       html: `<p>Bonjour,</p><p>Veuillez trouver en pièce jointe la facture de commission <strong>${safeNumber}</strong> déposée par ${safeName || 'un apporteur d’affaires'}.</p><p>Montant : ${Number(invoice.montant_ht).toFixed(2)} € HT.</p><p>Cordialement,</p><p>${safeName || 'Apporteur d’affaires'}</p>`,
       attachments: [{ filename: `${safeNumber}.pdf`, content }],
     }),

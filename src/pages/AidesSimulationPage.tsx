@@ -7,6 +7,7 @@ import { Button } from '../components/ui/Button'
 import { determinerProfilMPR, calculAideMPR, LABEL_PROFIL } from '../lib/aides/baremeMaPrimeRenov'
 import { estimerPrimeCEE } from '../lib/aides/calculAidesCEE'
 import { CATEGORIE_VERS_GESTE_MPR, CATEGORIE_VERS_GESTE_CEE } from '../lib/devis/calculDevis'
+import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 const euro=(n:number)=>new Intl.NumberFormat('fr-FR',{style:'currency',currency:'EUR',maximumFractionDigits:0}).format(n||0)
 type SavedEstimate={id:string;prospect_id:string;produit_id:string|null;geste_id:string;montant_travaux_ht:number;quantite:number;profil_mpr:string|null;montant_mpr:number;montant_cee:number;taux_cee:number;avertissement:string;created_at:string;prospect?:Prospect|null;produit?:Produit|null}
@@ -30,7 +31,7 @@ export function AidesSimulationPage({initialProspectId,onInitialProspectHandled}
     const [p,prod,e,h]=await Promise.all([
       supabase.from('prospects').select('*').order('nom'),
       supabase.from('catalogue_produits').select('id, nom, categorie, catalogue_groupe, public_cible, fiche_cee').eq('actif',true).order('nom'),
-      supabase.from('entreprises').select('*').limit(1).maybeSingle(),
+      entrepriseCourante('*'),
       supabase.from('simulations_aides').select('*').order('created_at',{ascending:false}).limit(50),
     ])
     setProspects((p.data||[]) as Prospect[]);setProduits((prod.data||[]) as Produit[]);setEntreprise((e.data||null) as Entreprise|null)

@@ -41,6 +41,8 @@ import {
   type ConformiteMeta, type PointConformite,
 } from '../lib/devis/conformite'
 import { REGLES_FICHES } from '../lib/devis/reglesFichesCEE'
+import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
+import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 const CLE_PRO_LOCAL = 'renova.devis.pro'
 const pick = (o: any, cles: string[]) => { for (const k of cles) if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return String(o[k]); return '' }
@@ -139,6 +141,7 @@ interface DevisPageProps {
 export function DevisPage({
   openDevisId, onOpenedDevis, initialProspectId, onInitialProspectHandled }: DevisPageProps = {}) {
   const { profile } = useAuth()
+  const nomEntreprise = useNomEntreprise()
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
   const [view, setView] = useState<'list' | 'editor'>('list')
   const [rows, setRows] = useState<(Devis & { prospect?: Prospect })[]>([])
@@ -215,7 +218,7 @@ export function DevisPage({
     })()
     supabase.from('installateurs').select('*').eq('devis_autorise', true).eq('actif', true).order('nom')
       .then(({ data }) => setPartenairesDevis((data || []) as Installateur[]))
-    supabase.from('entreprises').select('*').limit(1).maybeSingle().then(({ data }) => {
+    entrepriseCourante('*').then(({ data }) => {
       if (data) {
         setEntreprise(data as Entreprise)
         if (data.taux_cee_eur_par_mwh_cumac) setTauxCEE(data.taux_cee_eur_par_mwh_cumac)
@@ -259,11 +262,7 @@ export function DevisPage({
       return
     }
 
-    const { data: entreprise, error: entrepriseError } = await supabase
-      .from('entreprises')
-      .select('id, raison_sociale, forme_juridique, siret, numero_tva, adresse, code_postal, ville, telephone, email, logo_url, devis_duree_validite_jours, devis_conditions_paiement_defaut, conditions_generales_devis')
-      .limit(1)
-      .maybeSingle()
+    const { data: entreprise, error: entrepriseError } = await entrepriseCourante('id, raison_sociale, forme_juridique, siret, numero_tva, adresse, code_postal, ville, telephone, email, logo_url, devis_duree_validite_jours, devis_conditions_paiement_defaut, conditions_generales_devis')
 
     if (entrepriseError) {
       setCreationError(`Impossible de charger les informations de l'entreprise : ${entrepriseError.message}`)
@@ -302,8 +301,8 @@ export function DevisPage({
       : {
           emetteur_type: 'renova_soluces',
           emetteur_installateur_id: null,
-          emetteur_nom_affichage: entreprise?.raison_sociale || 'Reno Soluces',
-          emetteur_raison_sociale: entreprise?.raison_sociale || 'Reno Soluces',
+          emetteur_nom_affichage: entreprise?.raison_sociale || nomEntreprise,
+          emetteur_raison_sociale: entreprise?.raison_sociale || nomEntreprise,
           emetteur_forme_juridique: entreprise?.forme_juridique || '',
           emetteur_siret: entreprise?.siret || '',
           emetteur_numero_tva: entreprise?.numero_tva || '',
@@ -376,7 +375,7 @@ export function DevisPage({
     if (!current) return
     setCreatingAvenant(true)
     const numeroAvenant = (avenants.length || 0) + 1
-    const { data: entreprise } = await supabase.from('entreprises').select('devis_duree_validite_jours, devis_conditions_paiement_defaut').limit(1).maybeSingle()
+    const { data: entreprise } = await entrepriseCourante('devis_duree_validite_jours, devis_conditions_paiement_defaut')
     const dureeValidite = entreprise?.devis_duree_validite_jours ?? 30
     const dateValidite = new Date(Date.now() + dureeValidite * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
     const { data: nouveau, error } = await supabase.from('devis').insert({
@@ -467,7 +466,7 @@ export function DevisPage({
     return determinerProfilMPR(p.rfr, p.nombre_personnes_foyer, !!p.zone_ile_de_france)
   }, [current])
 
-  // Prime CEE ITE selon le barème transmis par Reno Soluces :
+  // Prime CEE ITE selon le barème transmis :
   // Bleu = 12 €/m² ; Jaune/Violet/Rose = 8 €/m².
   // La surface est calculée à partir des seules lignes de produits isolants ITE,
   // jamais à partir de l'échafaudage ou de l'enduit pour éviter le double comptage.
@@ -536,7 +535,7 @@ export function DevisPage({
         id: existing?.id || `tmp_${current.id}_cee_rampants`,
         devis_id: current.id,
         type: 'cee',
-        libelle: `Prime CEE rampants / sarking — ${surface} m² × ${tauxRampantsM2} €/m² (barème Reno Soluces)`,
+        libelle: `Prime CEE rampants / sarking — ${surface} m² × ${tauxRampantsM2} €/m²`,
         montant,
         details: { calculType: 'cee_rampants_surface', gesteId: 'isolation_rampants', surface_m2: surface, taux_eur_m2: tauxRampantsM2, fiche: 'BAR-EN-101', estimation: false },
         created_at: existing?.created_at || new Date().toISOString(),
@@ -561,7 +560,7 @@ export function DevisPage({
     })
   }, [current?.id, lignes, produits, profilMPR])
 
-  // Combles perdus : barème 2026 communiqué par Reno Soluces, distinct des rampants.
+  // Combles perdus : barème 2026, distinct des rampants.
   useEffect(() => {
     if (!current) return
     const surface = lignes.reduce((total, ligne) => {
@@ -1199,7 +1198,7 @@ export function DevisPage({
               value={quoteIssuerId}
               onChange={setQuoteIssuerId}
               options={[
-                { value: 'renova_soluces', label: entreprise?.raison_sociale || 'Reno Soluces' },
+                { value: 'renova_soluces', label: entreprise?.raison_sociale || nomEntreprise || 'Mon entreprise' },
                 ...partenairesDevis.map(p => ({ value: p.id, label: p.devis_nom_affichage || p.nom })),
               ]}
             />
@@ -1489,7 +1488,7 @@ export function DevisPage({
               </div>
             )}
             <p className="note" style={{ margin: '12px 0 0' }}>
-              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — barème Reno Soluces 2026 : MaPrimeRénov’ Bleu 25 €/m², Jaune 20 €/m², Violet 15 €/m², Rose non éligible en geste seul ; CEE BAR-EN-101 : Bleu 13 €/m², autres profils 10 €/m². Les montants sont calculés sur la quantité des lignes de produits combles perdus.' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE Reno Soluces : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
+              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — barème 2026 : MaPrimeRénov’ Bleu 25 €/m², Jaune 20 €/m², Violet 15 €/m², Rose non éligible en geste seul ; CEE BAR-EN-101 : Bleu 13 €/m², autres profils 10 €/m². Les montants sont calculés sur la quantité des lignes de produits combles perdus.' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
             </p>
           </section>
 
@@ -1550,7 +1549,7 @@ export function DevisPage({
             <div className="hd">
               <div><h3>DEVIS</h3><div className="co">N° {current?.numero || '—'} · {current?.created_at ? new Date(current.created_at).toLocaleDateString('fr-FR') : new Date().toLocaleDateString('fr-FR')} · valable jusqu’au {current?.date_validite ? new Date(`${current.date_validite.slice(0, 10)}T12:00:00`).toLocaleDateString('fr-FR') : 'à définir'}</div></div>
               <div style={{ textAlign: 'right' }}>
-                <b style={{ fontSize: 14 }}>{current?.emetteur_nom_affichage || entreprise?.raison_sociale || 'Reno Soluces'}</b>
+                <b style={{ fontSize: 14 }}>{current?.emetteur_nom_affichage || entreprise?.raison_sociale || nomEntreprise}</b>
                 <div className="co">{(current?.emetteur_siret || entreprise?.siret) ? `SIRET ${current?.emetteur_siret || entreprise?.siret}` : <span className="ph">SIRET à renseigner</span>}<br />
                   {fichesDuDevis.length > 0 && <>RGE n° {conf.pro.rge ? `${conf.pro.rge} · ${conf.pro.organisme}` : <span className="ph">à renseigner</span>}<br /></>}
                   {current?.emetteur_telephone || entreprise?.telephone || ''} · {current?.emetteur_email || entreprise?.email || ''}</div>

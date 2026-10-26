@@ -6,7 +6,7 @@ export type TypeAcces = 'apporteur' | 'partenaire' | 'commercial'
 
 export const LIBELLES_ACCES: Record<TypeAcces, { label: string; role: string; description: string }> = {
   apporteur: { label: 'Apporteur d’affaires', role: 'apporteur', description: 'Recommande des clients et suit ses dossiers et commissions.' },
-  partenaire: { label: 'Partenaire (société)', role: 'partner_admin', description: 'Dirigeant d’une société partenaire : son entreprise a son propre espace.' },
+  partenaire: { label: 'Autre entreprise', role: 'partner_admin', description: 'Dirigeant d’une entreprise distincte, avec son propre espace (gérée dans l’Organigramme).' },
   commercial: { label: 'Commercial de mon équipe', role: 'commercial', description: 'Rejoint votre équipe commerciale.' },
 }
 
@@ -40,10 +40,22 @@ export interface InfosAcces {
   lien: string
   entreprise: string
   invitePar: string
+  /**
+   * Compte d'une autre entreprise (son propre espace) : message neutre, sans nom de l'invitant
+   * ni mention d'une relation entre entreprises.
+   */
+  autreEntreprise?: boolean
 }
 
 /** Message d'invitation, prêt à envoyer tel quel. */
 export function messageAcces(i: InfosAcces): string {
+  if (i.autreEntreprise) {
+    const l = [`Bonjour${i.prenom ? ` ${i.prenom}` : ''} 👋`, '', `Votre espace ${i.entreprise} sur Renova OS est prêt.`, '']
+    if (i.motDePasse) l.push('🔗 Connexion : ' + i.lien, `👤 Identifiant : ${i.email}`, `🔑 Mot de passe provisoire : ${i.motDePasse}`, '', 'Vous choisirez votre propre mot de passe à la première connexion.')
+    else l.push('🔗 Activez votre compte et choisissez votre mot de passe ici :', i.lien, '', 'Ce lien est personnel et valable pour une durée limitée.')
+    l.push('', 'Vous y gérez vos clients, devis et dossiers, et invitez votre équipe.', '', 'Bonne découverte !')
+    return l.join('\n')
+  }
   const role = i.type === 'apporteur' ? 'apporteur d’affaires' : i.type === 'partenaire' ? 'partenaire' : 'membre de l’équipe'
   const lignes = [
     `Bonjour${i.prenom ? ` ${i.prenom}` : ''} 👋`,

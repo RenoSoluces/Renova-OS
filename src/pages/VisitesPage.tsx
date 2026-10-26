@@ -90,6 +90,7 @@ import type { ImportVTResult } from '../lib/pdf/import/importVT'
 import type { DispositifAide } from '../types'
 import { logAuditEvent } from '../lib/auditLog'
 import { chargerCatalogue } from '../lib/catalogue/chargerCatalogue'
+import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 const ICONES_CATEGORIE: Record<string, typeof Wrench> = {
   combles: Home, murs: BrickWall, plancher: Layers, menuiseries: DoorOpen,
@@ -195,11 +196,7 @@ export function VisitesPage({
   const [creatingDevisPV, setCreatingDevisPV] = useState(false)
 
   useEffect(() => {
-    supabase
-      .from('entreprises')
-      .select('*')
-      .limit(1)
-      .maybeSingle()
+    entrepriseCourante('*')
       .then(({ data }) => {
         if (data) setEntreprise(data as Entreprise)
       })

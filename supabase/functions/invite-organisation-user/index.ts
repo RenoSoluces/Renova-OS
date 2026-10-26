@@ -61,7 +61,7 @@ const ROLE_LIBELLES: Record<string, string> = {
   admin: 'Grand Admin',
   manager: 'Manager',
   commercial_manager: 'Responsable commercial',
-  partner_admin: 'Dirigeant partenaire',
+  partner_admin: 'Dirigeant',
   company_admin: 'Dirigeant',
   commercial: 'Commercial',
   apporteur: "Apporteur d'affaires",
@@ -70,15 +70,19 @@ const ROLE_LIBELLES: Record<string, string> = {
 
 const echapper = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))
 
-function emailInvitation(p: { nom: string; invitePar: string; organisation: string; role: string; lien: string; identifiant?: string; motDePasse?: string }) {
+function emailInvitation(p: { nom: string; invitePar: string; organisation: string; role: string; lien: string; identifiant?: string; motDePasse?: string; neutre?: boolean }) {
   const prenom = echapper(p.nom.split(' ')[0] || p.nom)
+  // Compte d'une autre entreprise : ni nom de l'invitant, ni rôle, ni relation entre entreprises.
+  const intro = p.neutre
+    ? `Votre espace <b>${echapper(p.organisation)}</b> sur Renova OS est prêt.`
+    : `${echapper(p.invitePar)} vous invite à rejoindre <b>${echapper(p.organisation)}</b> sur Renova OS, en tant que <b>${echapper(p.role)}</b>.`
   return `<!doctype html><html lang="fr"><body style="margin:0;background:#F6F8F7;font-family:Arial,Helvetica,sans-serif;color:#1F2A24">
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="padding:32px 12px"><tr><td align="center">
 <table role="presentation" width="560" cellpadding="0" cellspacing="0" style="max-width:560px;background:#ffffff;border-radius:16px;overflow:hidden;border:1px solid #E3E9E5">
 <tr><td style="background:#1B4332;padding:22px 28px;color:#ffffff;font-size:20px;font-weight:bold">Renova OS</td></tr>
 <tr><td style="padding:28px">
 <p style="font-size:16px;margin:0 0 14px">Bonjour ${prenom},</p>
-<p style="font-size:15px;line-height:1.55;margin:0 0 14px">${echapper(p.invitePar)} vous invite à rejoindre <b>${echapper(p.organisation)}</b> sur Renova OS, en tant que <b>${echapper(p.role)}</b>.</p>
+<p style="font-size:15px;line-height:1.55;margin:0 0 14px">${intro}</p>
 ${p.motDePasse
     ? `<p style="font-size:15px;line-height:1.55;margin:0 0 12px">Vos identifiants de connexion :</p>
 <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 18px;background:#F3F7F5;border-radius:10px;width:100%"><tr><td style="padding:14px 16px;font-size:14.5px;line-height:1.8">Identifiant : <b>${echapper(p.identifiant || '')}</b><br>Mot de passe provisoire : <b style="font-family:monospace">${echapper(p.motDePasse)}</b></td></tr></table>
@@ -91,10 +95,16 @@ ${p.motDePasse
 </td></tr></table></td></tr></table></body></html>`
 }
 
-async function envoyerViaResend(destinataire: string, sujet: string, html: string): Promise<string | null> {
+async function envoyerViaResend(destinataire: string, sujet: string, html: string, nomExpediteur?: string): Promise<string | null> {
   const resendApiKey = Deno.env.get('RESEND_API_KEY')
-  const mailFrom = Deno.env.get('MAIL_FROM')
+  let mailFrom = Deno.env.get('MAIL_FROM')
   if (!resendApiKey || !mailFrom) return 'non_configure'
+  if (nomExpediteur) {
+    // Autre entreprise : expéditeur à son nom, adresse neutre (MAIL_FROM_AUTRES) si elle est définie.
+    const source = Deno.env.get('MAIL_FROM_AUTRES') || mailFrom
+    const adresse = (source.match(/<([^>]+)>/)?.[1] || source).trim()
+    mailFrom = `${nomExpediteur.replace(/[<>"]/g, '').trim() || 'Renova OS'} <${adresse}>`
+  }
   const reponse = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' },
@@ -162,7 +172,7 @@ Deno.serve(async (req: Request) => {
     }
   } else if (isCompanyLeader) {
     if (![...staffRoles, 'commercial_manager'].includes(requestedRole)) {
-      return response({ error: 'La direction partenaire peut inviter des membres de son entreprise, pas créer une autre direction.' }, 403, origin)
+      return response({ error: 'Vous pouvez inviter les membres de votre entreprise (commerciaux, responsables, apporteurs, téléconseillers).' }, 403, origin)
     }
   } else if (!staffRoles.has(requestedRole)) {
     return response({ error: 'Un manager ne peut inviter que des membres de son équipe.' }, 403, origin)
@@ -295,7 +305,9 @@ Deno.serve(async (req: Request) => {
 
   // Envoi de l'e-mail via Resend (expéditeur de l'entreprise). Pas de repli sur l'e-mail Supabase :
   // il générerait un nouveau jeton et invaliderait le lien renvoyé à l'administrateur.
+  const autreEntreprise = organisationId !== caller.organisation_id
   const html = emailInvitation({
+    neutre: autreEntreprise,
     nom: nomComplet,
     invitePar: caller.nom_complet || 'Votre responsable',
     organisation: organisation.nom,
@@ -303,7 +315,9 @@ Deno.serve(async (req: Request) => {
     lien,
     ...(mode === 'mot_de_passe' ? { identifiant: email, motDePasse } : {}),
   })
-  const erreurResend = await envoyerViaResend(email, `${caller.nom_complet || 'Renova OS'} vous invite sur Renova OS`, html)
+  const erreurResend = autreEntreprise
+    ? await envoyerViaResend(email, `Votre espace ${organisation.nom} sur Renova OS`, html, organisation.nom)
+    : await envoyerViaResend(email, `${caller.nom_complet || 'Renova OS'} vous invite sur Renova OS`, html)
   const emailEnvoye = erreurResend === null
   const canal: 'resend' | 'aucun' = emailEnvoye ? 'resend' : 'aucun'
   const detailEnvoi: string | null = erreurResend && erreurResend !== 'non_configure' ? erreurResend : null

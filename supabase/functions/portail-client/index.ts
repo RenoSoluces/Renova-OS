@@ -26,6 +26,23 @@ async function sha256(texte: string) {
   return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2, '0')).join('')
 }
 
+/**
+ * Expéditeur des e-mails envoyés aux clients : le nom de l'entreprise qui suit le client.
+ * Pour une entreprise autre que l'entreprise interne, l'adresse MAIL_FROM_AUTRES (si définie)
+ * remplace celle de MAIL_FROM, afin qu'aucune adresse d'une autre entreprise n'apparaisse.
+ */
+async function expediteurClient(admin: any, organisationId: string | null, mailFrom: string): Promise<string> {
+  const adresse = (v: string) => (v.match(/<([^>]+)>/)?.[1] || v).trim()
+  if (!organisationId) return mailFrom
+  const [{ data: org }, { data: ent }] = await Promise.all([
+    admin.from('organisations').select('nom,type').eq('id', organisationId).maybeSingle(),
+    admin.from('entreprises').select('raison_sociale').eq('organisation_id', organisationId).order('created_at').limit(1).maybeSingle(),
+  ])
+  if (!org || org.type === 'interne') return mailFrom
+  const nom = String(ent?.raison_sociale || org.nom || 'Renova OS').replace(/[<>"]/g, '').trim()
+  return `${nom} <${adresse(Deno.env.get('MAIL_FROM_AUTRES') || mailFrom)}>`
+}
+
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: cors })
   if (req.method !== 'POST') return json({ error: 'Méthode non autorisée.' }, 405)
@@ -61,7 +78,8 @@ Deno.serve(async (req: Request) => {
   if (action === 'charger') {
     await admin.from('portail_acces').update({ dernier_acces: new Date().toISOString() }).eq('id', acces.id)
     const [{ data: entreprise }, { data: commercial }, { data: dossier }, { data: lignes }, { data: aides }, { data: visites }] = await Promise.all([
-      admin.from('entreprises').select('raison_sociale,telephone,email,logo_url,conditions_generales_devis').limit(1).maybeSingle(),
+      // Identité de l'entreprise qui suit ce client, et d'elle seule.
+      admin.from('entreprises').select('raison_sociale,telephone,email,logo_url,conditions_generales_devis').eq('organisation_id', prospect.organisation_id || '').order('created_at').limit(1).maybeSingle(),
       prospect.commercial_id ? admin.from('profiles').select('nom_complet,telephone,email').eq('id', prospect.commercial_id).maybeSingle() : Promise.resolve({ data: null }),
       dossierId ? admin.from('dossiers').select('id,reference,statut,date_installation_prevue,date_installation').eq('id', dossierId).maybeSingle() : Promise.resolve({ data: null }),
       devis ? admin.from('devis_lignes').select('designation,quantite,montant_ht,ordre').eq('devis_id', devis.id).order('ordre') : Promise.resolve({ data: [] }),
@@ -153,7 +171,7 @@ Deno.serve(async (req: Request) => {
 <p style="font-size:15px;line-height:1.55;margin:0 0 18px">Voici votre code pour signer le devis ${echapper(devis.numero || '')} :</p>
 <p style="font-size:34px;letter-spacing:8px;font-weight:bold;text-align:center;margin:0 0 18px;font-family:monospace">${code}</p>
 <p style="font-size:13px;color:#6B7A72;line-height:1.5;margin:0">Ce code est valable 10 minutes. Si vous n’êtes pas à l’origine de cette demande, ignorez cet e-mail.</p></div></div></body></html>`
-    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: mailFrom, to: [prospect.email], subject: `Votre code de signature : ${code}`, html, text: `Votre code de signature : ${code} (valable 10 minutes).` }) })
+    const r = await fetch('https://api.resend.com/emails', { method: 'POST', headers: { Authorization: `Bearer ${resendApiKey}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ from: await expediteurClient(admin, prospect.organisation_id, mailFrom), to: [prospect.email], subject: `Votre code de signature : ${code}`, html, text: `Votre code de signature : ${code} (valable 10 minutes).` }) })
     if (!r.ok) return json({ error: 'L’e-mail n’a pas pu être envoyé.' }, 502)
     return json({ ok: true, email: prospect.email.replace(/^(.{2}).*(@.*)$/, '$1•••$2') })
   }
