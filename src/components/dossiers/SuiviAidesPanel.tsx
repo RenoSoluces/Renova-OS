@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react'
 import { AlertOctagon, CheckCircle2, Circle, Clock3, ListPlus, Mail, ShieldCheck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { BoutonEspaceClient } from '../partage/BoutonEspaceClient'
 import { alertesDossier, etapesDossier, messageDemandePieces, piecesAAjouter, type Aide, type Etape, type PieceDossier, type SuiviAides } from '../../lib/dossiers/suiviAides'
 
 interface Props {
   dossier: { id: string; reference?: string | null; prospect_id: string | null; aides?: string[] | null; suivi_aides?: SuiviAides | null; date_installation?: string | null; date_installation_prevue?: string | null }
-  prospect?: { prenom?: string | null; email?: string | null; fiches_cee?: string[] | null } | null
+  prospect?: { prenom?: string | null; email?: string | null; telephone?: string | null; fiches_cee?: string[] | null } | null
   signatureDevis?: string | null
   pieces: PieceDossier[]
   /** Recharge les pièces et le dossier après une modification. */
@@ -131,6 +132,7 @@ export function SuiviAidesPanel({ dossier, prospect, signatureDevis, pieces, onC
         <div className="sa-actions">
           {aAjouter.length > 0 && <button type="button" className="sa-btn" onClick={() => void ajouterPieces()} disabled={occupe}><ListPlus size={15} /> Ajouter les {aAjouter.length} pièce(s) obligatoire(s) manquante(s) à la liste</button>}
           {manquantes.length > 0 && <button type="button" className="sa-btn prim" onClick={() => void demanderAuClient()} disabled={occupe || !prospect?.email}><Mail size={15} /> Demander les pièces au client</button>}
+          {dossier.prospect_id && <BoutonEspaceClient prospect={{ id: dossier.prospect_id, prenom: prospect?.prenom, telephone: (prospect as any)?.telephone, email: prospect?.email }} dossierId={dossier.id} motif="pieces" className="sa-btn" libelle="Espace client (dépôt en ligne)" />}
           {!prospect?.email && manquantes.length > 0 && <small className="sa-note">Ajoutez l’e-mail du client pour lui demander les pièces.</small>}
         </div>
       </>}

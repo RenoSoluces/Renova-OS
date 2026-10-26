@@ -1,5 +1,5 @@
 import './lib/compat'
-import { StrictMode } from 'react'
+import { StrictMode, Suspense, lazy } from 'react'
 import { createRoot } from 'react-dom/client'
 import './styles/reset.css'
 import './styles/variables.css'
@@ -34,11 +34,19 @@ const mettreAJour = registerSW({
 
 document.documentElement.dataset.renovaStarted = 'true'
 
+// Espace client public (lien personnel, sans compte) : aucune session Renova OS n'est chargée.
+const PortailClientPage = lazy(() => import('./pages/PortailClientPage').then(m => ({ default: m.PortailClientPage })))
+const estPortail = window.location.pathname.startsWith('/portail/')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <AuthProvider>
-      <App />
-      <MiseAJourDisponible />
-    </AuthProvider>
+    {estPortail ? (
+      <Suspense fallback={null}><PortailClientPage /></Suspense>
+    ) : (
+      <AuthProvider>
+        <App />
+        <MiseAJourDisponible />
+      </AuthProvider>
+    )}
   </StrictMode>,
 )

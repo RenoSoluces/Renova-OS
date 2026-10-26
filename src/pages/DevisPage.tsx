@@ -24,6 +24,7 @@ const estLigneAssociee = (designation: string, produit: string) =>
   PREFIXES_ASSOCIES.some(prefixe => designation === `${prefixe} — ${produit}`)
 import { estimerPrimeCEE } from '../lib/aides/calculAidesCEE'
 import { telechargerDevisPDF, devisPDFFichier } from '../lib/pdf/genererDevisPDF'
+import { BoutonEspaceClient } from '../components/partage/BoutonEspaceClient'
 import { SignatureSurPlace, type ConsentementsSignature, type ResultatSignature } from '../components/devis/SignatureSurPlace'
 import { useAuth } from '../lib/auth/AuthContext'
 import { numeroDevis } from '../lib/devis/numeroDevis'
@@ -1236,6 +1237,10 @@ export function DevisPage({
           <Button variant="secondary" onClick={telechargerPDF} disabled={lignes.length === 0}>
             <Download size={16} /> PDF
           </Button>
+          {current?.prospect_id && p && (
+            <BoutonEspaceClient prospect={{ ...p, id: current.prospect_id }} devisId={current.id} dossierId={current.dossier_id || null}
+              motif={current.statut === 'envoye' ? 'devis' : 'suivi'} libelle={current.statut === 'envoye' ? 'Signature en ligne' : 'Espace client'} />
+          )}
           {isAdmin && (
             <Button variant="secondary" onClick={supprimerDevis}>
               <Trash2 size={16} /> Supprimer
