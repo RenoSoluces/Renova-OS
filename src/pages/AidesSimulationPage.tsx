@@ -29,7 +29,7 @@ export function AidesSimulationPage({initialProspectId,onInitialProspectHandled}
     setLoading(true)
     const [p,prod,e,h]=await Promise.all([
       supabase.from('prospects').select('*').order('nom'),
-      supabase.from('catalogue_produits').select('*').eq('actif',true).order('nom'),
+      supabase.from('catalogue_produits').select('id, nom, categorie, catalogue_groupe, public_cible, fiche_cee').eq('actif',true).order('nom'),
       supabase.from('entreprises').select('*').limit(1).maybeSingle(),
       supabase.from('simulations_aides').select('*').order('created_at',{ascending:false}).limit(50),
     ])
