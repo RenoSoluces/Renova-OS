@@ -35,9 +35,9 @@ export function FichesTechniquesPage() {
   async function load() {
     setLoading(true)
     const [{ data: documents, error: docError }, { data: catalogue, error: produitError }] = await Promise.all([
-      supabase.from('documents').select('*, produit:catalogue_produits(*)')
+      supabase.from('documents').select('id, nom, categorie, produit_id, url, created_at, produit:catalogue_produits(id, nom, marque, reference, fiche_cee)')
         .in('categorie', Object.values(CATEGORIE).flat()).order('created_at', { ascending: false }),
-      supabase.from('catalogue_produits').select('*').eq('actif', true).order('nom'),
+      supabase.from('catalogue_produits').select('id, nom, marque, reference, fiche_cee, catalogue_groupe, public_cible, actif').eq('actif', true).order('nom'),
     ])
     if (docError) setError(`Lecture des fiches impossible : ${docError.message}`)
     else setDocs((documents || []) as any)
