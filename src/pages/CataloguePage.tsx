@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText, ShieldCheck } from 'lucide-react'
+import { Plus, Package, Pencil, Trash2, X, Copy, Search, FileText, ShieldCheck, Calculator } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -14,6 +14,8 @@ import { REGLES_FICHES } from '../lib/devis/reglesFichesCEE'
 import { LigneFicheFields } from '../components/devis/LigneFicheFields'
 import { Drawer } from '../components/devis/Drawer'
 import '../components/devis/rv.css'
+import { TarificationModal, type RegleTarifaire } from '../components/catalogue/TarificationModal'
+import { totalConsommables } from '../lib/devis/rentabilite'
 
 const nettoyerDescriptionProduit = (value: string | null | undefined) => String(value || '')
   .replace(/Prix HT communiqué dans le catalogue fourni/gi, '')
@@ -99,6 +101,8 @@ interface FormState {
   forfait_pose_ht: string
   forfait_evacuation_ht: string
   forfait_consommables_ht: string
+  prix_achat_ht: string
+  consommables_detail: { libelle: string; quantite: string; unite: string; prix_ht: string }[]
 }
 
 const carObj = (list: CaracLigne[]): Record<string, string> =>
@@ -199,6 +203,7 @@ function emptyForm(): FormState {
     eligible_mpr: false, eligible_cee: false, fiche_cee: '', actif: true,
     zones_prix: [],
     forfait_pose_ht: '', forfait_evacuation_ht: '', forfait_consommables_ht: '',
+    prix_achat_ht: '', consommables_detail: [],
   }
 }
 
@@ -223,6 +228,10 @@ export function CataloguePage() {
   const [saving, setSaving] = useState(false)
   const [ficheDetail, setFicheDetail] = useState<Produit | null>(null)
   const [filtreAudit, setFiltreAudit] = useState<'aucun' | 'conformite' | 'commercial'>('aucun')
+  const [tarifOpen, setTarifOpen] = useState(false)
+  const [prixAchat, setPrixAchat] = useState<Map<string, number>>(new Map())
+  const [regles, setRegles] = useState<Record<string, RegleTarifaire>>({})
+  const estAdministrateur = profile?.role === 'admin'
 
   async function fetchProduits() {
     setLoading(true)
@@ -231,7 +240,7 @@ export function CataloguePage() {
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabase
         .from('catalogue_produits')
-        .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht')
+        .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht,prix_conseille_ht,prix_plancher_ht,consommables_detail')
         // Le produit générique « Isolation » est remplacé par les produits détaillés.
         .neq('nom', 'Isolation')
         .order('categorie', { ascending: true })
@@ -248,6 +257,15 @@ export function CataloguePage() {
     }
     setRows(all)
     setLoading(false)
+    if (isAdmin) {
+      // Le prix d'achat n'est pas lisible directement : fonction réservée à la direction.
+      const [{ data: achats }, { data: r }] = await Promise.all([
+        supabase.rpc('catalogue_prix_achat'),
+        supabase.from('regles_tarifaires').select('*'),
+      ])
+      setPrixAchat(new Map(((achats || []) as { id: string; prix_achat_ht: number | null }[]).map(a => [a.id, Number(a.prix_achat_ht) || 0])))
+      setRegles(Object.fromEntries(((r || []) as RegleTarifaire[]).map(x => [x.categorie, x])))
+    }
   }
 
   useEffect(() => { fetchProduits(); void chargerCategories() }, [])
@@ -328,6 +346,8 @@ export function CataloguePage() {
       actif: p.actif,
       zones_prix: (p.zones_prix || []).map(z => ({ zone: z.zone, prix_unitaire_ht: String(z.prix_unitaire_ht) })),
       forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''), forfait_consommables_ht: String(p.forfait_consommables_ht ?? ''),
+      prix_achat_ht: prixAchat.get(p.id) ? String(prixAchat.get(p.id)) : '',
+      consommables_detail: (p.consommables_detail || []).map(c => ({ libelle: c.libelle, quantite: String(c.quantite ?? 1), unite: c.unite || 'forfait', prix_ht: String(c.prix_ht ?? '') })),
     })
     setModalOpen(true)
   }
@@ -347,6 +367,8 @@ export function CataloguePage() {
       actif: true,
       zones_prix: (p.zones_prix || []).map(z => ({ zone: z.zone, prix_unitaire_ht: String(z.prix_unitaire_ht) })),
       forfait_pose_ht: String(p.forfait_pose_ht ?? ''), forfait_evacuation_ht: String(p.forfait_evacuation_ht ?? ''), forfait_consommables_ht: String(p.forfait_consommables_ht ?? ''),
+      prix_achat_ht: prixAchat.get(p.id) ? String(prixAchat.get(p.id)) : '',
+      consommables_detail: (p.consommables_detail || []).map(c => ({ libelle: c.libelle, quantite: String(c.quantite ?? 1), unite: c.unite || 'forfait', prix_ht: String(c.prix_ht ?? '') })),
     })
     setModalOpen(true)
   }
@@ -391,6 +413,11 @@ export function CataloguePage() {
     if ((parseFloat(form.prix_unitaire_ht) || 0) > 0) delete caracteristiques.prix_a_renseigner
     if ((parseFloat(form.forfait_pose_ht) || 0) > 0) delete caracteristiques.forfait_pose_a_renseigner
 
+    const detailConsommables = form.consommables_detail
+      .filter(c => c.libelle.trim())
+      .map(c => ({ libelle: c.libelle.trim(), quantite: parseFloat(c.quantite) || 1, unite: c.unite || 'forfait', prix_ht: parseFloat(c.prix_ht) || 0 }))
+    const achatForm = parseFloat(form.prix_achat_ht) || 0
+    const regleForm = regles[form.categorie]
     const payload = {
       categorie: form.categorie,
       catalogue_groupe: form.catalogue_groupe,
@@ -412,7 +439,13 @@ export function CataloguePage() {
         .map(z => ({ zone: z.zone.trim(), prix_unitaire_ht: parseFloat(z.prix_unitaire_ht) || 0 })),
       forfait_pose_ht: parseFloat(form.forfait_pose_ht) || 0,
       forfait_evacuation_ht: parseFloat(form.forfait_evacuation_ht) || 0,
-      forfait_consommables_ht: parseFloat(form.forfait_consommables_ht) || 0,
+      forfait_consommables_ht: detailConsommables.length ? totalConsommables(detailConsommables) : parseFloat(form.forfait_consommables_ht) || 0,
+      consommables_detail: detailConsommables,
+      ...(form.prix_achat_ht !== '' ? {
+        prix_achat_ht: achatForm,
+        prix_conseille_ht: regleForm ? Math.round(achatForm * regleForm.coef_fourniture) : null,
+        prix_plancher_ht: regleForm ? Math.round(achatForm * (1 + regleForm.marge_min_pct / 100) * 100) / 100 : null,
+      } : {}),
     }
 
     const result = editing
@@ -526,6 +559,7 @@ export function CataloguePage() {
           <p className="page-subtitle">Les produits et prestations que vous proposez, utilisés pour construire vos devis</p>
         </div>
         {isAdmin && <div className="page-actions">
+          <Button variant="secondary" onClick={() => setTarifOpen(true)}><Calculator size={18} /> Tarification</Button>
           <Button variant="secondary" onClick={() => void ajouterCategorie(filtrePublic)}><Plus size={18} /> Ajouter une catégorie</Button>
           <Button variant="primary" onClick={openCreate}><Plus size={18} /> Ajouter un produit</Button>
         </div>}
@@ -689,7 +723,18 @@ export function CataloguePage() {
                               </button>
                             )}
                           </td>
-                          {isAdmin && <td className="num">{prixARenseigner(p) ? 'À renseigner' : euro(p.prix_unitaire_ht)} <span className="note">/ {UNITES.find(u => u.value === p.unite)?.label || p.unite}</span></td>}
+                          {isAdmin && <td className="num">{prixARenseigner(p) ? 'À renseigner' : euro(p.prix_unitaire_ht)} <span className="note">/ {UNITES.find(u => u.value === p.unite)?.label || p.unite}</span>
+                            {(() => {
+                              const achat = prixAchat.get(p.id) || 0
+                              const vente = Number(p.prix_unitaire_ht) || 0
+                              if (!(achat > 0) || !(vente > 0)) return null
+                              const marge = ((vente - achat) / vente) * 100
+                              const plancher = Number(p.prix_plancher_ht) || 0
+                              return <div className={`marge-cat${plancher > 0 && vente < plancher ? ' bas' : ''}`} title={`Achat ${euro(achat)} · conseillé ${euro(Number(p.prix_conseille_ht) || 0)} · plancher ${euro(plancher)}`}>
+                                marge {marge.toLocaleString('fr-FR', { maximumFractionDigits: 0 })} %{Number(p.prix_conseille_ht) > 0 && Math.abs(Number(p.prix_conseille_ht) - vente) > 1 ? ` · conseillé ${euro(Number(p.prix_conseille_ht))}` : ''}
+                              </div>
+                            })()}
+                          </td>}
                           {isAdmin && <td className="num">{Number(p.forfait_pose_ht) > 0 ? euro(p.forfait_pose_ht) : 'À renseigner'}</td>}
                           {isAdmin && <td className="num">{Number(p.forfait_consommables_ht) > 0 ? euro(Number(p.forfait_consommables_ht)) : 'À renseigner'}</td>}
                           <td className="num">{p.tva_taux} %</td>
@@ -833,6 +878,37 @@ export function CataloguePage() {
             </div>
           </div>
 
+          {isAdmin && (
+            <div className="grid grid-3 prix-achat-bloc">
+              <label className="field">
+                <span>Prix d’achat fournisseur HT</span>
+                <input type="number" step="0.01" value={form.prix_achat_ht} onChange={e => setForm(f => ({ ...f, prix_achat_ht: e.target.value }))} placeholder="0.00" />
+                <small className="text-xs text-muted">Visible de la direction uniquement</small>
+              </label>
+              {(() => {
+                const achat = parseFloat(form.prix_achat_ht) || 0
+                const r = regles[form.categorie]
+                const conseille = r && achat > 0 ? Math.round(achat * r.coef_fourniture) : 0
+                const plancher = r && achat > 0 ? Math.round(achat * (1 + r.marge_min_pct / 100)) : 0
+                const vente = parseFloat(form.prix_unitaire_ht) || 0
+                return <>
+                  <div className="field">
+                    <span>Prix de vente conseillé</span>
+                    <div className="prix-conseille">{conseille ? euro(conseille) : '—'}
+                      {conseille > 0 && Math.abs(conseille - vente) > 1 && <button type="button" className="lien-btn" onClick={() => setForm(f => ({ ...f, prix_unitaire_ht: String(conseille) }))}>Appliquer</button>}
+                    </div>
+                    <small className="text-xs text-muted">{r ? `Achat × ${String(r.coef_fourniture).replace('.', ',')}` : 'Aucune règle pour cette catégorie'}</small>
+                  </div>
+                  <div className="field">
+                    <span>Prix plancher</span>
+                    <div className={`prix-conseille${plancher && vente && vente < plancher ? ' bas' : ''}`}>{plancher ? euro(plancher) : '—'}</div>
+                    <small className="text-xs text-muted">{vente && achat ? `Marge actuelle ${(((vente - achat) / vente) * 100).toLocaleString('fr-FR', { maximumFractionDigits: 1 })} %` : 'Alerte « devis non rentable » en dessous'}</small>
+                  </div>
+                </>
+              })()}
+            </div>
+          )}
+
           <div className="grid grid-3">
             <label className="field">
               <span>Prix unitaire HT *</span>
@@ -858,16 +934,37 @@ export function CataloguePage() {
               <input type="number" step="0.01" value={form.forfait_pose_ht} onChange={e => setForm(f => ({ ...f, forfait_pose_ht: e.target.value }))} placeholder="0.00" />
             </label>
             <label className="field">
-              <span>Forfait évacuation des déchets HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
+              <span>Dépose et évacuation HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
               <input type="number" step="0.01" value={form.forfait_evacuation_ht} onChange={e => setForm(f => ({ ...f, forfait_evacuation_ht: e.target.value }))} placeholder="0.00" />
             </label>
           </div>
-          <label className="field">
-            <span>Coût des consommables HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
-            <input type="number" min="0" step="0.01" value={form.forfait_consommables_ht} onChange={e => setForm(f => ({ ...f, forfait_consommables_ht: e.target.value }))} placeholder="0.00" />
-          </label>
+          <div className="field">
+            <span>Consommables HT (par {UNITES.find(u => u.value === form.unite)?.label.toLowerCase() || 'unité'})</span>
+            {form.consommables_detail.length === 0
+              ? <input type="number" min="0" step="0.01" value={form.forfait_consommables_ht} onChange={e => setForm(f => ({ ...f, forfait_consommables_ht: e.target.value }))} placeholder="0.00" />
+              : <div className="conso-total num">{euro(form.consommables_detail.reduce((t, c) => t + (parseFloat(c.prix_ht) || 0) * (parseFloat(c.quantite) || 0), 0))} <small className="text-xs text-muted">calculé depuis le détail</small></div>}
+            <div className="conso-detail">
+              {form.consommables_detail.map((c, i) => (
+                <div key={i} className="conso-ligne">
+                  <input aria-label="Libellé" value={c.libelle} placeholder="Libellé" onChange={e => setForm(f => ({ ...f, consommables_detail: f.consommables_detail.map((x, idx) => idx === i ? { ...x, libelle: e.target.value } : x) }))} />
+                  <input aria-label="Quantité" type="number" min="0" step="0.5" value={c.quantite} onChange={e => setForm(f => ({ ...f, consommables_detail: f.consommables_detail.map((x, idx) => idx === i ? { ...x, quantite: e.target.value } : x) }))} />
+                  <select aria-label="Unité" value={c.unite} onChange={e => setForm(f => ({ ...f, consommables_detail: f.consommables_detail.map((x, idx) => idx === i ? { ...x, unite: e.target.value } : x) }))}>
+                    {['forfait', 'u', 'ml', 'm²', 'kg', 'l'].map(u => <option key={u} value={u}>{u}</option>)}
+                  </select>
+                  <input aria-label="Prix HT" type="number" min="0" step="0.01" value={c.prix_ht} placeholder="€ HT" onChange={e => setForm(f => ({ ...f, consommables_detail: f.consommables_detail.map((x, idx) => idx === i ? { ...x, prix_ht: e.target.value } : x) }))} />
+                  <button type="button" className="iconbtn" title="Retirer" onClick={() => setForm(f => ({ ...f, consommables_detail: f.consommables_detail.filter((_, idx) => idx !== i) }))}><X size={14} /></button>
+                </div>
+              ))}
+              <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                <button type="button" className="lien-btn" onClick={() => setForm(f => ({ ...f, consommables_detail: [...f.consommables_detail, { libelle: '', quantite: '1', unite: 'forfait', prix_ht: '' }] }))}><Plus size={13} /> Détailler un consommable</button>
+                {form.consommables_detail.length === 0 && (regles[form.categorie]?.consommables?.length || 0) > 0 && (
+                  <button type="button" className="lien-btn" onClick={() => setForm(f => ({ ...f, consommables_detail: regles[form.categorie].consommables.map(c => ({ libelle: c.libelle, quantite: String(c.quantite ?? 1), unite: c.unite || 'forfait', prix_ht: String(c.prix_ht) })) }))}>Reprendre le détail type de la catégorie</button>
+                )}
+              </div>
+            </div>
+          </div>
           <p className="text-xs text-muted mb-2" style={{ marginTop: -8 }}>
-            Les forfaits de pose, d’évacuation et de consommables renseignés sont ajoutés automatiquement en lignes séparées au devis, sans modifier le prix du matériel.
+            Les forfaits de pose, de dépose et de consommables renseignés sont ajoutés automatiquement en lignes séparées au devis, sans modifier le prix du matériel.
           </p>
 
           <div className="grid grid-2">
@@ -983,6 +1080,7 @@ export function CataloguePage() {
           )
         })()}
       </Drawer>
+      {isAdmin && <TarificationModal open={tarifOpen} onClose={() => setTarifOpen(false)} produits={rows} prixAchat={prixAchat} libelles={labelsCategories} peutModifier={estAdministrateur} onApplique={() => void fetchProduits()} />}
     </div>
   )
 }

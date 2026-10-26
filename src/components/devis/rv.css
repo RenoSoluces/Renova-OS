@@ -108,3 +108,57 @@
 .rv-dw .dot.no{background:#fdf0dc;color:#a85d00}.rv-dw .dot.inf{background:#e3f0f8;color:#1d6fa5}
 .rv-dw .pill,.rv-dw .note,.rv-dw .lab,.rv-dw .grid,.rv-dw .g3{}
 @media (max-width:640px){.rv-dw .grid-2,.rv-dw .grid-3{grid-template-columns:1fr}}
+/* Rentabilité du devis */
+.rv .rentab{margin-top:16px;border:1px solid var(--rv-line);border-radius:12px;padding:14px 16px;background:var(--rv-bg);--rt:var(--rv-green);--rt-soft:var(--rv-green-soft)}
+.rv .rentab-sous_conseille{--rt:var(--rv-warn);--rt-soft:var(--rv-warn-soft)}
+.rv .rentab-non_rentable{--rt:var(--rv-bad);--rt-soft:var(--rv-bad-soft)}
+.rv .rentab{border-color:color-mix(in srgb,var(--rt) 35%,var(--rv-line));background:color-mix(in srgb,var(--rt-soft) 55%,#fff)}
+.rv .rentab-tete{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--rt)}
+.rv .rentab-pastille{width:10px;height:10px;border-radius:50%;background:var(--rt);box-shadow:0 0 0 4px color-mix(in srgb,var(--rt) 18%,transparent)}
+.rv .rentab-jauge{flex:1;height:6px;border-radius:99px;background:color-mix(in srgb,var(--rt) 14%,#fff);overflow:hidden;margin-left:6px}
+.rv .rentab-jauge span{display:block;height:100%;background:var(--rt);border-radius:inherit;transition:width .3s ease}
+.rv .rentab-chiffres{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-top:12px}
+.rv .rentab-chiffres div{display:flex;flex-direction:column;gap:2px;min-width:0}
+.rv .rentab-chiffres span{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--rv-mute);font-weight:600}
+.rv .rentab-chiffres b{font-size:15px;color:var(--rv-ink)}
+.rv .rentab-msg{margin:10px 0 0;font-size:13px;color:var(--rv-ink)}
+.rv .rentab-lignes{margin:8px 0 0;padding-left:18px;font-size:12.5px;color:var(--rv-bad)}
+.rv .cell.sous-plancher{border-color:var(--rv-bad)!important;background:var(--rv-bad-soft)!important}
+.rv .cell-aide{font-size:10.5px;color:var(--rv-mute);margin-top:2px;white-space:nowrap;font-variant-numeric:tabular-nums}
+.rv .cell-aide.alerte{color:var(--rv-bad);font-weight:700}
+@media (max-width:720px){.rv .rentab-chiffres{grid-template-columns:repeat(2,minmax(0,1fr))}}
+/* Tarification (catalogue) */
+.rv .marge-cat{font-size:11px;color:var(--rv-green);font-weight:600;margin-top:2px;white-space:nowrap}
+.rv .marge-cat.bas{color:var(--rv-bad)}
+.rv .lien-btn{background:none;border:none;padding:0;color:var(--rv-blue);font-weight:600;font-size:12.5px;cursor:pointer;display:inline-flex;align-items:center;gap:4px}
+.rv .lien-btn:hover{text-decoration:underline}
+.rv .prix-achat-bloc{background:var(--rv-bg);border:1px dashed var(--rv-line);border-radius:10px;padding:12px;margin-bottom:12px}
+.rv .prix-conseille{display:flex;align-items:center;gap:10px;font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;padding:8px 0;color:var(--rv-ink)}
+.rv .prix-conseille.bas{color:var(--rv-bad)}
+.rv .conso-total{font-size:15px;font-weight:700;padding:8px 0}
+.rv .conso-detail{display:flex;flex-direction:column;gap:6px;margin-top:6px}
+.rv .conso-ligne,.rv .tarif-conso-ligne{display:grid;grid-template-columns:minmax(0,1fr) 70px 90px 100px 32px;gap:6px;align-items:center}
+.rv .conso-ligne input,.rv .conso-ligne select,.rv .tarif-conso-ligne input,.rv .tarif-conso-ligne select{border:1px solid var(--rv-line);background:#fff;border-radius:7px;padding:7px 9px;font-size:13px;min-width:0;width:100%}
+.rv .tarif{display:grid;grid-template-columns:240px minmax(0,1fr);gap:18px;min-height:420px}
+.rv .tarif-cats{display:flex;flex-direction:column;gap:4px;max-height:62vh;overflow:auto;padding-right:4px;border-right:1px solid var(--rv-line)}
+.rv .tarif-cat{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1px solid transparent;background:none;border-radius:9px;padding:9px 11px;cursor:pointer;color:var(--rv-ink);font-weight:600;font-size:13.5px}
+.rv .tarif-cat small{font-weight:500;color:var(--rv-mute);font-size:11.5px;font-variant-numeric:tabular-nums}
+.rv .tarif-cat:hover{background:var(--rv-bg)}
+.rv .tarif-cat[aria-pressed="true"]{background:var(--rv-green-soft);border-color:color-mix(in srgb,var(--rv-green) 30%,transparent);color:var(--rv-green)}
+.rv .tarif-detail{display:flex;flex-direction:column;gap:14px;min-width:0}
+.rv .tarif-intro{margin:0;font-size:13px;color:var(--rv-mute);line-height:1.5}
+.rv .tarif-grille{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.rv .tarif-grille small{font-size:11px;color:var(--rv-mute)}
+.rv .tarif-conso{border:1px solid var(--rv-line);border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:6px}
+.rv .tarif-conso-tete{display:flex;justify-content:space-between;font-size:13.5px;margin-bottom:4px}
+.rv .tarif-ajout{align-self:flex-start;background:none;border:1px dashed var(--rv-line);border-radius:7px;padding:6px 10px;font-size:12.5px;font-weight:600;color:var(--rv-blue);cursor:pointer;display:inline-flex;gap:5px;align-items:center}
+.rv .tarif-apercu{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.rv .tarif-apercu>div{background:var(--rv-bg);border-radius:10px;padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.rv .tarif-apercu span{font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--rv-mute);font-weight:700}
+.rv .tarif-apercu b{font-size:17px;font-variant-numeric:tabular-nums}
+.rv .tarif-apercu b.mauvais{color:var(--rv-bad)}
+.rv .tarif-apercu small{font-size:11px;color:var(--rv-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.rv .tarif-message{display:flex;gap:6px;align-items:center;color:var(--rv-green);font-weight:600;font-size:13px;margin:0}
+.rv .tarif-actions{display:flex;gap:8px;justify-content:flex-end;flex-wrap:wrap}
+@media (max-width:820px){.rv .tarif{grid-template-columns:1fr}.rv .tarif-cats{flex-direction:row;overflow:auto;border-right:none;border-bottom:1px solid var(--rv-line);padding-bottom:6px}.rv .tarif-cat{min-width:170px}.rv .tarif-grille,.rv .tarif-apercu{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (max-width:600px){.rv .conso-ligne,.rv .tarif-conso-ligne{grid-template-columns:60px minmax(0,1fr) 90px 32px}.rv .conso-ligne>input:first-child,.rv .tarif-conso-ligne>input:first-child{grid-column:1/-1}}
