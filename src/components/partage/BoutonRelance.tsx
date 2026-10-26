@@ -15,7 +15,7 @@ interface Props {
   libelle?: string
 }
 
-const TITRES: Record<ContexteRelance, string> = { relance: 'Relancer le client', rdv: 'Message avant le rendez-vous', apres_rdv: 'Message après le rendez-vous', devis: 'Relancer le devis', pieces: 'Demander les pièces' }
+const TITRES: Record<ContexteRelance, string> = { installation: 'Prévenir le client de la pose', relance: 'Relancer le client', rdv: 'Message avant le rendez-vous', apres_rdv: 'Message après le rendez-vous', devis: 'Relancer le devis', pieces: 'Demander les pièces' }
 
 /** Bouton « Message » : choisit un modèle adapté à la situation et l'envoie par WhatsApp, SMS ou e-mail. */
 export function BoutonRelance({ prospect, contexte, infos, espace, className = 'btn btn-sm btn-secondary', libelle = 'Message' }: Props) {
