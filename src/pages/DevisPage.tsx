@@ -23,7 +23,8 @@ const PREFIXES_ASSOCIES = ['Pose', 'Dépose et évacuation', 'Évacuation des d�
 const estLigneAssociee = (designation: string, produit: string) =>
   PREFIXES_ASSOCIES.some(prefixe => designation === `${prefixe} — ${produit}`)
 import { estimerPrimeCEE } from '../lib/aides/calculAidesCEE'
-import { telechargerDevisPDF } from '../lib/pdf/genererDevisPDF'
+import { telechargerDevisPDF, devisPDFFichier } from '../lib/pdf/genererDevisPDF'
+import { SignatureSurPlace, type ConsentementsSignature, type ResultatSignature } from '../components/devis/SignatureSurPlace'
 import { useAuth } from '../lib/auth/AuthContext'
 import { numeroDevis } from '../lib/devis/numeroDevis'
 import { uploadDocument } from '../lib/storage/uploadDocument'
@@ -905,14 +906,14 @@ export function DevisPage({
     )
   }
 
-  async function validerSignature() {
-    if (!current || !signatureData || !nomSignataire.trim()) return
+  async function validerSignature(nomSignataire: string, signatureData: string, consentements: ConsentementsSignature): Promise<ResultatSignature> {
+    if (!current || !signatureData || !nomSignataire.trim()) return { ok: false, erreur: 'Signature ou nom manquant.' }
     setSigning(true)
 
     // On enregistre d'abord les lignes/aides en l'état, un devis signé ne doit plus être
     // modifiable ensuite (valeur juridique du "bon pour accord")
     const saved = await enregistrer()
-    if (!saved) { setSigning(false); return }
+    if (!saved) { setSigning(false); return { ok: false, erreur: 'Le devis n’a pas pu être enregistré.' } }
 
     const dateSignature = new Date().toISOString()
 
@@ -934,6 +935,13 @@ export function DevisPage({
       user_agent: navigator.userAgent,
       langue: navigator.language,
       signe_par_compte: profile?.nom_complet || null,
+      consentements: {
+        cgv_acceptees: consentements.cgv_acceptees,
+        bordereau_retractation_remis: consentements.bordereau_remis,
+        execution_avant_fin_retractation: consentements.execution_anticipee,
+        vente_hors_etablissement: conf.venteHorsEtablissement,
+        cgv_empreinte: (current.emetteur_cgv || entreprise?.conditions_generales_devis || '').length,
+      },
       note_juridique: 'Signature manuscrite capturée en présence du client (tablette). Horodatage et empreinte du document fournis à titre de preuve renforcée ; ceci ne constitue pas une signature électronique qualifiée au sens eIDAS.',
     }
 
@@ -993,13 +1001,57 @@ export function DevisPage({
       await setProspectStatus(current.prospect_id, 'Installation', `devis ${current.numero} → installation`)
     }
 
-    setSigning(false)
-    setShowSignatureModal(false)
-
-    if (!error && data) {
-      setCurrent(data as any)
-      fetchListe()
+    if (error || !data) {
+      setSigning(false)
+      return { ok: false, erreur: error?.message || 'La signature n’a pas pu être enregistrée.' }
     }
+
+    // PDF signé (CGV et bordereau inclus) : archivé dans le dossier, puis envoyé au client.
+    const signe = data as any
+    const resultat: ResultatSignature = { ok: true, pdfArchive: false, emailEnvoyeA: null, erreurEmail: null }
+    const { data: devisAJour } = await supabase.from('devis').select('dossier_id').eq('id', current.id).maybeSingle()
+    const dossierId = devisAJour?.dossier_id || current.dossier_id || null
+    let cheminPdf: string | null = null
+    try {
+      const fichier = await devisPDFFichier({ ...signe, montant_ht: totaux.montantHT, montant_ht_avant_remise: totaux.montantHTAvantRemise, remise_montant_ht: totaux.remiseHT, montant_tva: totaux.montantTVA, montant_ttc: totaux.montantTTC, montant_aides: totalAides, reste_a_charge: resteACharge }, lignesAvecCategorie, aides, signe.prospect || current.prospect || null, entreprise)
+      const chemin = `${dossierId || current.prospect_id || 'divers'}/${current.numero}-signe-${Date.now()}.pdf`
+      const { error: upErr } = await supabase.storage.from('documents').upload(chemin, fichier, { contentType: 'application/pdf', upsert: false })
+      if (!upErr) {
+        const champs = { nom: fichier.name, url: chemin, taille: fichier.size, recu: true, type: 'devis_signe', categorie: 'Contractuel' }
+        const { data: existant } = dossierId
+          ? await supabase.from('documents').select('id').eq('dossier_id', dossierId).eq('type', 'devis_signe').limit(1).maybeSingle()
+          : { data: null }
+        const { error: docErr } = existant
+          ? await supabase.from('documents').update(champs).eq('id', existant.id)
+          : await supabase.from('documents').insert({ ...champs, dossier_id: dossierId, prospect_id: current.prospect_id })
+        if (!docErr) { cheminPdf = chemin; resultat.pdfArchive = true }
+      }
+    } catch (e) { console.error('PDF signé non archivé', e) }
+
+    const emailClient = signe.prospect?.email || current.prospect?.email
+    if (consentements.envoyer_copie && emailClient && current.prospect_id) {
+      const prenom = signe.prospect?.prenom || current.prospect?.prenom || ''
+      const message = [
+        `Bonjour${prenom ? ` ${prenom}` : ''},`,
+        `Merci pour votre confiance. Vous trouverez ci-joint votre devis ${current.numero} signé ce jour (${euro(totaux.montantTTC)} TTC${totalAides > 0 ? `, reste à charge estimé ${euro(resteACharge)}` : ''}), accompagné de nos conditions générales de vente.`,
+        conf.venteHorsEtablissement ? 'Conformément au Code de la consommation, vous disposez d’un délai de 14 jours pour exercer votre droit de rétractation, à l’aide du bordereau joint au devis.' : '',
+        'Nous revenons vers vous très vite pour la suite de votre projet (documents à fournir et planification des travaux).',
+        'Bien cordialement,',
+      ].filter(Boolean).join('\n\n')
+      if (cheminPdf) {
+        const { data: env, error: envErr } = await supabase.functions.invoke('envoyer-email-prospect', { body: { prospect_id: current.prospect_id, sujet: `Votre devis ${current.numero} signé`, message, modele: 'devis_signe', piece_jointe: cheminPdf } })
+        if (envErr || env?.error) {
+          let detail = env?.error || envErr?.message || 'erreur inconnue'
+          try { const j = await (envErr as any)?.context?.json?.(); if (j?.error) detail = j.error } catch { /* ignoré */ }
+          resultat.erreurEmail = detail
+        } else resultat.emailEnvoyeA = emailClient
+      } else resultat.erreurEmail = 'le PDF n’a pas pu être archivé'
+    }
+
+    setSigning(false)
+    setCurrent(signe)
+    fetchListe()
+    return resultat
   }
 
   async function supprimerDevis() {
@@ -1562,46 +1614,24 @@ export function DevisPage({
         </div>
       </Modal>
 
-      <Modal
+      <SignatureSurPlace
         open={showSignatureModal}
-        onClose={() => setShowSignatureModal(false)}
-        title="Signature du devis"
-        width={620}
-        footer={
-          <>
-            <Button variant="secondary" onClick={() => setShowSignatureModal(false)}>Annuler</Button>
-            <Button
-              variant="primary"
-              onClick={validerSignature}
-              disabled={!signatureData || !nomSignataire.trim() || signing}
-            >
-              {signing ? 'Validation…' : 'Valider la signature'}
-            </Button>
-          </>
-        }
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-          <div className="card card-pad" style={{ background: 'var(--c-bg-alt)' }}>
-            <div className="font-semibold">{current?.numero}</div>
-            <div className="text-sm text-muted">Montant TTC : {euro(totaux.montantTTC)} · Reste à charge : {euro(resteACharge)}{totaux.remiseHT > 0 ? ` · Remise : -${euro(totaux.remiseHT)}` : ''}</div>
-          </div>
-
-          <label className="field">
-            <span>Nom du signataire</span>
-            <input value={nomSignataire} onChange={e => setNomSignataire(e.target.value)} placeholder="Nom et prénom" />
-          </label>
-
-          <div>
-            <div className="field-label" style={{ marginBottom: 6 }}>Signature</div>
-            <SignaturePad onChange={setSignatureData} height={200} />
-          </div>
-
-          <p className="text-sm text-muted">
-            En signant, le client reconnaît avoir pris connaissance des conditions générales et donne son accord
-            ("bon pour accord") sur le présent devis. Le devis sera verrouillé après signature.
-          </p>
-        </div>
-      </Modal>
+        onClose={() => { if (!signing) setShowSignatureModal(false) }}
+        numero={current?.numero || ''}
+        client={p ? `${p.prenom || ''} ${p.nom || ''}`.trim() : ''}
+        emailClient={p?.email || null}
+        lignes={lignesAvecCategorie.map(l => ({ designation: l.designation, quantite: Number(l.quantite) || 0, montant_ht: Number(l.montant_ht) || 0 }))}
+        totalHT={totaux.montantHT}
+        totalTTC={totaux.montantTTC}
+        remiseHT={totaux.remiseHT}
+        aides={aides.filter(a => a.montant > 0).map(a => ({ libelle: a.libelle, montant: a.montant }))}
+        resteACharge={resteACharge}
+        cgv={current?.emetteur_cgv || entreprise?.conditions_generales_devis || ''}
+        horsEtablissement={conf.venteHorsEtablissement}
+        nomParDefaut={p ? `${p.prenom || ''} ${p.nom || ''}`.trim() : ''}
+        onSigner={validerSignature}
+        onTelecharger={telechargerPDF}
+      />
     </div>
   )
 }
