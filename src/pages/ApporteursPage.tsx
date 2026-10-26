@@ -5,6 +5,7 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { Button } from '../components/ui/Button'
 import '../styles/apporteurs.css'
 import { CreerAccesReseau } from '../components/reseau/CreerAccesReseau'
+import { ListeAcces } from '../components/reseau/ListeAcces'
 
 type Apporteur = {
   id: string; organisation_id: string; nom: string; contact: string | null
@@ -42,6 +43,8 @@ export function ApporteursPage() {
   const [saving, setSaving] = useState(false)
   const canManage = ['admin', 'manager', 'partner'].includes(profile?.role || '')
   const isGlobalAdmin = profile?.role === 'admin'
+
+  const [accesMaj, setAccesMaj] = useState(0)
 
   // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load() {
@@ -126,7 +129,8 @@ export function ApporteursPage() {
       {canManage && <Button variant="primary" onClick={() => { if (formOpen && !editing) reset(); else { reset(); setFormOpen(true) } setError(''); setSuccess('') }}><Plus size={17}/> Ajouter un contact au carnet</Button>}
     </header>
 
-    <CreerAccesReseau onCree={() => void load()} />
+    <CreerAccesReseau onCree={() => { void load(); setAccesMaj(n => n + 1) }} />
+    <ListeAcces actualisation={accesMaj} />
 
     <section className="apporteurs-stats" aria-label="Synthèse du réseau">
       <article className="apporteur-stat"><span className="apporteur-stat-icon"><Users size={18}/></span><div><small>Apporteurs référencés</small><strong>{stats.total}</strong></div></article>
