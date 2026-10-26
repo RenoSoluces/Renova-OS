@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, lazy, Suspense } from 'react'
 import { Sidebar } from './components/Sidebar'
 import { Topbar } from './components/Topbar'
 import { DashboardPage } from './pages/DashboardPage'
+const EspaceApporteurPage = lazy(() => import('./pages/EspaceApporteurPage').then(m => ({ default: m.EspaceApporteurPage })))
 const PilotagePage = lazy(() => import('./pages/PilotagePage').then(m => ({ default: m.PilotagePage })))
 const ProspectsPage = lazy(() => import('./pages/ProspectsPage').then(m => ({ default: m.ProspectsPage })))
 const VisitesPage = lazy(() => import('./pages/VisitesPage').then(m => ({ default: m.VisitesPage })))
@@ -74,6 +75,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   installateurs: { title: 'Installateurs', subtitle: 'Répertoire des partenaires techniques et installateurs' },
   challenges: { title: 'Challenges & classements', subtitle: 'Challenges et classements isolés par société' },
   performance: { title: 'Performance & CA', subtitle: 'CA généré par partenaires et commerciaux' },
+  espace_apporteur: { title: 'Mon espace apporteur', subtitle: 'Recommander un client et suivre mes recommandations' },
   pilotage: { title: 'Pilotage équipe', subtitle: 'Activité, transformation et points d’attention de l’équipe' },
   sante_systeme: { title: 'Santé du système', subtitle: 'Contrôles métier et qualité des données' },
   organisation: { title: 'Organigramme', subtitle: 'Structure des entreprises et équipes' },
@@ -122,6 +124,11 @@ function AppContent() {
     window.addEventListener('popstate', syncPageFromUrl)
     return () => window.removeEventListener('popstate', syncPageFromUrl)
   }, [page])
+  // Un apporteur d'affaires n'a accès qu'à son espace et à ses commissions.
+  const estApporteur = profile?.role === 'apporteur'
+  useEffect(() => {
+    if (estApporteur && page !== 'espace_apporteur' && page !== 'commissions') navigate('espace_apporteur')
+  }, [estApporteur, page, navigate])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
     navigate('devis')
@@ -235,6 +242,7 @@ function AppContent() {
           {page === 'partenaires' && <ApporteursPage />}
           {page === 'installateurs' && (['admin','manager','partner_admin','company_admin'].includes(profile?.role || '') ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction et aux responsables autorisés.</strong></div></div>)}
           {page === 'challenges' && <ChallengesPage />}
+          {page === 'espace_apporteur' && <EspaceApporteurPage onNavigate={navigate} />}
           {page === 'pilotage' && (profile.role === 'admin' || profile.role === 'manager' ? <PilotagePage onNavigate={navigate} /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction.</strong></div></div>)}
           {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}

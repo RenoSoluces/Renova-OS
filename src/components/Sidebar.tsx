@@ -59,6 +59,13 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
   ] },
 ]
 
+const NAV_APPORTEUR: { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = [
+  { label: 'Mon espace', items: [
+    { key: 'espace_apporteur', label: 'Mes recommandations', icon: Users },
+    { key: 'commissions', label: 'Mes commissions', icon: Wallet },
+  ] },
+]
+
 export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge, prospectsBadge }: SidebarProps) {
   const { profile } = useAuth()
   const [prospectCount, setProspectCount] = useState(prospectsBadge ?? 0)
@@ -104,7 +111,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
       </button>
 
       <nav className="sidebar-nav">
-        {NAV_GROUPS(prospectCount).map(group => (
+        {(profile?.role === 'apporteur' ? NAV_APPORTEUR : NAV_GROUPS(prospectCount)).map(group => (
           <div key={group.label}>
             {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
             {group.items.filter(item => (item.key !== 'performance' && item.key !== 'sante_systeme' && item.key !== 'pilotage') || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'pilotage' || ['admin','manager'].includes(profile?.role || '')).filter(item => item.key !== 'installateurs' || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
