@@ -118,7 +118,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
                 >
                   <Icon />
                   {!collapsed && <span className="sidebar-item-label">{item.label}</span>}
-                  {!collapsed && item.badge && <span className="sidebar-item-badge">{item.badge}</span>}
+                  {!collapsed && !!item.badge && <span className="sidebar-item-badge">{item.badge}</span>}
                 </button>
               )
             })}
