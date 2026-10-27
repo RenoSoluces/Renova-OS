@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Search, AlertTriangle } from 'lucide-react'
+import { Search } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { lirePages } from '../../lib/catalogue/chargerCatalogue'
@@ -16,8 +16,8 @@ const sansAccent = (v: string) => v.normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 const AFFICHES = 300
 
 /**
- * Envoie des prospects déjà présents dans le CRM vers la prospection téléphonique,
- * en les confiant à la personne qui fait le phoning.
+ * Envoie des prospects déjà présents dans le CRM vers la prospection téléphonique
+ * d'une personne (phoning), sans changer le commercial à qui ils sont attribués.
  */
 export function AjoutListeAppels({ open, onClose, onAjoute, exclus }: {
   open: boolean
@@ -50,7 +50,7 @@ export function AjoutListeAppels({ open, onClose, onAjoute, exclus }: {
       const [{ data, error }, equipe] = await Promise.all([
         lirePages<Prospect>((debut, fin) => {
           let q = supabase.from('prospects')
-            .select('id,nom,prenom,raison_sociale,telephone,email,code_postal,ville,statut,source,tags,commercial,commercial_id,liste_appels_le,organisation_id,created_at')
+            .select('id,nom,prenom,raison_sociale,telephone,email,code_postal,ville,statut,source,tags,commercial,commercial_id,liste_appels_le,liste_appels_pour,organisation_id,created_at')
           if (org) q = q.eq('organisation_id', org)
           return q.order('nom').order('id').range(debut, fin) as any
         }),
@@ -100,7 +100,6 @@ export function AjoutListeAppels({ open, onClose, onAjoute, exclus }: {
   function basculer(id: string) { setChoix(c => { const n = new Set(c); n.has(id) ? n.delete(id) : n.add(id); return n }) }
 
   const personne = membres.find(m => m.id === assigne)
-  const changentDeMain = useMemo(() => prospects.filter(p => choix.has(p.id) && p.commercial_id && p.commercial_id !== assigne), [prospects, choix, assigne])
 
   async function valider() {
     if (!assigne || !choix.size) return
@@ -119,11 +118,11 @@ export function AjoutListeAppels({ open, onClose, onAjoute, exclus }: {
 
   const nomProspect = (p: Prospect) => p.raison_sociale || `${p.prenom || ''} ${p.nom}`.trim()
 
-  return <Modal open={open} onClose={onClose} title="Ajouter des prospects du CRM" width={860}
+  return <Modal open={open} onClose={onClose} title="Envoyer des prospects du CRM en prospection téléphonique" width={860}
     footer={<>
       <Button variant="secondary" onClick={onClose}>Annuler</Button>
       <Button variant="primary" onClick={() => void valider()} disabled={envoi || !choix.size || !assigne}>
-        {envoi ? 'Ajout…' : `Ajouter ${choix.size || ''} prospect${choix.size > 1 ? 's' : ''}${personne ? ` chez ${personne.nom_complet}` : ''}`}
+        {envoi ? 'Envoi…' : `Envoyer ${choix.size || ''} prospect${choix.size > 1 ? 's' : ''}${personne ? ` à ${personne.nom_complet}` : ''}`}
       </Button>
     </>}>
     <div className="la">
@@ -151,20 +150,18 @@ export function AjoutListeAppels({ open, onClose, onAjoute, exclus }: {
 
       <div className="la-liste">
         {chargement ? <p className="la-vide">Chargement des prospects…</p>
-          : !filtres.length ? <p className="la-vide">{candidats.length ? 'Aucun prospect ne correspond à ces filtres.' : 'Tous vos prospects joignables sont déjà dans la liste d’appels.'}</p>
+          : !filtres.length ? <p className="la-vide">{candidats.length ? 'Aucun prospect ne correspond à ces filtres.' : 'Tous vos prospects joignables sont déjà dans une liste d’appels.'}</p>
           : filtres.slice(0, AFFICHES).map(p => (
             <label key={p.id} className={`la-ligne ${choix.has(p.id) ? 'on' : ''}`}>
               <input type="checkbox" checked={choix.has(p.id)} onChange={() => basculer(p.id)} />
               <span className="la-nom"><strong>{nomProspect(p)}</strong><small>{[p.code_postal, p.ville].filter(Boolean).join(' ') || '—'}</small></span>
               <span className="la-tel">{p.telephone}</span>
-              <span className="la-meta"><span className="la-statut">{p.statut}</span><small>{p.commercial || 'Sans commercial'}</small></span>
+              <span className="la-meta"><span className="la-statut">{p.statut}</span><small>{p.commercial ? `Commercial : ${p.commercial}` : 'Sans commercial'}</small></span>
             </label>))}
         {filtres.length > AFFICHES && <p className="la-vide">{filtres.length - AFFICHES} autres prospects correspondent : « Tout cocher » les inclut, ou affinez avec les filtres.</p>}
       </div>
 
-      {changentDeMain.length > 0 && personne && <p className="la-alerte"><AlertTriangle size={15} />
-        {changentDeMain.length} prospect{changentDeMain.length > 1 ? 's' : ''} sélectionné{changentDeMain.length > 1 ? 's sont suivis' : ' est suivi'} par quelqu’un d’autre : {changentDeMain.length > 1 ? 'ils seront attribués' : 'il sera attribué'} à {personne.nom_complet}.</p>}
-      <p className="pt-aide">Les prospects ajoutés sont attribués à la personne choisie et apparaissent dans sa liste « À appeler ». Leur fiche et leur historique restent inchangés.{sansTelephone ? ` ${sansTelephone} prospect${sansTelephone > 1 ? 's' : ''} sans numéro de téléphone ne ${sansTelephone > 1 ? 'sont' : 'est'} pas proposé${sansTelephone > 1 ? 's' : ''}.` : ''}</p>
+      <p className="pt-aide">Les prospects envoyés apparaissent dans la liste « À appeler » de la personne choisie. Ils restent attribués à leur commercial : elle peut les appeler, noter le résultat et programmer un rappel, sans accès aux devis ni aux dossiers.{sansTelephone ? ` ${sansTelephone} prospect${sansTelephone > 1 ? 's' : ''} sans numéro de téléphone ne ${sansTelephone > 1 ? 'sont' : 'est'} pas proposé${sansTelephone > 1 ? 's' : ''}.` : ''}</p>
     </div>
   </Modal>
 }
