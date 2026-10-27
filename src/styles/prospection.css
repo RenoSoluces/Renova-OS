@@ -69,3 +69,35 @@ button.pt-stat:hover { border-color: var(--c-border-dark); transform: translateY
 .pt-modal { gap: var(--sp-3); }
 .pt-resultat { min-height: 42px; }
 .pt-modal .pt-aide { margin: 0; }
+
+/* Ajout de prospects du CRM à la liste d'appels (préfixe la-) */
+.pt-retirer { display: grid; place-items: center; width: 32px; height: 32px; border-radius: var(--r-md); border: 1px solid var(--c-border-light); background: var(--c-bg-alt); color: var(--c-text-muted); }
+.pt-retirer:hover { color: var(--c-error); border-color: var(--c-border-dark); }
+.la { display: flex; flex-direction: column; gap: var(--sp-3); }
+.la .field { margin: 0; }
+.la-filtres { display: grid; grid-template-columns: minmax(180px, 1.6fr) repeat(4, minmax(0, 1fr)); gap: var(--sp-2); }
+.la-filtres .pt-recherche .input { min-height: 40px; }
+.la-entete { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--c-text-muted); }
+.la-tous { display: inline-flex; align-items: center; gap: 8px; font-weight: 600; color: var(--c-text); cursor: pointer; }
+.la-liste { max-height: 46vh; overflow-y: auto; border: 1px solid var(--c-border-light); border-radius: var(--r-md); background: var(--c-bg-alt); }
+.la-ligne { display: grid; grid-template-columns: auto minmax(0, 1.5fr) minmax(110px, .7fr) minmax(0, 1fr); align-items: center; gap: var(--sp-3); padding: 9px var(--sp-3); border-bottom: 1px solid var(--c-border-light); cursor: pointer; }
+.la-ligne:last-child { border-bottom: 0; }
+.la-ligne:hover { background: var(--c-bg-soft); }
+.la-ligne.on { background: var(--c-primary-50); }
+.la-nom { display: flex; flex-direction: column; min-width: 0; }
+.la-nom strong { font-size: 14px; color: var(--c-text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.la-nom small, .la-meta small { font-size: 12px; color: var(--c-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.la-tel { font-size: 13px; font-variant-numeric: tabular-nums; color: var(--c-text-secondary); }
+.la-meta { display: flex; flex-direction: column; align-items: flex-start; min-width: 0; }
+.la-statut { font-size: 12px; font-weight: 600; color: var(--c-text-secondary); }
+.la-vide { margin: 0; padding: var(--sp-4); font-size: 13px; color: var(--c-text-muted); text-align: center; }
+.la-alerte { display: flex; align-items: flex-start; gap: 8px; margin: 0; padding: var(--sp-2) var(--sp-3); font-size: 13px; color: #8A5A00; background: color-mix(in srgb, var(--c-warning) 13%, #fff); border-radius: var(--r-md); }
+.la-alerte svg { flex-shrink: 0; margin-top: 2px; }
+@media (max-width: 800px) {
+  .la-filtres { grid-template-columns: 1fr 1fr; } .la-filtres .pt-recherche { grid-column: 1 / -1; }
+  .la-ligne { grid-template-columns: auto minmax(0, 1fr) auto; } .la-meta { display: none; }
+}
+.la select.input { appearance: none; min-height: 40px; padding-right: 30px; text-overflow: ellipsis;
+  background: var(--c-bg-alt) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%236b7280' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E") no-repeat right 10px center; }
+@media (min-width: 801px) { .pt-lead { grid-template-columns: minmax(180px, 1.4fr) minmax(130px, .8fr) minmax(190px, 1.2fr) 250px; } }
+.la-filtres > * { min-width: 0; } .la-filtres select.input { width: 100%; }

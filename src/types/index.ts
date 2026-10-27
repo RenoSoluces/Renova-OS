@@ -36,6 +36,8 @@ export interface Prospect {
   pot_commun?: boolean
   pot_commun_at?: string | null
   pot_commun_ancien_commercial?: string | null
+  /** Date d'ajout à la liste d'appels (prospection téléphonique), null si le prospect n'y est pas. */
+  liste_appels_le?: string | null
   tags: string[]
   temperature: 'chaud' | 'tiede' | 'froid' | null
   derniere_interaction_at: string | null
@@ -93,7 +95,7 @@ export interface Visite {
 
 export interface Notification {
   id: string
-  type: 'relance_devis' | 'tache_retard' | 'vt_a_qualifier' | 'nouveau_prospect' | 'evolution_dossier' | 'info'
+  type: 'relance_devis' | 'tache_retard' | 'vt_a_qualifier' | 'nouveau_prospect' | 'evolution_dossier' | 'info' | 'liste_appels'
   titre: string
   message: string
   prospect_id: string | null

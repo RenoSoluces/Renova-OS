@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   Upload, Phone, PhoneOff, PhoneCall, Search, CheckCircle2, CalendarCheck, UserRound, Download, FileSpreadsheet,
-  Voicemail, ArrowRight, Clock, Inbox,
+  Voicemail, ArrowRight, Clock, Inbox, ListPlus, X,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -9,6 +9,7 @@ import { lirePages } from '../lib/catalogue/chargerCatalogue'
 import type { Prospect } from '../types'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
+import { AjoutListeAppels } from '../components/prospection/AjoutListeAppels'
 
 /** Issue d'un appel : « joint » = on a parlé à quelqu'un ; « pas_joint » = pas de conversation. */
 type Issue = 'joint' | 'pas_joint'
@@ -83,6 +84,15 @@ export function ProspectionTelephonePage(): JSX.Element {
   const [selected, setSelected] = useState<Lead | null>(null)
   const [resultForm, setResultForm] = useState({ resultat: '', note: '', date_rappel: '', priorite: 'normale' })
   const [savingResult, setSavingResult] = useState(false)
+  const [ajoutOuvert, setAjoutOuvert] = useState(false)
+  const peutConstituer = ['admin', 'manager', 'commercial_manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
+  const dejaListes = useMemo(() => new Set(leads.map(l => l.id)), [leads])
+
+  async function retirerDeLaListe(lead: Lead): Promise<void> {
+    const { error: e } = await supabase.from('prospects').update({ liste_appels_le: null }).eq('id', lead.id)
+    if (e) { setError(`Impossible de retirer ce prospect : ${e.message}`); return }
+    setLeads(ls => ls.filter(l => l.id !== lead.id))
+  }
 
   // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load(): Promise<void> {
@@ -91,7 +101,8 @@ export function ProspectionTelephonePage(): JSX.Element {
       supabase.from('prospects').select('*').order('created_at', { ascending: false }).order('id').range(debut, fin) as any)
     if (error) { setError(error.message); setLeads([]); setLoading(false); return }
     // Les portes saisies sur le terrain sans numéro de téléphone n'ont pas leur place dans une liste d'appels.
-    const rows = data.filter(p => SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || !/porte/i.test(p.source || '')))
+    // Prospects ajoutés depuis le CRM (liste d'appels) : visibles par la personne à qui ils sont confiés et par ses responsables.
+    const rows = data.filter(p => p.liste_appels_le || (SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || !/porte/i.test(p.source || ''))))
 
     // Historique des appels de prospection, par paquets (une liste d'identifiants trop longue casse l'URL de la requête).
     const parProspect = new Map<string, { resultat: string; date: string; n: number }>()
@@ -226,15 +237,16 @@ async function importerCsv(file?:File):Promise<void>{
 
   return <div className="page pt">
     <div className="page-header">
-      <div><h1 className="page-title">Prospection Téléphone</h1><p className="page-subtitle">Importez vos fichiers de leads, appelez-les à la chaîne et notez pour chacun si vous l’avez eu ou non.</p></div>
+      <div><h1 className="page-title">Prospection Téléphone</h1><p className="page-subtitle">Importez vos fichiers de leads ou ajoutez des prospects du CRM, appelez-les à la chaîne et notez pour chacun si vous l’avez eu ou non.</p></div>
       <div className="page-actions">
         <input ref={fileRef} type="file" accept=".csv,.txt,text/csv" hidden onChange={e => void importerCsv(e.target.files?.[0])} />
         <Button variant="secondary" onClick={() => telechargerCsv('modele-leads.csv', MODELE_CSV)}><FileSpreadsheet size={16} /> Modèle CSV</Button>
         <Button variant="secondary" onClick={exporter} disabled={visibles.length === 0}><Download size={16} /> Exporter</Button>
+        {peutConstituer && <Button variant="secondary" onClick={() => setAjoutOuvert(true)}><ListPlus size={16} /> Ajouter depuis le CRM</Button>}
         <Button variant="primary" onClick={() => fileRef.current?.click()} disabled={importing}><Upload size={16} />{importing ? 'Import…' : 'Importer un fichier CSV'}</Button>
       </div>
     </div>
-    {error && <div className={`pt-message ${error.includes('importé') ? 'ok' : 'erreur'}`} role="status">{error}</div>}
+    {error && <div className={`pt-message ${/importé|ajouté/.test(error) ? 'ok' : 'erreur'}`} role="status">{error}</div>}
 
     <div className="pt-stats">
       {FILTRES.map(f => { const Icone = f.icone; return (
@@ -252,12 +264,12 @@ async function importerCsv(file?:File):Promise<void>{
 
     <div className="pt-liste">
       {loading ? <div className="card card-pad text-muted">Chargement des leads…</div>
-        : visibles.length === 0 ? <div className="empty-state"><UserRound size={36} /><h3>{leads.length ? 'Aucun lead dans ce filtre' : 'Aucun lead de prospection'}</h3><p>{leads.length ? 'Changez de filtre ou de recherche.' : 'Importez un fichier CSV pour constituer votre liste d’appels.'}</p></div>
+        : visibles.length === 0 ? <div className="empty-state"><UserRound size={36} /><h3>{leads.length ? 'Aucun lead dans ce filtre' : 'Aucun lead de prospection'}</h3><p>{leads.length ? 'Changez de filtre ou de recherche.' : 'Importez un fichier CSV ou ajoutez des prospects du CRM pour constituer votre liste d’appels.'}</p></div>
         : visibles.map(l => (
           <article key={l.id} className={`pt-lead ${l.statutLead}`}>
             <div className="pt-lead-id">
               <strong>{l.raison_sociale || `${l.prenom} ${l.nom}`.trim()}</strong>
-              <span>{[l.code_postal, l.ville].filter(Boolean).join(' ') || 'Localisation inconnue'}</span>
+              <span>{[l.code_postal, l.ville].filter(Boolean).join(' ') || 'Localisation inconnue'}{l.liste_appels_le ? ` · Du CRM${peutConstituer && l.commercial ? `, chez ${l.commercial}` : ''}` : ''}</span>
             </div>
             <div className="pt-lead-tel">{l.telephone ? <a href={`tel:${telPropre(l.telephone)}`}>{l.telephone}</a> : <em>Téléphone manquant</em>}</div>
             <div className="pt-lead-statut">
@@ -267,9 +279,13 @@ async function importerCsv(file?:File):Promise<void>{
             <div className="pt-lead-actions">
               {l.telephone && <a className="btn btn-secondary btn-sm" href={`tel:${telPropre(l.telephone)}`}><Phone size={14} /> Appeler</a>}
               <Button variant={l.statutLead === 'a_appeler' ? 'primary' : 'secondary'} size="sm" onClick={() => ouvrir(l)}>Résultat <ArrowRight size={14} /></Button>
+              {l.liste_appels_le && <button type="button" className="pt-retirer" onClick={() => void retirerDeLaListe(l)} title="Retirer de la liste d’appels (la fiche reste dans le CRM)" aria-label={`Retirer ${l.prenom} ${l.nom} de la liste d’appels`}><X size={15} /></button>}
             </div>
           </article>))}
     </div>
+
+    {peutConstituer && <AjoutListeAppels open={ajoutOuvert} onClose={() => setAjoutOuvert(false)} exclus={dejaListes}
+      onAjoute={(n, nom) => { setAjoutOuvert(false); setError(`${n} prospect${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la liste d’appels${nom ? ` de ${nom}` : ''}.`); void load() }} />}
 
     <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? `Appel — ${selected.raison_sociale || `${selected.prenom} ${selected.nom}`}` : 'Appel'} width={620}
       footer={<><Button variant="secondary" onClick={() => setSelected(null)}>Annuler</Button><Button variant="secondary" onClick={() => void enregistrerResultat(false)} disabled={savingResult}>Enregistrer</Button><Button variant="primary" onClick={() => void enregistrerResultat(true)} disabled={savingResult}>{savingResult ? 'Enregistrement…' : 'Enregistrer et suivant'}</Button></>}>
