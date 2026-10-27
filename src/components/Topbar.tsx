@@ -1,4 +1,4 @@
-import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download, Users, FolderOpen, MessageCircle } from 'lucide-react'
+import { Search, Bell, HelpCircle, LogOut, Clock, FileWarning, Info, Check, ClipboardCheck, Download, Users, FolderOpen, MessageCircle, PhoneCall } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { useAuth } from '../lib/auth/AuthContext'
 import { supabase } from '../lib/supabase'
@@ -21,6 +21,7 @@ const ICONS: Record<string, any> = {
   evolution_dossier: FolderOpen,
   info: Info,
   message_prospect: MessageCircle,
+  liste_appels: PhoneCall,
 }
 
 function tempsEcoule(iso: string): string {
@@ -99,7 +100,8 @@ export function Topbar({ title, subtitle, actions, onNavigate, refreshKey }: Top
       await supabase.from('notifications').update({ lue: true }).eq('id', n.id)
       setNotifs(prev => prev.map(x => x.id === n.id ? { ...x, lue: true } : x))
     }
-    if (n.type === 'vt_a_qualifier' && n.visite_id) onNavigate?.('visites')
+    if (n.type === 'liste_appels') onNavigate?.('prospection')
+    else if (n.type === 'vt_a_qualifier' && n.visite_id) onNavigate?.('visites')
     else if (n.dossier_id) onNavigate?.('dossiers')
     else if (n.devis_id) onNavigate?.('devis')
     else if (n.prospect_id) onNavigate?.('prospects')
