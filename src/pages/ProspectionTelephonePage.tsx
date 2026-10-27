@@ -88,8 +88,16 @@ export function ProspectionTelephonePage(): JSX.Element {
   const peutConstituer = ['admin', 'manager', 'commercial_manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
   const dejaListes = useMemo(() => new Set(leads.map(l => l.id)), [leads])
 
+  // Noms des personnes chargées des appels, pour que les responsables sachent dans quelle liste est chaque prospect.
+  const [appelants, setAppelants] = useState<Record<string, string>>({})
+  useEffect(() => {
+    if (!peutConstituer) return
+    void supabase.from('profiles').select('id,nom_complet').then(({ data }) =>
+      setAppelants(Object.fromEntries(((data || []) as { id: string; nom_complet: string }[]).map(p => [p.id, p.nom_complet]))))
+  }, [peutConstituer])
+
   async function retirerDeLaListe(lead: Lead): Promise<void> {
-    const { error: e } = await supabase.from('prospects').update({ liste_appels_le: null }).eq('id', lead.id)
+    const { error: e } = await supabase.rpc('retirer_liste_appels', { p_id: lead.id })
     if (e) { setError(`Impossible de retirer ce prospect : ${e.message}`); return }
     setLeads(ls => ls.filter(l => l.id !== lead.id))
   }
@@ -101,8 +109,9 @@ export function ProspectionTelephonePage(): JSX.Element {
       supabase.from('prospects').select('*').order('created_at', { ascending: false }).order('id').range(debut, fin) as any)
     if (error) { setError(error.message); setLeads([]); setLoading(false); return }
     // Les portes saisies sur le terrain sans numéro de téléphone n'ont pas leur place dans une liste d'appels.
-    // Prospects ajoutés depuis le CRM (liste d'appels) : visibles par la personne à qui ils sont confiés et par ses responsables.
-    const rows = data.filter(p => p.liste_appels_le || (SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || !/porte/i.test(p.source || ''))))
+    // Prospects envoyés depuis le CRM : dans la liste de la personne qui les appelle ; les responsables voient toutes les listes.
+    const rows = data.filter(p => (p.liste_appels_le && (p.liste_appels_pour === profile?.id || peutConstituer))
+      || (SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || !/porte/i.test(p.source || ''))))
 
     // Historique des appels de prospection, par paquets (une liste d'identifiants trop longue casse l'URL de la requête).
     const parProspect = new Map<string, { resultat: string; date: string; n: number }>()
@@ -242,7 +251,7 @@ async function importerCsv(file?:File):Promise<void>{
         <input ref={fileRef} type="file" accept=".csv,.txt,text/csv" hidden onChange={e => void importerCsv(e.target.files?.[0])} />
         <Button variant="secondary" onClick={() => telechargerCsv('modele-leads.csv', MODELE_CSV)}><FileSpreadsheet size={16} /> Modèle CSV</Button>
         <Button variant="secondary" onClick={exporter} disabled={visibles.length === 0}><Download size={16} /> Exporter</Button>
-        {peutConstituer && <Button variant="secondary" onClick={() => setAjoutOuvert(true)}><ListPlus size={16} /> Ajouter depuis le CRM</Button>}
+        {peutConstituer && <Button variant="secondary" onClick={() => setAjoutOuvert(true)}><ListPlus size={16} /> Envoyer des prospects du CRM</Button>}
         <Button variant="primary" onClick={() => fileRef.current?.click()} disabled={importing}><Upload size={16} />{importing ? 'Import…' : 'Importer un fichier CSV'}</Button>
       </div>
     </div>
@@ -269,7 +278,7 @@ async function importerCsv(file?:File):Promise<void>{
           <article key={l.id} className={`pt-lead ${l.statutLead}`}>
             <div className="pt-lead-id">
               <strong>{l.raison_sociale || `${l.prenom} ${l.nom}`.trim()}</strong>
-              <span>{[l.code_postal, l.ville].filter(Boolean).join(' ') || 'Localisation inconnue'}{l.liste_appels_le ? ` · Du CRM${peutConstituer && l.commercial ? `, chez ${l.commercial}` : ''}` : ''}</span>
+              <span>{[l.code_postal, l.ville].filter(Boolean).join(' ') || 'Localisation inconnue'}{l.liste_appels_le ? ` · Commercial : ${l.commercial || '—'}${peutConstituer && l.liste_appels_pour && l.liste_appels_pour !== profile?.id ? ` · Liste de ${appelants[l.liste_appels_pour] || '…'}` : ''}` : ''}</span>
             </div>
             <div className="pt-lead-tel">{l.telephone ? <a href={`tel:${telPropre(l.telephone)}`}>{l.telephone}</a> : <em>Téléphone manquant</em>}</div>
             <div className="pt-lead-statut">
@@ -279,13 +288,13 @@ async function importerCsv(file?:File):Promise<void>{
             <div className="pt-lead-actions">
               {l.telephone && <a className="btn btn-secondary btn-sm" href={`tel:${telPropre(l.telephone)}`}><Phone size={14} /> Appeler</a>}
               <Button variant={l.statutLead === 'a_appeler' ? 'primary' : 'secondary'} size="sm" onClick={() => ouvrir(l)}>Résultat <ArrowRight size={14} /></Button>
-              {l.liste_appels_le && <button type="button" className="pt-retirer" onClick={() => void retirerDeLaListe(l)} title="Retirer de la liste d’appels (la fiche reste dans le CRM)" aria-label={`Retirer ${l.prenom} ${l.nom} de la liste d’appels`}><X size={15} /></button>}
+              {l.liste_appels_le && <button type="button" className="pt-retirer" onClick={() => void retirerDeLaListe(l)} title="Retirer de la liste d’appels (la fiche et son commercial ne changent pas)" aria-label={`Retirer ${l.prenom} ${l.nom} de la liste d’appels`}><X size={15} /></button>}
             </div>
           </article>))}
     </div>
 
     {peutConstituer && <AjoutListeAppels open={ajoutOuvert} onClose={() => setAjoutOuvert(false)} exclus={dejaListes}
-      onAjoute={(n, nom) => { setAjoutOuvert(false); setError(`${n} prospect${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la liste d’appels${nom ? ` de ${nom}` : ''}.`); void load() }} />}
+      onAjoute={(n, nom) => { setAjoutOuvert(false); setError(`${n} prospect${n > 1 ? 's' : ''} ajouté${n > 1 ? 's' : ''} à la liste d’appels${nom ? ` de ${nom}` : ''}. Le commercial attribué ne change pas.`); void load() }} />}
 
     <Modal open={!!selected} onClose={() => setSelected(null)} title={selected ? `Appel — ${selected.raison_sociale || `${selected.prenom} ${selected.nom}`}` : 'Appel'} width={620}
       footer={<><Button variant="secondary" onClick={() => setSelected(null)}>Annuler</Button><Button variant="secondary" onClick={() => void enregistrerResultat(false)} disabled={savingResult}>Enregistrer</Button><Button variant="primary" onClick={() => void enregistrerResultat(true)} disabled={savingResult}>{savingResult ? 'Enregistrement…' : 'Enregistrer et suivant'}</Button></>}>

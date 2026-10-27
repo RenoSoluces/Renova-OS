@@ -38,6 +38,8 @@ export interface Prospect {
   pot_commun_ancien_commercial?: string | null
   /** Date d'ajout à la liste d'appels (prospection téléphonique), null si le prospect n'y est pas. */
   liste_appels_le?: string | null
+  /** Personne chargée d'appeler ce prospect (le commercial attribué ne change pas). */
+  liste_appels_pour?: string | null
   tags: string[]
   temperature: 'chaud' | 'tiede' | 'froid' | null
   derniere_interaction_at: string | null
