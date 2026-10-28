@@ -30,6 +30,9 @@ interface Props {
   /** Redirige vers la page adaptée à la prochaine étape du cycle de vie du prospect (VT, devis, dossier). */
   onContinueLifecycle?: (target: 'visite' | 'simulation' | 'devis' | 'dossier', prospect: Prospect) => void
   initialView?: 'liste' | 'pipeline'
+  /** Ouvre directement la fiche de ce prospect une fois la liste chargée. */
+  initialProspectId?: string | null
+  onInitialProspectHandled?: () => void
 }
 
 const CIVILITES = [
@@ -144,8 +147,10 @@ const EMPTY_FORM = {
   source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
 
-export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialView = 'liste' }: Props) {
+export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialView = 'liste', initialProspectId, onInitialProspectHandled }: Props) {
   const { profile } = useAuth()
+  // Apporteur / call : consulte ses prospects (fiche, chat, historique, rappels) sans modifier la fiche.
+  const lectureSeule = profile?.role === 'apporteur'
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -199,8 +204,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       .from('prospects')
       .select('*')
       .order('created_at', { ascending: false })
-    if (!canViewTeam && profile?.id) {
-      query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true`)
+    if (lectureSeule && profile?.id) {
+      query = query.or(`apporteur_user_id.eq.${profile.id},liste_appels_pour.eq.${profile.id}`)
+    } else if (!canViewTeam && profile?.id) {
+      query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true,liste_appels_pour.eq.${profile.id}`)
     }
     const { data, error } = await query
     if (error) { setProspects([]); return }
@@ -280,6 +287,14 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       visites: v.count || 0, simulations: s.count || 0, devis: d.count || 0, dossiers: dos.count || 0,
     })
   }
+
+  useEffect(() => {
+    if (!initialProspectId || !prospects.length) return
+    const cible = prospects.find(p => p.id === initialProspectId)
+    if (cible) setSelected(cible)
+    onInitialProspectHandled?.()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialProspectId, prospects])
 
   useEffect(() => {
     if (selected) {
@@ -585,6 +600,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               className={`prospect-status-tag prospect-status-select ${statutClass(e.statut)}`}
               value={stageOf(e.statut).value}
               onChange={ev => updateStage(selected.id, ev.target.value)}
+              disabled={lectureSeule}
             >
               {PIPELINE_STAGES.map(s => <option key={s.value} value={s.value}>{s.label}</option>)}
             </select>
@@ -593,7 +609,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             )}
             {(selected.tags || []).map(tag => (
               <span key={tag} className="prospect-tag-chip">
-                {tag} <XIcon size={11} onClick={() => removeTag(tag)} />
+                {tag} {!lectureSeule && <XIcon size={11} onClick={() => removeTag(tag)} />}
               </span>
             ))}
           </div>
@@ -608,12 +624,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
           </p>
 
           <div className="prospect-detail-actions">
-            <Button
+            {!lectureSeule && <Button
               variant="primary"
               onClick={() => (onContinueLifecycle ? onContinueLifecycle('visite', selected) : onProspectClick?.(selected))}
             >
               <Calendar size={16} /> Nouvelle visite
-            </Button>
+            </Button>}
             {selected.telephone && (
               <a href={`tel:${selected.telephone}`} className="btn btn-outline" style={{ textDecoration: 'none' }}>
                 <Phone size={16} /> Appeler
@@ -629,13 +645,13 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 <PhoneCall size={16} /> Prospection tél.
               </Button>
             )}
-            <Button variant="ghost" onClick={() => openEdit(selected)}>
+            {!lectureSeule && <Button variant="ghost" onClick={() => openEdit(selected)}>
               <Pencil size={16} /> Modifier
-            </Button>
+            </Button>}
           </div>
           {envoiPhoning && <EnvoiProspectionModal ids={envoiPhoning.ids} libelle={envoiPhoning.libelle} onClose={() => setEnvoiPhoning(null)} />}
 
-          {currentStep < 5 && (
+          {currentStep < 5 && !lectureSeule && (
             <div className="action-rec-banner">
               <span className="action-rec-badge">ACTION RECOMMANDÉE</span>
               <span className="action-rec-text">
@@ -693,9 +709,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     <div className="detail-section-heading">Bénéficiaire</div>
                     <div className="detail-section-subdesc">Informations personnelles et foyer fiscal</div>
                   </div>
-                  <span className="detail-modify-btn" onClick={() => openEdit(selected)}>
+                  {!lectureSeule && <span className="detail-modify-btn" onClick={() => openEdit(selected)}>
                     <Pencil size={12} /> Modifier
-                  </span>
+                  </span>}
                 </div>
                 <div className="detail-info-card">
                   <div className="detail-info-inner">
@@ -768,9 +784,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     <div className="detail-section-heading">Logement</div>
                     <div className="detail-section-subdesc">Adresse du bien à rénover</div>
                   </div>
-                  <span className="detail-modify-btn" onClick={() => openEdit(selected)}>
+                  {!lectureSeule && <span className="detail-modify-btn" onClick={() => openEdit(selected)}>
                     <Pencil size={12} /> Modifier
-                  </span>
+                  </span>}
                 </div>
                 <div className="detail-info-card">
                   <div className="detail-info-inner">
@@ -826,7 +842,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               )}
 
               {/* Documents du prospect / devis partenaires */}
-              <div className="detail-section-card">
+              {!lectureSeule && <div className="detail-section-card">
                 <div className="detail-section-top">
                   <div>
                     <div className="detail-etape-row">
@@ -879,7 +895,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     </div>
                   )}
                 </div>
-              </div>
+              </div>}
 
               {/* Chat interne Admin ↔ Commercial */}
               <ProspectChat prospect={selected} />
@@ -893,7 +909,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               </div>
 
               {/* Danger zone : suppression réservée à l'administration */}
-              {isAdmin ? (
+              {lectureSeule ? null : isAdmin ? (
                 <div className="danger-zone">
                   <div className="danger-zone-title">
                     <AlertTriangle size={16} style={{ verticalAlign: 'middle', marginRight: 6 }} />
@@ -999,6 +1015,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                           className={`temp-toggle-btn ${active ? 'active' : ''}`}
                           style={active ? { background: t.color, borderColor: t.color, color: '#fff' } : {}}
                           onClick={() => updateProspectField('temperature', t.value)}
+                          disabled={lectureSeule}
                         >
                           <Icon size={13} /> {t.label}
                         </button>
@@ -1006,7 +1023,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     })}
                   </div>
                 </div>
-                <div className="right-mini-section">
+                {!lectureSeule && <div className="right-mini-section">
                   <div className="right-mini-section-label">Étiquettes</div>
                   <div className="tag-input-row">
                     <input
@@ -1018,7 +1035,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     />
                     <button className="tag-add-btn" onClick={addTag}><Tag size={13} /></button>
                   </div>
-                </div>
+                </div>}
               </div>
 
               <div className="right-mini-card">
@@ -1045,7 +1062,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 )}
               </div>
 
-              <div className="right-mini-card">
+              {!lectureSeule && <div className="right-mini-card">
                 <div className="right-mini-label">À consulter</div>
                 <div className="right-consulter-item" onClick={() => onContinueLifecycle?.('visite', selected)}>
                   <FileText size={16} /> Visite technique
@@ -1063,7 +1080,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                   <Home size={16} /> Dossier de travaux
                   <span className="right-consulter-count">{linkedCounts ? linkedCounts.dossiers : '…'}</span>
                 </div>
-              </div>
+              </div>}
 
               <div className="right-mini-card">
                 <div className="right-mini-label">Informations</div>
@@ -1131,26 +1148,26 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             <p className="page-subtitle">{prospects.length} prospect{prospects.length > 1 ? 's' : ''} · {formatDate(new Date().toISOString())}</p>
           </div>
           <div className="page-actions">
-            <div className="view-toggle">
+            {!lectureSeule && <div className="view-toggle">
               <button className={`view-toggle-btn ${view === 'liste' ? 'active' : ''}`} onClick={() => setView('liste')}>
                 <ListIcon size={15} /> Liste
               </button>
               <button className={`view-toggle-btn ${view === 'pipeline' ? 'active' : ''}`} onClick={() => setView('pipeline')}>
                 <LayoutGrid size={15} /> Pipeline
               </button>
-            </div>
+            </div>}
             {peutEnvoyerPhoning && view === 'liste' && (
               <Button variant="secondary" disabled={!filtered.some(p => p.telephone)} title="Envoie les prospects affichés (selon vos filtres) dans la Prospection téléphone"
                 onClick={() => { const ids = filtered.filter(p => p.telephone).map(p => p.id); setEnvoiPhoning({ ids, libelle: `les ${ids.length} prospect${ids.length > 1 ? 's' : ''} affiché${ids.length > 1 ? 's' : ''}${filtresActifsCount ? ' (selon vos filtres)' : ''}` }) }}>
                 <PhoneCall size={16} /> Envoyer en prospection tél.
               </Button>
             )}
-            <Button variant="secondary" onClick={() => setImportGoogle(true)}>
+            {!lectureSeule && <Button variant="secondary" onClick={() => setImportGoogle(true)}>
               <CalendarDays size={16} /> Importer mes RDV Google
-            </Button>
-            <Button variant="primary" onClick={openWizard}>
+            </Button>}
+            {!lectureSeule && <Button variant="primary" onClick={openWizard}>
               <Plus size={18} /> Nouveau prospect
-            </Button>
+            </Button>}
           </div>
         </div>
         {envoiPhoning && <EnvoiProspectionModal ids={envoiPhoning.ids} libelle={envoiPhoning.libelle} onClose={() => setEnvoiPhoning(null)} />}
@@ -1247,10 +1264,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             <div className="empty-state">
               <Users size={40} />
               <h3>{search || statutFilter ? 'Aucun prospect trouvé' : 'Aucun prospect'}</h3>
-              <p>{search || statutFilter ? 'Modifiez vos filtres.' : 'Commencez par créer votre premier prospect.'}</p>
-              <Button variant="primary" onClick={openWizard}>
+              <p>{search || statutFilter ? 'Modifiez vos filtres.' : lectureSeule ? 'Les clients que vous recommandez apparaîtront ici.' : 'Commencez par créer votre premier prospect.'}</p>
+              {!lectureSeule && <Button variant="primary" onClick={openWizard}>
                 <Plus size={18} /> Nouveau prospect
-              </Button>
+              </Button>}
             </div>
           </div>
         ) : (

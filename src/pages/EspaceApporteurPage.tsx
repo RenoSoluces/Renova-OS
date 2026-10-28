@@ -16,7 +16,7 @@ const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', 
 const VIDE = { prenom: '', nom: '', telephone: '', email: '', adresse: '', code_postal: '', ville: '', commentaire: '' }
 
 /** Espace de l'apporteur d'affaires : recommander un client en 30 secondes et suivre ses recommandations. */
-export function EspaceApporteurPage({ onNavigate }: { onNavigate?: (p: PageKey) => void }) {
+export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNavigate?: (p: PageKey) => void; onOuvrirProspect?: (id: string) => void }) {
   const { profile } = useAuth()
   const [liste, setListe] = useState<Recommandation[]>([])
   const [chargement, setChargement] = useState(true)
@@ -96,7 +96,7 @@ export function EspaceApporteurPage({ onNavigate }: { onNavigate?: (p: PageKey) 
       </section>
 
       <section className="eap-liste">
-        <div className="eap-liste-tete"><h2>Mes recommandations</h2><button type="button" onClick={() => void charger()} aria-label="Actualiser"><RefreshCw size={16} className={chargement ? 'spin' : ''} /></button></div>
+        <div className="eap-liste-tete"><h2>Mes recommandations</h2>{onOuvrirProspect && <button type="button" className="eap-tout-voir" onClick={() => onNavigate?.('prospects')}>Voir tous mes prospects <ChevronRight size={14} /></button>}<button type="button" onClick={() => void charger()} aria-label="Actualiser"><RefreshCw size={16} className={chargement ? 'spin' : ''} /></button></div>
         {!chargement && liste.length === 0 && (
           <div className="eap-vide"><Gift size={30} /><strong>Votre première recommandation vous attend</strong><span>Un voisin qui se plaint de sa facture de chauffage ? Un ami qui veut des panneaux solaires ? Touchez « Recommander un client ».</span></div>
         )}
@@ -104,10 +104,14 @@ export function EspaceApporteurPage({ onNavigate }: { onNavigate?: (p: PageKey) 
           const index = Math.max(0, ETAPES.indexOf(r.etape))
           const sansSuite = r.etape === 'Sans suite'
           return (
-            <article key={r.id} className={`eap-reco${sansSuite ? ' perdue' : ''}`}>
+            <article key={r.id} className={`eap-reco${sansSuite ? ' perdue' : ''}${onOuvrirProspect ? ' cliquable' : ''}`}
+              role={onOuvrirProspect ? 'button' : undefined} tabIndex={onOuvrirProspect ? 0 : undefined}
+              onClick={() => onOuvrirProspect?.(r.id)}
+              onKeyDown={e => { if (onOuvrirProspect && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); onOuvrirProspect(r.id) } }}
+              title={onOuvrirProspect ? 'Voir la fiche, le chat et l’historique' : undefined}>
               <div className="eap-reco-tete">
                 <div><strong>{r.client}</strong><small>{r.ville || '—'} · recommandé le {new Date(r.cree_le).toLocaleDateString('fr-FR')}</small></div>
-                <span className={`eap-badge e-${index}`}>{r.etape}</span>
+                <span className="eap-reco-droite"><span className={`eap-badge e-${index}`}>{r.etape}</span>{onOuvrirProspect && <ChevronRight size={18} className="eap-reco-fleche" />}</span>
               </div>
               {!sansSuite && (
                 <ol className="eap-etapes" aria-label="Avancement">

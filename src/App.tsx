@@ -106,6 +106,8 @@ function AppContent() {
   const [pendingDevisProspectId, setPendingDevisProspectId] = useState<string | null>(null)
   const [pendingDossierProspectId, setPendingDossierProspectId] = useState<string | null>(null)
   const [pendingSimulationProspectId, setPendingSimulationProspectId] = useState<string | null>(null)
+  // Fiche prospect à ouvrir directement sur la page Prospects (ex. depuis le tableau de bord d'un apporteur).
+  const [pendingProspectId, setPendingProspectId] = useState<string | null>(null)
   const [notifRefresh, setNotifRefresh] = useState(0)
 
   const navigate = useCallback((p: PageKey) => {
@@ -128,10 +130,10 @@ function AppContent() {
     window.addEventListener('popstate', syncPageFromUrl)
     return () => window.removeEventListener('popstate', syncPageFromUrl)
   }, [page])
-  // Un apporteur d'affaires n'a accès qu'à son espace et à ses commissions.
+  // Un apporteur d'affaires (ou le call) a son tableau de bord, ses prospects et ses commissions.
   const estApporteur = profile?.role === 'apporteur'
   useEffect(() => {
-    if (estApporteur && page !== 'espace_apporteur' && page !== 'commissions') navigate('espace_apporteur')
+    if (estApporteur && !['espace_apporteur', 'prospects', 'commissions'].includes(page)) navigate('espace_apporteur')
   }, [estApporteur, page, navigate])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
@@ -213,7 +215,7 @@ function AppContent() {
         <div className="page-scroll">
           <Suspense fallback={<div className="page" style={{display:'flex',justifyContent:'center',padding:48}}><Loader2 className="spin" size={26} /></div>}>
           {page === 'dashboard' && <DashboardPage onNavigate={navigate} />}
-          {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} />}
+          {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} initialProspectId={pendingProspectId} onInitialProspectHandled={() => setPendingProspectId(null)} />}
           {page === 'prospection' && <ProspectionTelephonePage />}
           {page === 'prospection_terrain' && <ProspectionTerrainPage />}
           {page === 'simulations' && <AidesSimulationPage initialProspectId={pendingSimulationProspectId} onInitialProspectHandled={() => setPendingSimulationProspectId(null)} />}
@@ -246,7 +248,7 @@ function AppContent() {
           {page === 'partenaires' && <ApporteursPage />}
           {page === 'installateurs' && (['admin','manager','partner_admin','company_admin'].includes(profile?.role || '') ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction et aux responsables autorisés.</strong></div></div>)}
           {page === 'challenges' && <ChallengesPage />}
-          {page === 'espace_apporteur' && <EspaceApporteurPage onNavigate={navigate} />}
+          {page === 'espace_apporteur' && <EspaceApporteurPage onNavigate={navigate} onOuvrirProspect={id => { setPendingProspectId(id); navigate('prospects') }} />}
           {page === 'pilotage' && (profile.role === 'admin' || profile.role === 'manager' ? <PilotagePage onNavigate={navigate} /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction.</strong></div></div>)}
           {page === 'performance' && (profile.role === 'admin' || profile.role === 'manager' ? <PerformancePage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
           {page === 'sante_systeme' && (profile.role === 'admin' || profile.role === 'manager' ? <SystemHealthPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à l'administration.</strong></div></div>)}
