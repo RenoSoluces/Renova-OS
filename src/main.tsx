@@ -33,6 +33,14 @@ const mettreAJour = registerSW({
   immediate: true,
   onNeedRefresh() { window.dispatchEvent(new CustomEvent('renova:mise-a-jour', { detail: () => mettreAJour(true) })) },
   onRegisterError(error) { console.error('[RENOVA OS] Enregistrement du service worker impossible :', error) },
+  // Une appli installée peut rester ouverte des jours : on vérifie s'il existe une nouvelle version
+  // toutes les 15 minutes et au retour sur l'appli, pour afficher le bandeau sans recharger d'office.
+  onRegisteredSW(_url, registration) {
+    if (!registration) return
+    const verifier = () => { if (navigator.onLine) void registration.update().catch(() => undefined) }
+    window.setInterval(verifier, 15 * 60 * 1000)
+    document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verifier() })
+  },
 })
 
 document.documentElement.dataset.renovaStarted = 'true'
