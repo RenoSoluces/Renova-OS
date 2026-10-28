@@ -46,14 +46,38 @@ const EMPTY = {
   pourcentage_commercial: '',
   mode: 'fixe',
   base_pourcentage: 'montant_ht',
-  priorite: '0',
+  priorite: '100',
   date_debut: '',
   date_fin: '',
   actif: true,
   public_cible: 'particulier',
   categorie_produit: '',
   variante_produit: '',
+  panneaux_min: '',
+  panneaux_max: '',
 }
+
+/** Libellés lisibles des types de produits rémunérés. */
+const LIBELLES_CATEGORIES: Record<string, string> = {
+  pac_air_eau: 'PAC air/eau', pac_air_air: 'PAC air/air', solaire_thermique: 'Solaire thermique (SSC)',
+  photovoltaique: 'Photovoltaïque', batterie_stockage: 'Batterie de stockage', combles_perdus: 'Combles perdus',
+  vt_complete: 'Visite technique', vt_produit: 'Visite technique produit',
+}
+export function libelleCategorie(c?: string | null): string {
+  if (!c) return 'Tous les produits'
+  const t = LIBELLES_CATEGORIES[c] || c.replace(/_/g, ' ')
+  return t.charAt(0).toUpperCase() + t.slice(1)
+}
+/** Libellé d'une variante de règle (ex. pac_mpr_cee_H1 → « PAC + SSC · MaPrimeRénov’ + CEE · H1 »). */
+export function libelleVariante(v?: string | null): string {
+  if (!v) return ''
+  const ssc = /^(pac|seul)_(mpr|full)_cee_(H[123])$/.exec(v)
+  if (ssc) return `${ssc[1] === 'pac' ? 'PAC A/E + SSC' : 'SSC seul'} · ${ssc[2] === 'mpr' ? 'MaPrimeRénov’ + CEE' : '100 % CEE'} · ${ssc[3]}`
+  return v.replace(/_/g, ' · ').replace(/mpr · cee/i, 'MaPrimeRénov’ + CEE').replace(/full · cee/i, '100 % CEE').replace(/autres/i, 'autres profils').replace(/bleu/i, 'Bleu').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé')
+}
+const trancheTexte = (r: any) => r.panneaux_min == null && r.panneaux_max == null ? ''
+  : r.panneaux_min === r.panneaux_max ? `${r.panneaux_min} panneaux`
+  : r.panneaux_max == null ? `${r.panneaux_min} panneaux et plus` : r.panneaux_min == null ? `jusqu’à ${r.panneaux_max} panneaux` : `${r.panneaux_min} à ${r.panneaux_max} panneaux`
 
 type PaymentTarget = 'commercial' | 'societe'
 type PaymentFilter = 'toutes' | 'a_payer' | 'payees'
@@ -110,6 +134,9 @@ export function CommissionsPage() {
   const [commerciaux, setCommerciaux] = useState<any[]>([])
   const [produits, setProduits] = useState<any[]>([])
   const [baremePublic, setBaremePublic] = useState<'particulier' | 'professionnel' | 'visite_technique'>('particulier')
+  const [baremeCategorie, setBaremeCategorie] = useState('')
+  const [baremeCommercial, setBaremeCommercial] = useState('')
+  const [baremeInactives, setBaremeInactives] = useState(false)
 
   const [modal, setModal] = useState(false)
   const [form, setForm] = useState<any>(EMPTY)
@@ -737,7 +764,7 @@ export function CommissionsPage() {
         r.base_pourcentage ||
         'montant_ht',
       priorite: String(
-        r.priorite || 0,
+        r.priorite ?? 100,
       ),
       date_debut:
         r.date_debut || '',
@@ -747,6 +774,8 @@ export function CommissionsPage() {
       public_cible: r.public_cible || 'tous',
       categorie_produit: r.categorie_produit || produits.find((p: any) => p.id === r.produit_id)?.categorie || '',
       variante_produit: r.variante_produit || '',
+      panneaux_min: r.panneaux_min == null ? '' : String(r.panneaux_min),
+      panneaux_max: r.panneaux_max == null ? '' : String(r.panneaux_max),
     })
 
     setModal(true)
@@ -783,7 +812,7 @@ export function CommissionsPage() {
       base_pourcentage:
         form.base_pourcentage,
       priorite:
-        Number(form.priorite) || 0,
+        form.priorite === '' ? 100 : Number(form.priorite) || 0,
       date_debut:
         form.date_debut || null,
       date_fin:
@@ -792,6 +821,8 @@ export function CommissionsPage() {
       public_cible: form.public_cible || (baremePublic === 'visite_technique' ? 'tous' : baremePublic),
       categorie_produit: form.categorie_produit || null,
       variante_produit: form.variante_produit || null,
+      panneaux_min: form.categorie_produit === 'solaire_thermique' && form.panneaux_min !== '' ? Number(form.panneaux_min) : null,
+      panneaux_max: form.categorie_produit === 'solaire_thermique' && form.panneaux_max !== '' ? Number(form.panneaux_max) : null,
     }
 
     const q = editing
@@ -1090,12 +1121,23 @@ export function CommissionsPage() {
     load()
   }
 
-  const displayedRules = rules.filter((r: any) => {
-    if (baremePublic === 'visite_technique') {
-      return r.type === 'vt' || produits.some((p: any) => p.id === r.produit_id && p.catalogue_groupe === 'visite_technique')
-    }
-    return (r.public_cible || 'tous') === baremePublic || (r.public_cible || 'tous') === 'tous'
-  })
+  // Les visites techniques ont leur propre onglet : elles n'apparaissent pas chez les particuliers ni les professionnels.
+  const estRegleVt = (r: any) => r.type === 'vt' || produits.some((p: any) => p.id === r.produit_id && p.catalogue_groupe === 'visite_technique')
+  const categorieRegle = (r: any) => r.categorie_produit || produits.find((p: any) => p.id === r.produit_id)?.categorie || ''
+  const reglesDuPublic = rules.filter((r: any) => baremePublic === 'visite_technique'
+    ? estRegleVt(r)
+    : !estRegleVt(r) && ((r.public_cible || 'tous') === baremePublic || (r.public_cible || 'tous') === 'tous'))
+  const categoriesBareme = [...new Set(reglesDuPublic.map(categorieRegle))].sort((a, b) => libelleCategorie(a).localeCompare(libelleCategorie(b), 'fr'))
+  const commerciauxBareme = commerciaux.filter((c: any) => reglesDuPublic.some((r: any) => r.commercial_id === c.id))
+  const reglesInactives = reglesDuPublic.filter((r: any) => !r.actif).length
+  const displayedRules = reglesDuPublic
+    .filter((r: any) => (baremeInactives || r.actif)
+      && (!baremeCategorie || categorieRegle(r) === (baremeCategorie === '__aucune__' ? '' : baremeCategorie))
+      && (!baremeCommercial || (baremeCommercial === '__tous__' ? !r.commercial_id : r.commercial_id === baremeCommercial)))
+    .sort((a: any, b: any) => libelleCategorie(categorieRegle(a)).localeCompare(libelleCategorie(categorieRegle(b)), 'fr')
+      || String(a.variante_produit || '').localeCompare(String(b.variante_produit || ''), 'fr', { numeric: true })
+      || (a.panneaux_min ?? 0) - (b.panneaux_min ?? 0)
+      || String(a.libelle).localeCompare(String(b.libelle), 'fr', { numeric: true }))
   const categoriesProduits = [...new Set(produits
     .filter((p: any) => form.type === 'vt'
       ? p.catalogue_groupe === 'visite_technique'
@@ -1127,7 +1169,7 @@ export function CommissionsPage() {
   const ruleVariants = rules
     .filter((r: any) => r.categorie_produit === form.categorie_produit
       && (r.public_cible === form.public_cible || r.public_cible === 'tous')
-      && r.variante_produit)
+      && r.variante_produit && r.actif)
     .map((r: any) => String(r.variante_produit))
   const variantesProduits = [...new Set([
     ...produitsCategorie.map((p: any) => produitVariant(p)).filter(Boolean),
@@ -2171,10 +2213,24 @@ export function CommissionsPage() {
       {canViewBareme &&
         tab === 'bareme' && (
           <>
-            <div className="view-toggle" style={{ marginBottom: 16 }}>
-              <button className={`view-toggle-btn ${baremePublic === 'particulier' ? 'active' : ''}`} onClick={() => setBaremePublic('particulier')}>Particuliers</button>
-              <button className={`view-toggle-btn ${baremePublic === 'professionnel' ? 'active' : ''}`} onClick={() => setBaremePublic('professionnel')}>Professionnels</button>
-              <button className={`view-toggle-btn ${baremePublic === 'visite_technique' ? 'active' : ''}`} onClick={() => setBaremePublic('visite_technique')}>Visites techniques</button>
+            <div className="bareme-barre">
+              <div className="view-toggle">
+                <button className={`view-toggle-btn ${baremePublic === 'particulier' ? 'active' : ''}`} onClick={() => { setBaremePublic('particulier'); setBaremeCategorie('') }}>Particuliers</button>
+                <button className={`view-toggle-btn ${baremePublic === 'professionnel' ? 'active' : ''}`} onClick={() => { setBaremePublic('professionnel'); setBaremeCategorie('') }}>Professionnels</button>
+                <button className={`view-toggle-btn ${baremePublic === 'visite_technique' ? 'active' : ''}`} onClick={() => { setBaremePublic('visite_technique'); setBaremeCategorie('') }}>Visites techniques</button>
+              </div>
+              <div className="bareme-filtres">
+                {categoriesBareme.length > 1 && <select className="pro-filter-select" value={baremeCategorie} onChange={e => setBaremeCategorie(e.target.value)} aria-label="Catégorie de produit">
+                  <option value="">Toutes les catégories</option>
+                  {categoriesBareme.map(c => <option key={c || '__aucune__'} value={c || '__aucune__'}>{c ? libelleCategorie(c) : 'Sans catégorie (tous produits)'}</option>)}
+                </select>}
+                {admin && commerciauxBareme.length > 0 && <select className="pro-filter-select" value={baremeCommercial} onChange={e => setBaremeCommercial(e.target.value)} aria-label="Commercial">
+                  <option value="">Tous les commerciaux</option>
+                  {reglesDuPublic.some((r: any) => !r.commercial_id) && <option value="__tous__">Règles communes à tous</option>}
+                  {commerciauxBareme.map((c: any) => <option key={c.id} value={c.id}>{c.nom_complet}</option>)}
+                </select>}
+                {reglesInactives > 0 && <label className="bareme-inactives"><input type="checkbox" checked={baremeInactives} onChange={e => setBaremeInactives(e.target.checked)} /> Afficher les inactives ({reglesInactives})</label>}
+              </div>
             </div>
             <div className="card commission-matrix">
             <div className="card-pad">
@@ -2238,8 +2294,9 @@ export function CommissionsPage() {
                       <span>
                         {produits.find((p: any) => p.id === r.produit_id)?.nom ||
                           (r.categorie_produit
-                            ? `${String(r.categorie_produit).replace(/_/g, ' ')}${r.variante_produit ? ` · ${r.variante_produit}` : ' · tous les produits du type'}`
+                            ? `${libelleCategorie(r.categorie_produit)}${r.variante_produit ? ` · ${libelleVariante(r.variante_produit)}` : ' · tous les produits du type'}`
                             : 'Tous les produits')}
+                        {trancheTexte(r) && <div className="text-sm text-muted">{trancheTexte(r)}</div>}
                       </span>
 
                       <span>
@@ -2370,15 +2427,20 @@ export function CommissionsPage() {
             label="Type de produit"
             value={form.categorie_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, categorie_produit: v, variante_produit: '', produit_id: '' }))}
-            options={[{ value: '', label: 'Sélectionnez d’abord un type de produit' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: categorie.replace(/_/g, ' ').charAt(0).toUpperCase() + categorie.replace(/_/g, ' ').slice(1) }))]}
+            options={[{ value: '', label: 'Sélectionnez d’abord un type de produit' }, ...categoriesProduits.map((categorie: string) => ({ value: categorie, label: libelleCategorie(categorie) }))]}
           />
 
           <FloatSelect
-            label={form.categorie_produit === 'solaire_thermique' ? "Zone · panneaux · régime d’aide" : form.categorie_produit === 'combles_perdus' ? "Zone · profil du foyer" : "Variante rémunérée (facultatif)"}
+            label={form.categorie_produit === 'solaire_thermique' ? "Ensemble · régime d’aide · zone" : form.categorie_produit === 'combles_perdus' ? "Zone · profil du foyer" : "Variante rémunérée (facultatif)"}
             value={form.variante_produit}
             onChange={(v) => setForm((f: any) => ({ ...f, variante_produit: v, produit_id: '' }))}
-            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: String(variante).replace(/_/g, ' · ').replace(/mpr · cee/i, 'MaPrimeRénov’ + CEE').replace(/full · cee/i, 'Full CEE').replace(/autres/i, 'autres profils').replace(/bleu/i, 'Bleu').replace(/monophase/i, 'monophasé').replace(/triphase/i, 'triphasé') }))]}
+            options={[{ value: '', label: 'Toutes les variantes du type' }, ...variantesProduits.map((variante: any) => ({ value: String(variante), label: libelleVariante(String(variante)) }))]}
           />
+
+          {form.categorie_produit === 'solaire_thermique' && <>
+            <FloatInput label="Panneaux — à partir de" type="number" value={form.panneaux_min} onChange={(v) => setForm((f: any) => ({ ...f, panneaux_min: v }))} />
+            <FloatInput label="Panneaux — jusqu’à" type="number" value={form.panneaux_max} onChange={(v) => setForm((f: any) => ({ ...f, panneaux_max: v }))} />
+          </>}
 
           <FloatSelect
             label="Produit (facultatif si règle par type)"

@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronLeft, ChevronRight, Check, Phone, Mail, MapPin,
   Pencil, Trash2, Zap, Home, Wrench, User, Users, Wallet, ArrowRight,
   AlertTriangle, FileText, Calendar, LayoutGrid, List as ListIcon,
-  Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download, CalendarDays,
+  Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download, CalendarDays, PhoneCall,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import type { Prospect, CrmTask } from '../types'
@@ -23,6 +23,7 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { resolveDocumentRows } from '../lib/storage/documentUrl'
 import { ProspectShareControl } from '../components/crm/ProspectShareControl'
+import { EnvoiProspectionModal, peutEnvoyerEnProspection } from '../components/prospection/EnvoiProspectionModal'
 
 interface Props {
   onProspectClick?: (p: Prospect) => void
@@ -178,6 +179,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [anciensCommerciaux, setAnciensCommerciaux] = useState<{ id: string; nom_complet: string }[]>([])
   const [installateurs, setInstallateurs] = useState<{ id: string; nom: string; actif: boolean }[]>([])
   const isAdmin = profile?.role === 'admin' || profile?.role === 'manager'
+  const peutEnvoyerPhoning = peutEnvoyerEnProspection(profile?.role)
+  const [envoiPhoning, setEnvoiPhoning] = useState<{ ids: string[]; libelle: string } | null>(null)
 
   const extended = (p: Prospect): any => p as any
 
@@ -621,10 +624,16 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 <Mail size={16} /> Email
               </a>
             )}
+            {peutEnvoyerPhoning && selected.telephone && (
+              <Button variant="ghost" onClick={() => setEnvoiPhoning({ ids: [selected.id], libelle: `${selected.prenom} ${selected.nom}`.trim() })}>
+                <PhoneCall size={16} /> Prospection tél.
+              </Button>
+            )}
             <Button variant="ghost" onClick={() => openEdit(selected)}>
               <Pencil size={16} /> Modifier
             </Button>
           </div>
+          {envoiPhoning && <EnvoiProspectionModal ids={envoiPhoning.ids} libelle={envoiPhoning.libelle} onClose={() => setEnvoiPhoning(null)} />}
 
           {currentStep < 5 && (
             <div className="action-rec-banner">
@@ -1130,6 +1139,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 <LayoutGrid size={15} /> Pipeline
               </button>
             </div>
+            {peutEnvoyerPhoning && view === 'liste' && (
+              <Button variant="secondary" disabled={!filtered.some(p => p.telephone)} title="Envoie les prospects affichés (selon vos filtres) dans la Prospection téléphone"
+                onClick={() => { const ids = filtered.filter(p => p.telephone).map(p => p.id); setEnvoiPhoning({ ids, libelle: `les ${ids.length} prospect${ids.length > 1 ? 's' : ''} affiché${ids.length > 1 ? 's' : ''}${filtresActifsCount ? ' (selon vos filtres)' : ''}` }) }}>
+                <PhoneCall size={16} /> Envoyer en prospection tél.
+              </Button>
+            )}
             <Button variant="secondary" onClick={() => setImportGoogle(true)}>
               <CalendarDays size={16} /> Importer mes RDV Google
             </Button>
@@ -1138,6 +1153,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             </Button>
           </div>
         </div>
+        {envoiPhoning && <EnvoiProspectionModal ids={envoiPhoning.ids} libelle={envoiPhoning.libelle} onClose={() => setEnvoiPhoning(null)} />}
         {importGoogle && <ImportRdvGoogleModal onClose={() => setImportGoogle(false)} onImporte={() => { void fetchProspects() }} />}
 
         {view === 'liste' && (
