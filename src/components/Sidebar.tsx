@@ -61,7 +61,8 @@ const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: Pag
 
 const NAV_APPORTEUR: { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = [
   { label: 'Mon espace', items: [
-    { key: 'espace_apporteur', label: 'Mes recommandations', icon: Users },
+    { key: 'espace_apporteur', label: 'Tableau de bord', icon: LayoutDashboard },
+    { key: 'prospects', label: 'Mes prospects', icon: Users },
     { key: 'commissions', label: 'Mes commissions', icon: Wallet },
   ] },
 ]

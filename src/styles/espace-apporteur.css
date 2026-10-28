@@ -70,3 +70,10 @@
   .eap-grille { grid-template-columns: 1fr; }
   .eap-fab { display: grid; }
 }
+.eap-reco.cliquable { cursor: pointer; transition: border-color var(--tr-fast), transform var(--tr-fast), box-shadow var(--tr-fast); }
+.eap-reco.cliquable:hover { border-color: var(--c-primary-300); box-shadow: var(--sh-md); }
+.eap-reco.cliquable:focus-visible { outline: 3px solid color-mix(in srgb, var(--c-primary-300) 55%, transparent); outline-offset: 2px; }
+.eap-reco-tete { position: relative; }
+.eap-reco-fleche { flex-shrink: 0; margin-left: 6px; color: var(--c-text-light); align-self: center; }
+.eap-liste-tete .eap-tout-voir { width: auto; height: auto; margin-left: auto; margin-right: 6px; padding: 7px 12px; display: inline-flex; align-items: center; gap: 4px; font-size: 13px; font-weight: 600; color: var(--c-primary); border-radius: 999px; background: var(--c-primary-50); }
+.eap-reco-droite { display: inline-flex; align-items: center; flex-shrink: 0; }
