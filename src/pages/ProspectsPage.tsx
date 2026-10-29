@@ -6,6 +6,7 @@ import {
   Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download, CalendarDays, PhoneCall,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import type { Prospect, CrmTask } from '../types'
 import { FloatInput, FloatSelect, FloatTextarea } from '../components/ui/FloatInput'
 import { Modal } from '../components/ui/Modal'
@@ -200,16 +201,18 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
         .limit(1)
       canViewTeam = Boolean(directReports?.length)
     }
-    let query = supabase
-      .from('prospects')
-      .select('*')
-      .order('created_at', { ascending: false })
-    if (lectureSeule && profile?.id) {
-      query = query.or(`apporteur_user_id.eq.${profile.id},liste_appels_pour.eq.${profile.id}`)
-    } else if (!canViewTeam && profile?.id) {
-      query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true,liste_appels_pour.eq.${profile.id}`)
-    }
-    const { data, error } = await query
+    const { data, error } = await lireTout<Prospect>(() => {
+      let query = supabase
+        .from('prospects')
+        .select('*')
+        .order('created_at', { ascending: false })
+      if (lectureSeule && profile?.id) {
+        query = query.or(`apporteur_user_id.eq.${profile.id},liste_appels_pour.eq.${profile.id}`)
+      } else if (!canViewTeam && profile?.id) {
+        query = query.or(`commercial_id.eq.${profile.id},pot_commun.eq.true,liste_appels_pour.eq.${profile.id}`)
+      }
+      return query
+    })
     if (error) { setProspects([]); return }
     setProspects((data || []) as Prospect[])
   }

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Calculator, Save, AlertTriangle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { Entreprise, Produit, Prospect } from '../types'
 import { Button } from '../components/ui/Button'
@@ -29,8 +30,8 @@ export function AidesSimulationPage({initialProspectId,onInitialProspectHandled}
   async function load(){
     setLoading(true)
     const [p,prod,e,h]=await Promise.all([
-      supabase.from('prospects').select('*').order('nom'),
-      supabase.from('catalogue_produits').select('id, nom, categorie, catalogue_groupe, public_cible, fiche_cee').eq('actif',true).order('nom'),
+      lireTout(() => supabase.from('prospects').select('*').order('nom')),
+      lireTout(() => supabase.from('catalogue_produits').select('id, nom, categorie, catalogue_groupe, public_cible, fiche_cee').eq('actif',true).order('nom')),
       entrepriseCourante('*'),
       supabase.from('simulations_aides').select('*').order('created_at',{ascending:false}).limit(50),
     ])

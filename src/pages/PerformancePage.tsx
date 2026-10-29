@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Building2, Users, TrendingUp, Euro, HardHat } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { euro } from '../lib/crm/constants'
 
 interface Partner { id: string; nom: string; actif: boolean; dossiersValides?: number; installationsValides?: number; installed?: number; ca?: number; vtCount?: number; vtValides?: number; vtCa?: number; activiteScore?: number }
@@ -28,7 +29,7 @@ export function PerformancePage() {
       supabase.from('installateurs').select('id,nom,actif').order('nom'),
       supabase.from('profiles').select('id,nom_complet,role').in('role', ['commercial','manager','admin']).order('nom_complet'),
       supabase.from('dossiers').select('id,prospect_id,devis_id,installateur_id,montant_total,statut'),
-      supabase.from('prospects').select('id,commercial_id,installateur_id'),
+      lireTout(() => supabase.from('prospects').select('id,commercial_id,installateur_id')),
       supabase.from('devis').select('id,prospect_id,montant_ttc'),
       supabase.from('commissions_safe').select('id,commercial_id,montant_commercial,montant_societe,statut,date_paiement_commercial,date_paiement_societe').neq('statut','annulee'),
       supabase.from('visites').select('id,prospect_id,statut,date_visite'),

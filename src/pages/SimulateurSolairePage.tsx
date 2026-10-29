@@ -4,6 +4,7 @@ import {
   AlertTriangle, BatteryCharging, Info, Loader2, Calculator, Satellite, Sparkles, Wallet,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { creerDevisDepuisPV } from '../lib/devis/creerDevisDepuisPV'
 import { genererSimulationSolairePDF } from '../lib/pdf/genererSimulationSolairePDF'
@@ -80,7 +81,7 @@ export function SimulateurSolairePage({ onCreateDevis, initialProspectId }: Prop
   const heuresZone = heuresPourZone(zone)
 
   useEffect(() => {
-    supabase.from('prospects').select('*').order('nom').then(({ data }) => setProspects((data || []) as Prospect[]))
+    lireTout(() => supabase.from('prospects').select('*').order('nom')).then(({ data }) => setProspects((data || []) as Prospect[]))
     entrepriseCourante('*').then(({ data }) => { if (data) setEntreprise(data as Entreprise) })
   }, [])
 

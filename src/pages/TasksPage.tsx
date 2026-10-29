@@ -7,6 +7,7 @@ import { normalizeStatut } from '../lib/crm/constants'
 import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { InvitationNotifications } from '../components/InvitationNotifications'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import type { CrmTask, Prospect } from '../types'
 import { Button } from '../components/ui/Button'
 
@@ -72,9 +73,9 @@ export function TasksPage(): JSX.Element {
     ])
     // Mes prospects avant signature, pour repérer ceux qui n'ont plus de nouvelles.
     const mesProspects = profile?.id
-      ? await supabase.from('prospects').select('id,prenom,nom,civilite,telephone,email,adresse,adresse_rue,code_postal,ville,raison_sociale,statut,categorie_mpr,created_at').eq('commercial_id', profile.id)
+      ? await lireTout(() => supabase.from('prospects').select('id,prenom,nom,civilite,telephone,email,adresse,adresse_rue,code_postal,ville,raison_sociale,statut,categorie_mpr,created_at').eq('commercial_id', profile.id))
       : { data: [], error: null }
-    if (mesProspects.error) setError(prev => [prev, `Prospects : ${mesProspects.error.message}`].filter(Boolean).join(' · '))
+    if (mesProspects.error) setError(prev => [prev, `Prospects : ${mesProspects.error?.message}`].filter(Boolean).join(' · '))
     if (taskResult.error) setError(`Tâches : ${taskResult.error.message}`)
     if (eventResult.error) setError(prev => [prev, `Agenda : ${eventResult.error.message}`].filter(Boolean).join(' · '))
     const taskRows = (taskResult.data || []) as CrmTask[]

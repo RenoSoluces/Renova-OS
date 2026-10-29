@@ -5,6 +5,7 @@ import {
   TimerReset, ListTodo, UserRound,
 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
+import { lireTout } from '../../lib/lireTout'
 import type { Commission, CrmTask, Dossier, Devis, Prospect, PageKey } from '../../types'
 import { euro, isProspectTerminal, stageOf } from '../../lib/crm/constants'
 import { useAuth } from '../../lib/auth/AuthContext'
@@ -52,7 +53,7 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
       // Rechargement discret : l'écran reste affiché pendant la mise à jour.
     async function load() {
       const [p, d, ds, c, profileRow, pa, t, i] = await Promise.all([
-        supabase.from('prospects').select('*').eq('commercial_id', userId).order('created_at', { ascending: false }),
+        lireTout(() => supabase.from('prospects').select('*').eq('commercial_id', userId).order('created_at', { ascending: false })),
         supabase.from('devis').select('*').order('created_at', { ascending: false }),
         supabase.from('dossiers').select('*').order('created_at', { ascending: false }),
         supabase.from('commissions_safe').select('*').eq('commercial_id', userId).order('date_generation', { ascending: false }),

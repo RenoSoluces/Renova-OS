@@ -23,6 +23,7 @@ import {
   Fan,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import { creerDevisDepuisTravaux } from '../lib/devis/creerDevisDepuisTravaux'
 import { creerDevisDepuisPV } from '../lib/devis/creerDevisDepuisPV'
@@ -229,10 +230,10 @@ export function VisitesPage({
   }, [])
 
   const fetchProspects = useCallback(async () => {
-    const { data } = await supabase
+    const { data } = await lireTout<Prospect>(() => supabase
       .from('prospects')
       .select('*')
-      .order('created_at', { ascending: false })
+      .order('created_at', { ascending: false }))
 
     setProspects(data || [])
   }, [])

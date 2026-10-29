@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Download, ExternalLink, FileText, Loader2, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import type { Document, Produit } from '../types'
@@ -37,7 +38,7 @@ export function FichesTechniquesPage() {
     const [{ data: documents, error: docError }, { data: catalogue, error: produitError }] = await Promise.all([
       supabase.from('documents').select('id, nom, categorie, produit_id, url, created_at, produit:catalogue_produits(id, nom, marque, reference, fiche_cee)')
         .in('categorie', Object.values(CATEGORIE).flat()).order('created_at', { ascending: false }),
-      supabase.from('catalogue_produits').select('id, nom, marque, reference, fiche_cee, catalogue_groupe, public_cible, actif').eq('actif', true).order('nom'),
+      lireTout(() => supabase.from('catalogue_produits').select('id, nom, marque, reference, fiche_cee, catalogue_groupe, public_cible, actif').eq('actif', true).order('nom')),
     ])
     if (docError) setError(`Lecture des fiches impossible : ${docError.message}`)
     else setDocs((documents || []) as any)

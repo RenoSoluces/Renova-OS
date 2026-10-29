@@ -3,6 +3,7 @@ import {
   Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus, Sparkles, ImagePlus,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { logAuditEvent } from '../lib/auditLog'
 import type { Devis, DevisLigne, DevisAide, Prospect, Produit, Entreprise, Installateur } from '../types'
@@ -192,7 +193,7 @@ export function DevisPage({
 
   useEffect(() => {
     fetchListe()
-    supabase.from('prospects').select('*').order('nom').then(({ data }) => setProspects((data || []) as Prospect[]))
+    lireTout(() => supabase.from('prospects').select('*').order('nom')).then(({ data }) => setProspects((data || []) as Prospect[]))
     void (async () => {
       // Supabase REST peut limiter une réponse à 1 000 lignes. Charger toutes les pages
       // pour ne pas masquer les catégories situées en fin de catalogue (SSC, VMC, etc.).

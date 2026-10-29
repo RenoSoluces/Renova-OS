@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, ArrowUpRight, Ban, BellRing, Bot, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, FileCheck2, FileOutput, Gauge, RefreshCw, Send, ShieldCheck, Sparkles, Target, TrendingUp, Users, Trophy } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import { supabase } from '../../lib/supabase'
+import { lireTout } from '../../lib/lireTout'
 import { logAuditEvent } from '../../lib/auditLog'
 import { euro, timeAgo } from '../../lib/crm/constants'
 import { Button } from '../ui/Button'
@@ -25,7 +26,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
   async function load(){
     try {
       const queries = [
-        supabase.from('prospects').select('*').order('created_at',{ascending:false}),
+        lireTout(() => supabase.from('prospects').select('*').order('created_at',{ascending:false})),
         supabase.from('devis').select('*').order('created_at',{ascending:false}),
         supabase.from('dossiers').select('*').order('created_at',{ascending:false}),
         supabase.from('commissions_safe').select('*').order('date_generation',{ascending:false}),

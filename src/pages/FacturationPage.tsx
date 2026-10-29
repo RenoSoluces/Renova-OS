@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { CheckCircle2, Download, Mail, Plus, Receipt, XCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { genererFacturePDF } from '../lib/pdf/genererFacturePDF'
@@ -41,7 +42,7 @@ export function FacturationPage(): JSX.Element {
     const invoiceResult = await supabase.from('factures_clients').select('*').order('created_at',{ascending:false})
     const quoteResult = await supabase.from('devis').select('*').eq('statut','signe').order('created_at',{ascending:false})
     const companyResult = await entrepriseCourante('*')
-    const prospectResult = await supabase.from('prospects').select('*')
+    const prospectResult = await lireTout(() => supabase.from('prospects').select('*'))
     if (invoiceResult.error) setError(`Chargement des factures impossible : ${invoiceResult.error.message}`)
     if (quoteResult.error) setError(`Chargement des devis signés impossible : ${quoteResult.error.message}`)
     const prospectRows = (prospectResult.data || []) as Prospect[]
