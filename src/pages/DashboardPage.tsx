@@ -236,7 +236,7 @@ export function DashboardPage({
       .map(
         s =>
           Number(
-            (s.resultat_avant as any)?.consommationEP,
+            (s.resultat_avant as any)?.consommationM2,
           ),
       )
       .filter(

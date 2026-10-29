@@ -39,7 +39,7 @@ export async function importVTFromPdf(
   }
 
   const parsing =
-    parseVT174(lecture.champs, lecture.text)
+    parseVT174(lecture.champs, lecture.text, lecture.photos)
 
   if (!parsing.success) {
     return {

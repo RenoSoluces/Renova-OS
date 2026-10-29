@@ -71,11 +71,12 @@ export function structurerChamps(pages: ItemPdf[][]): ChampPdf[] {
     const page = indexPage + 1
     const items = itemsPage
       .map(it => ({ ...it, s: nettoyer(it.s) }))
-      // Taille 0 : ancres de sommaire invisibles ; « Photo n » : légendes de vignettes.
-      .filter(it => it.s && it.size > 0 && !PHOTO.test(it.s))
+      // Taille 0 : ancres de sommaire invisibles. Les légendes « Photo n » sont gardées :
+      // elles deviennent la réponse de la question « Photo du mur… », ce qui rattache la photo.
+      .filter(it => it.s && it.size > 0)
       .sort((a, b) => b.y - a.y || a.x - b.x)
 
-    const estLabel = (it: ItemPdf) => it.size >= tailleLabel - 0.25
+    const estLabel = (it: ItemPdf) => it.size >= tailleLabel - 0.25 && !PHOTO.test(it.s)
     const blocsPage: Bloc[] = []
     let courant: Bloc | null = null
 

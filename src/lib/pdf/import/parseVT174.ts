@@ -247,6 +247,7 @@ interface MurBrut {
   localisation: string
   isolation_possible: string
   menuiseries: MenuiserieBrute[]
+  photos: number[]
 }
 
 interface SystemeChauffageBrut {
@@ -260,14 +261,16 @@ interface SystemeChauffageBrut {
 
 interface Lecture {
   ident: Record<string, string>
-  planchersBas: { type: string; surface: number | null; hsp: number | null; isolation: string }[]
-  planchersHauts: { type: string; surface: number | null; hauteur: number | null; isolation: string; notes: string[] }[]
+  planchersBas: { type: string; surface: number | null; hsp: number | null; isolation: string; photos: number[] }[]
+  planchersHauts: { type: string; surface: number | null; hauteur: number | null; isolation: string; notes: string[]; photos: number[] }[]
   murs: MurBrut[]
   chauffages: SystemeChauffageBrut[]
   ecs: { generateur: string; volume: number | null; notes: string[] }[]
   ventilation: string
   observations: string[]
   autres: string[]
+  /** Numéros des photos (« Photo n ») par destination. */
+  photos: { documents: number[]; facade: number[]; planchersBas: number[]; combles: number[]; equipements: number[]; croquis: number[]; autres: number[] }
 }
 
 type Section = 'ident' | 'plancher_bas' | 'plancher_haut' | 'murs' | 'chauffage' | 'ecs' | 'autre'
@@ -276,6 +279,7 @@ function lireChamps(champs: ChampPdf[]): Lecture {
   const l: Lecture = {
     ident: {}, planchersBas: [], planchersHauts: [], murs: [], chauffages: [], ecs: [],
     ventilation: '', observations: [], autres: [],
+    photos: { documents: [], facade: [], planchersBas: [], combles: [], equipements: [], croquis: [], autres: [] },
   }
   let section: Section = 'ident'
   let mur: MurBrut | null = null
@@ -301,7 +305,20 @@ function lireChamps(champs: ChampPdf[]): Lecture {
 
   for (const champ of champs) {
     const lab = norm(champ.label)
-    const val = clean(champ.value)
+    // Les légendes « Photo n » arrivent comme réponse de la question photo correspondante.
+    const numerosPhotos = [...champ.value.matchAll(/Photo\s+(\d+)/gi)].map(m => Number(m[1]))
+    const val = clean(champ.value.replace(/Photo\s+\d+/gi, ' '))
+    if (numerosPhotos.length) {
+      const dest = l.photos
+      if (lab.startsWith('croquis')) dest.croquis.push(...numerosPhotos)
+      else if (lab.includes('facade')) dest.facade.push(...numerosPhotos)
+      else if (lab.includes('planchers bas') || lab.includes('plancher bas')) (l.planchersBas[0]?.photos ?? dest.planchersBas).push(...numerosPhotos)
+      else if (lab.includes('comble') || lab.includes('rampant') || lab.includes('toiture') || lab.includes('plafond')) (l.planchersHauts[0]?.photos ?? dest.combles).push(...numerosPhotos)
+      else if (lab.includes('chauffage') || lab.includes('emetteur') || lab.includes('ecs') || lab.includes('ventilation') || lab.includes('caisson')) dest.equipements.push(...numerosPhotos)
+      else if (section === 'murs' && mur) mur.photos.push(...numerosPhotos)
+      else if (section === 'ident' || lab.includes('avis') || lab.includes('taxe')) dest.documents.push(...numerosPhotos)
+      else if (!lab.startsWith('resume')) dest.autres.push(...numerosPhotos)
+    }
 
     // --- Changements de section --------------------------------------------
     if (lab === 'planchers bas') { section = 'plancher_bas'; continue }
@@ -311,7 +328,7 @@ function lireChamps(champs: ChampPdf[]): Lecture {
     if (numMur) {
       fermerMenuiserie()
       section = 'murs'
-      mur = { numero: Number(numMur[1]), orientation: '', donnant_sur: '', surface: null, type: '', isolation: '', localisation: '', isolation_possible: '', menuiseries: [] }
+      mur = { numero: Number(numMur[1]), orientation: '', donnant_sur: '', surface: null, type: '', isolation: '', localisation: '', isolation_possible: '', menuiseries: [], photos: [] }
       l.murs.push(mur)
       continue
     }
@@ -360,7 +377,7 @@ function lireChamps(champs: ChampPdf[]): Lecture {
       }
       case 'plancher_bas': {
         if (lab.startsWith('types de planchers bas') || lab.startsWith('type de planchers bas') || lab.startsWith('type de plancher bas')) {
-          l.planchersBas.push({ type: val, surface: null, hsp: null, isolation: '' })
+          l.planchersBas.push({ type: val, surface: null, hsp: null, isolation: '', photos: [] })
           break
         }
         const p = l.planchersBas[l.planchersBas.length - 1]
@@ -372,7 +389,7 @@ function lireChamps(champs: ChampPdf[]): Lecture {
       }
       case 'plancher_haut': {
         if (/^type (de )?planchers? hauts?/.test(lab)) {
-          l.planchersHauts.push({ type: val, surface: null, hauteur: null, isolation: '', notes: [] })
+          l.planchersHauts.push({ type: val, surface: null, hauteur: null, isolation: '', notes: [], photos: [] })
           break
         }
         const p = l.planchersHauts[l.planchersHauts.length - 1]
@@ -438,8 +455,9 @@ function lireChamps(champs: ChampPdf[]): Lecture {
 /** Hauteur retenue pour convertir une surface de mur en longueur × hauteur (le rapport ne donne que la surface). */
 const HAUTEUR_MUR_DEFAUT = 2.5
 
-function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
+function versAudit(l: Lecture, images: Record<number, string>): { audit: AuditData; avertissements: string[] } {
   const avertissements: string[] = []
+  const photos = (numeros: number[]) => [...new Set(numeros)].map(n => images[n]).filter((p): p is string => Boolean(p))
   const i = l.ident
 
   // Identification -----------------------------------------------------------
@@ -468,7 +486,8 @@ function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
     code_postal: (i.code_postal || '').replace(/\D/g, '').slice(0, 5),
     ville: i.ville || '',
     notes: notesIdent.join('\n'),
-    photos: [],
+    // Documents (taxe foncière, avis d'imposition), photos des équipements et croquis.
+    photos: photos([...l.photos.documents, ...l.photos.equipements, ...l.photos.croquis, ...l.photos.autres]),
   }
 
   // Bâtiment -----------------------------------------------------------------
@@ -480,6 +499,8 @@ function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
     nombre_niveaux: nombre(i.niveaux),
     annee_construction: anneeDepuisTexte(i.annee || ''),
     hsp: HAUTEUR_MUR_DEFAUT,
+    photo_facade: photos(l.photos.facade)[0] ?? '',
+    photos_facade: photos(l.photos.facade),
   }
 
   // Murs et menuiseries ------------------------------------------------------
@@ -541,7 +562,7 @@ function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
         m.isolation_possible ? `Isolation possible : ${m.isolation_possible}` : '',
       ].filter(Boolean).join('\n'),
       etape_active: 0,
-      photos: [],
+      photos: photos(m.photos),
     }
   })
 
@@ -558,7 +579,7 @@ function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
       isolant_type: '',
       epaisseur_isolant_cm: isole ? nombre(p.isolation) : null,
       notes: [p.type ? `Type relevé : ${p.type}` : '', p.isolation ? `Isolation : ${p.isolation}` : ''].filter(Boolean).join('\n'),
-      photos: [],
+      photos: photos(index === 0 ? [...p.photos, ...l.photos.planchersBas] : p.photos),
     }
   })
 
@@ -580,7 +601,7 @@ function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
         p.isolation ? `Isolation : ${p.isolation}` : '',
         ...p.notes,
       ].filter(Boolean).join('\n'),
-      photos: [],
+      photos: photos(index === 0 ? [...p.photos, ...l.photos.combles] : p.photos),
     }
   })
 
@@ -654,13 +675,13 @@ function versAudit(l: Lecture): { audit: AuditData; avertissements: string[] } {
 // Point d'entrée
 // ---------------------------------------------------------------------------
 
-export function parseVT174(champs: ChampPdf[], texte = ''): VT174ParseResult {
+export function parseVT174(champs: ChampPdf[], texte = '', images: Record<number, string> = {}): VT174ParseResult {
   const avertissements: string[] = []
   const erreurs: string[] = []
 
   const formatDetecte = norm(texte).includes('vt th174') || champs.some(c => norm(c.label).includes('vt th174'))
   const lecture = lireChamps(champs)
-  const { audit, avertissements: avConversion } = versAudit(lecture)
+  const { audit, avertissements: avConversion } = versAudit(lecture, images)
   avertissements.push(...avConversion)
 
   const nbChamps = champs.filter(c => c.value).length
@@ -693,7 +714,7 @@ export function parseVT174(champs: ChampPdf[], texte = ''): VT174ParseResult {
     ventilation: audit.ventilation ?? {},
     chauffage: audit.chauffage ?? {},
     ecs: audit.ecs ?? {},
-    photos: [],
+    photos: Object.keys(images).map(n => `Photo ${n}`),
     observations: lecture.observations,
     metadata: {
       format: 'VT_TH174_175_SMART',
@@ -716,7 +737,12 @@ export function parseVT174(champs: ChampPdf[], texte = ''): VT174ParseResult {
       menuiseries_detectees: (audit.menuiseries ?? []).reduce((s, m) => s + (m.nombre || 1), 0),
       planchers_detectes: audit.planchers?.length ?? 0,
       plafonds_detectes: audit.plafonds?.length ?? 0,
-      photos_detectees: 0,
+      photos_detectees:
+        (audit.identification?.photos.length ?? 0)
+        + (audit.donnees_batiment?.photos_facade.length ?? 0)
+        + (audit.murs ?? []).reduce((n, m) => n + (m.photos?.length ?? 0), 0)
+        + (audit.planchers ?? []).reduce((n, p) => n + p.photos.length, 0)
+        + (audit.plafonds ?? []).reduce((n, p) => n + p.photos.length, 0),
     },
     avertissements,
     erreurs,
