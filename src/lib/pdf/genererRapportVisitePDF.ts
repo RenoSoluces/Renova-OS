@@ -329,7 +329,7 @@ export function genererRapportVisitePDF(
     doc.setFont("helvetica", "bold");
     doc.setFontSize(14);
     doc.setTextColor(20);
-    doc.text(`${nombre(dpe.consommationEP)} kWhEP/m².an`, xInfo, y + 13);
+    doc.text(`${nombre(dpe.consommationM2)} kWhEP/m².an`, xInfo, y + 13);
 
     doc.setFont("helvetica", "normal");
     doc.setFontSize(9);
