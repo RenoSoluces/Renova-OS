@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, ArrowUpRight, Clock3, FileWarning, Flame, Gauge, RefreshCw, Target, TrendingUp, Users } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { alertesPilotage, bornesPeriode, calculerPilotage, type Alerte, type DonneesPilotage, type Periode } from '../lib/pilotage/pilotage'
 import type { PageKey } from '../types'
 
@@ -24,7 +25,7 @@ export function PilotagePage({ onNavigate }: { onNavigate?: (p: PageKey) => void
     const depuis = new Date(Date.now() - 200 * 86400000).toISOString()
     const [profils, prospects, devis, visites, evenements, portes] = await Promise.all([
       supabase.from('profiles').select('id,nom_complet,role,objectif_mensuel').in('role', ['commercial', 'manager', 'admin']),
-      supabase.from('prospects').select('id,commercial_id,created_at,statut,temperature,derniere_interaction_at,prenom,nom').limit(5000),
+      lireTout(() => supabase.from('prospects').select('id,commercial_id,created_at,statut,temperature,derniere_interaction_at,prenom,nom')),
       supabase.from('devis').select('id,prospect_id,numero,statut,created_at,signature_date,montant_ht,montant_ht_avant_remise,remise_montant_ht,niveau_rentabilite,visite_id').gte('created_at', depuis).limit(5000),
       supabase.from('visites').select('id,prospect_id,statut,date_visite,created_at').gte('created_at', depuis).limit(5000),
       supabase.from('planning_events').select('id,user_id,type,date,source').gte('date', depuis.slice(0, 10)).limit(5000),

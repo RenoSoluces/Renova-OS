@@ -19,6 +19,7 @@ import {
   CalendarCheck2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { Dossier, Prospect, Devis, Document as DocumentPiece, DossierFacturation } from '../types'
 import { Modal } from '../components/ui/Modal'
@@ -183,10 +184,10 @@ export function DossiersPage({
     supabase.from('organisations').select('id, nom, type').eq('actif', true).order('nom')
       .then(({ data }) => setOrganisations((data || []) as OrganisationOption[]))
 
-    supabase
+    lireTout(() => supabase
       .from('prospects')
       .select('*')
-      .order('nom')
+      .order('nom'))
       .then(({ data }) => {
         setProspects((data || []) as Prospect[])
       })

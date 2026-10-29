@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Building2, Mail, MapPin, Phone, Plus, Search, ShieldCheck, Wrench, Users, Pencil, Power } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import { Button } from '../components/ui/Button'
 import { Modal } from '../components/ui/Modal'
 import { FloatInput } from '../components/ui/FloatInput'
@@ -25,7 +26,7 @@ export function PartenairesPage() {
   async function load(){
     const [p,pr,d,dv,rv]=await Promise.all([
       supabase.from('installateurs').select('*').order('nom'),
-      supabase.from('prospects').select('id,installateur_id,statut'),
+      lireTout(() => supabase.from('prospects').select('id,installateur_id,statut')),
       supabase.from('dossiers').select('id,prospect_id,devis_id,installateur_id,statut,montant_total'),
       supabase.from('devis').select('id,montant_ttc'),
       supabase.from('installateur_evaluations').select('*').order('created_at', { ascending: false }),

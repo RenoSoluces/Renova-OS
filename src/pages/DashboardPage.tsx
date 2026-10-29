@@ -15,6 +15,7 @@ import {
   Clock3,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import type {
   Prospect,
   Visite,
@@ -82,10 +83,10 @@ export function DashboardPage({
     }
 
     Promise.all([
-      supabase
+      lireTout(() => supabase
         .from('prospects')
         .select('*')
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })),
 
       supabase
         .from('visites')

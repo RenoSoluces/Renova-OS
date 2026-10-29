@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
+import { lireTout } from '../lib/lireTout'
 import type { Prospect, Visite, Simulation, Dossier, PlanningEvent, Document } from '../types'
 
 export function useData() {
@@ -16,7 +17,7 @@ export function useData() {
     (async () => {
       try {
         const [p, v, s, d, e, doc] = await Promise.all([
-          supabase.from('prospects').select('*').order('created_at', { ascending: false }),
+          lireTout<Prospect>(() => supabase.from('prospects').select('*').order('created_at', { ascending: false })),
           supabase.from('visites').select('*').order('date_visite', { ascending: false }),
           supabase.from('simulations').select('*').order('created_at', { ascending: false }),
           supabase.from('dossiers').select('*').order('created_at', { ascending: false }),

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Loader2, CalendarSearch, AlertTriangle, CheckCircle2 } from 'lucide-react'
 import { Modal } from '../ui/Modal'
 import { supabase } from '../../lib/supabase'
+import { lireTout } from '../../lib/lireTout'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { analyserRdv, type CandidatProspect, type ProspectExistant, type RdvGoogle } from '../../lib/crm/importGoogleAgenda'
 
@@ -24,7 +25,7 @@ export function ImportRdvGoogleModal({ onClose, onImporte }: { onClose: () => vo
       setChargement(true); setErreur('')
       const [{ data, error }, existants] = await Promise.all([
         supabase.functions.invoke('google-agenda', { body: { action: 'lister_rdv', jours } }),
-        supabase.from('prospects').select('id,nom,prenom,telephone,email,code_postal').limit(5000),
+        lireTout(() => supabase.from('prospects').select('id,nom,prenom,telephone,email,code_postal')),
       ])
       if (annule) return
       if (error || !data?.rdv) {
