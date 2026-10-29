@@ -108,10 +108,10 @@
 
 /* Gestes */
 .ra-gestes{display:flex;flex-direction:column;gap:10px}
-.ra-geste{display:grid;grid-template-columns:22px minmax(0,1fr) auto 120px 170px;align-items:center;gap:16px;padding:14px 18px;border-radius:14px;background:var(--c-bg-alt);border:1.5px solid var(--c-border-light);cursor:pointer;transition:border-color var(--tr-fast),background var(--tr-fast)}
+.ra-geste{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr) auto 120px 170px;align-items:center;gap:16px;padding:14px 18px;border-radius:14px;background:var(--c-bg-alt);border:1.5px solid var(--c-border-light);cursor:pointer;transition:border-color var(--tr-fast),background var(--tr-fast)}
 .ra-geste:hover{border-color:var(--c-border-dark)}
 .ra-geste.is-checked{border-color:var(--c-primary-300);background:#F7FCF9}
-.ra-geste input{position:absolute;opacity:0;pointer-events:none}
+.ra-geste input{position:absolute;top:0;left:0;width:1px;height:1px;opacity:0;pointer-events:none}
 .ra-check{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--c-border-dark);display:flex;align-items:center;justify-content:center;color:#fff;background:#fff}
 .ra-geste.is-checked .ra-check{background:var(--c-primary-400);border-color:var(--c-primary-400)}
 .ra-geste input:focus-visible + .ra-check{box-shadow:0 0 0 3px rgba(82,183,136,.35)}
