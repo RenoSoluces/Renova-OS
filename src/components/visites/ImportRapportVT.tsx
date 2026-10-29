@@ -6,8 +6,11 @@ import {
   Upload,
   X,
 } from 'lucide-react'
-import { useRef, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { AuditData } from '../../types'
+import { construireBatiment3CL } from '../../lib/3cl/batiment3CL'
+import { calculDPE } from '../../lib/3cl/calculDPE'
+import { dpeColor } from '../../lib/3cl/moteur3CL'
 import {
   importVTFromPdf,
   type ImportVTResult,
@@ -97,6 +100,16 @@ export function ImportRapportVT({
 
   const importResult =
     result?.parsing
+
+  // Note du logement calculée avec les données reprises du rapport (même calcul que la visite).
+  const noteLogement = useMemo(() => {
+    if (!result?.success || !result.audit_data?.donnees_batiment?.surface_habitable) return null
+    try {
+      return calculDPE(construireBatiment3CL(result.audit_data))
+    } catch {
+      return null
+    }
+  }, [result])
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4 backdrop-blur-sm">
@@ -244,43 +257,35 @@ export function ImportRapportVT({
                   </p>
                 </div>
 
+                {/* Note du logement */}
+                {noteLogement && (
+                  <div className="flex items-center gap-4 rounded-xl border border-gray-200 bg-white p-4">
+                    <div
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-xl text-2xl font-bold"
+                      style={{ background: dpeColor(noteLogement.etiquette), color: noteLogement.etiquette >= 'E' ? '#fff' : '#1f2937' }}
+                    >
+                      {noteLogement.etiquette}
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium uppercase tracking-wide text-gray-400">
+                        Note du logement (estimation 3CL)
+                      </p>
+                      <p className="mt-1 font-semibold text-gray-900">
+                        {Math.round(noteLogement.consommationM2)} kWh/m²/an · {Math.round(noteLogement.emissionsM2)} kg CO₂/m²/an (GES {noteLogement.etiquetteGES})
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Recalculée dans la visite après import ; vous pourrez corriger chaque section.
+                      </p>
+                    </div>
+                  </div>
+                )}
+
                 {/* Statistics */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                  <Stat
-                    label="Champs"
-                    value={
-                      importResult
-                        ?.statistiques
-                        .champs_detectes ?? 0
-                    }
-                  />
-
-                  <Stat
-                    label="Murs"
-                    value={
-                      importResult
-                        ?.statistiques
-                        .murs_detectes ?? 0
-                    }
-                  />
-
-                  <Stat
-                    label="Menuiseries"
-                    value={
-                      importResult
-                        ?.statistiques
-                        .menuiseries_detectees ?? 0
-                    }
-                  />
-
-                  <Stat
-                    label="Photos"
-                    value={
-                      importResult
-                        ?.statistiques
-                        .photos_detectees ?? 0
-                    }
-                  />
+                  <Stat label="Murs" value={importResult?.statistiques.murs_detectes ?? 0} />
+                  <Stat label="Menuiseries" value={importResult?.statistiques.menuiseries_detectees ?? 0} />
+                  <Stat label="Planchers bas" value={importResult?.statistiques.planchers_detectes ?? 0} />
+                  <Stat label="Combles / toiture" value={importResult?.statistiques.plafonds_detectes ?? 0} />
                 </div>
 
                 {/* Warnings */}
@@ -336,7 +341,7 @@ export function ImportRapportVT({
                     }
                     className="rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-emerald-700"
                   >
-                    Importer dans la visite
+                    Importer et calculer la note
                   </button>
                 </div>
               </div>
