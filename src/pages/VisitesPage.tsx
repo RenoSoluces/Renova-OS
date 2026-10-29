@@ -569,6 +569,8 @@ export function VisitesPage({
     }
   }
 
+  const [autoDpeVisiteId, setAutoDpeVisiteId] = useState<string | null>(null)
+
   const calculerLeDpe = useCallback(() => {
     const resultat = calculDPE(batiment3CL)
     const deperditionsResultat =
@@ -606,6 +608,13 @@ export function VisitesPage({
     currentVisite?.type_visite,
     currentVisite?.produit_cible,
   ])
+
+  useEffect(() => {
+    if (!autoDpeVisiteId || currentVisite?.id !== autoDpeVisiteId) return
+    setAutoDpeVisiteId(null)
+    setView('overview')
+    calculerLeDpe()
+  }, [autoDpeVisiteId, currentVisite?.id, calculerLeDpe])
 
   const telechargerRapport = useCallback(() => {
     if (!currentVisite) return
@@ -1230,6 +1239,8 @@ export function VisitesPage({
       setCreateError(null)
 
       startVisite(data as Visite)
+      // Visite importée : on affiche directement la synthèse avec la note du logement calculée.
+      setAutoDpeVisiteId((data as Visite).id)
 
       await fetchVisites()
     },

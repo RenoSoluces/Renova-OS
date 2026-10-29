@@ -170,7 +170,8 @@ function idVitrage(vitrage: string | undefined): string {
 }
 
 function idPlancher(type: string | undefined, isolation: string | undefined): string {
-  const isole = isolation === "oui";
+  // Le wizard des planchers enregistre « oui », celui des plafonds « Oui » : on compare sans la casse.
+  const isole = (isolation ?? "").trim().toLowerCase() === "oui";
   switch (type) {
     case "Terre-plein":
       return isole ? "terre_plein_isole" : "terre_plein_non_isole";
@@ -186,7 +187,7 @@ function idPlancher(type: string | undefined, isolation: string | undefined): st
 }
 
 function idToiture(type: string | undefined, isolation: string | undefined): string {
-  const isole = isolation === "oui";
+  const isole = (isolation ?? "").trim().toLowerCase() === "oui";
   switch (type) {
     case "Combles perdus":
       return isole ? "combles_perdus" : "toiture_non_isolee";
