@@ -83,7 +83,7 @@
 .dossier-col-title { font-size: 14.5px; font-weight: 700; color: var(--ep-ink); }
 .dossier-col-count { font-size: 12px; font-weight: 700; color: #5B6F72; background: #fff; border-radius: 999px; padding: 2px 9px; }
 .dossier-col-total { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ep-ink); font-variant-numeric: tabular-nums; }
-.dossier-card { display: flex; flex-direction: column; gap: 14px; width: 100%; text-align: left; padding: 18px; border: 1px solid var(--ep-line); border-radius: 18px; background: #fff; color: #14262A; box-shadow: 0 1px 2px rgba(10, 42, 46, .04), 0 8px 20px -14px rgba(10, 42, 46, .18); cursor: pointer; transition: box-shadow .2s, transform .2s; }
+.dossier-card { display: flex; flex-direction: column; gap: 12px; width: 100%; text-align: left; padding: 18px; border: 1px solid var(--ep-line); border-radius: 18px; background: #fff; color: #14262A; box-shadow: 0 1px 2px rgba(10, 42, 46, .04), 0 8px 20px -14px rgba(10, 42, 46, .18); cursor: pointer; transition: box-shadow .2s, transform .2s; }
 .dossier-card:hover { box-shadow: 0 2px 4px rgba(10, 42, 46, .06), 0 14px 28px -14px rgba(10, 42, 46, .26); transform: translateY(-1px); }
 .dossier-card-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
 .dossier-card-avatar { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ep-teal-soft); color: var(--ep-teal); font-size: 13px; font-weight: 700; }
@@ -128,3 +128,12 @@
   .admin-dashboard-hero h1 { font-size: 32px; }
   .cash-card strong { font-size: 34px; }
 }
+
+/* Glisser-déposer des dossiers */
+.dossier-card.glissable { cursor: grab; }
+.dossier-card.is-drag { opacity: .45; transform: rotate(-1deg); }
+.dossier-card-open { display: flex; flex-direction: column; gap: 14px; width: 100%; text-align: left; cursor: pointer; color: inherit; }
+.dossier-card-move { width: 100%; height: 34px; padding: 0 10px; border: 1px solid var(--ep-line); border-radius: 10px; background: #FAF8F4; color: #5B6F72; font: 600 12.5px var(--font-body); cursor: pointer; }
+.dossier-col { border: 2px solid transparent; transition: border-color .15s, background .15s; }
+.dossier-col.is-over { border-color: var(--ep-copper); background: #F3E3D6; }
+.dossier-board-message { margin-bottom: 14px; padding: 12px 16px; border-radius: 14px; background: var(--ep-copper-soft); color: #7F401C; font-size: 13.5px; font-weight: 600; }
