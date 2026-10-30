@@ -97,6 +97,8 @@ export function DossiersPage({
   const [savingStatut, setSavingStatut] = useState(false)
   const [detailMessage, setDetailMessage] = useState('')
   const [organisations, setOrganisations] = useState<OrganisationOption[]>([])
+  const [installateursDossier, setInstallateursDossier] = useState<{ id: string; nom: string }[]>([])
+  const [savingInstallateur, setSavingInstallateur] = useState(false)
   const [detailFacturationOrganisationId, setDetailFacturationOrganisationId] = useState('')
   const [detailDestinataireOrganisationId, setDetailDestinataireOrganisationId] = useState('')
   const [savingFacturationConfig, setSavingFacturationConfig] = useState(false)
@@ -183,6 +185,8 @@ export function DossiersPage({
     fetchListe()
     supabase.from('organisations').select('id, nom, type').eq('actif', true).order('nom')
       .then(({ data }) => setOrganisations((data || []) as OrganisationOption[]))
+    supabase.from('installateurs').select('id, nom').eq('actif', true).order('nom')
+      .then(({ data }) => setInstallateursDossier((data || []) as { id: string; nom: string }[]))
 
     lireTout(() => supabase
       .from('prospects')
@@ -315,6 +319,26 @@ export function DossiersPage({
     ])
     setPieces(await resolveDocumentRows((docs || []) as DocumentPiece[]))
     if (dossier) setDetail(d => d ? { ...d, ...(dossier as any) } : d)
+  }
+
+  // Un client peut avoir plusieurs dossiers posés par des installateurs différents :
+  // l'installateur (et donc le destinataire de la facture partenaire) se règle dossier par dossier.
+  async function changerInstallateurDossier(installateurId: string) {
+    if (!detail) return
+    setSavingInstallateur(true)
+    setDetailMessage('')
+    const { data, error } = await supabase.from('dossiers')
+      .update({ installateur_id: installateurId || null })
+      .eq('id', detail.id).select('*').single()
+    setSavingInstallateur(false)
+    if (error || !data) {
+      setDetailMessage(`Impossible de changer l'installateur : ${error?.message || 'erreur inconnue'}`)
+      return
+    }
+    setDetail({ ...detail, ...(data as Dossier) })
+    setRows(prev => prev.map(row => row.id === detail.id ? { ...row, ...(data as Dossier) } : row))
+    const nom = installateursDossier.find(i => i.id === installateurId)?.nom
+    setDetailMessage(nom ? `Installateur du dossier : ${nom}. Les factures partenaires de ce dossier lui seront adressées.` : 'Installateur retiré du dossier.')
   }
 
   async function enregistrerConfigurationFacturation() {
@@ -1345,6 +1369,20 @@ export function DossiersPage({
               <div className="font-semibold" style={{ marginBottom: 4 }}>Facturation du dossier</div>
               <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
                 Choisissez séparément l’entreprise qui émet la facture et l’entreprise destinataire. Les coordonnées légales doivent être renseignées dans les paramètres de chaque entreprise.
+              </div>
+              <div style={{ marginBottom: 12 }}>
+                <FloatSelect
+                  label={savingInstallateur ? 'Installateur du dossier — enregistrement…' : 'Installateur du dossier'}
+                  value={detail.installateur_id || ''}
+                  onChange={v => void changerInstallateurDossier(v)}
+                  options={[
+                    { value: '', label: 'Aucun installateur' },
+                    ...installateursDossier.map(i => ({ value: i.id, label: i.nom })),
+                  ]}
+                />
+                <div className="text-xs text-muted" style={{ marginTop: 4 }}>
+                  Repris du devis signé à la création du dossier. C’est à lui qu’est adressée la facture partenaire quand le destinataire est « Installateur associé au dossier ».
+                </div>
               </div>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: 10, alignItems: 'end' }}>
                 <FloatSelect
