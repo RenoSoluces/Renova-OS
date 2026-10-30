@@ -1,0 +1,130 @@
+/*
+ * Écrans premium : accueil, pipeline, dossiers et fiche dossier, dans la lignée des maquettes
+ * (teal profond, cuivre, titres en Fraunces). Chargé en dernier pour surcharger les styles
+ * historiques sans toucher à leur logique.
+ */
+:root {
+  --ep-ink: #0A2A2E;
+  --ep-teal: #0F5C5E;
+  --ep-teal-soft: #E3EFEE;
+  --ep-copper: #A4562A;
+  --ep-copper-soft: #F6E4D8;
+  --ep-line: #E6E1D8;
+  --ep-card: 0 1px 2px rgba(10, 42, 46, .04), 0 8px 24px -12px rgba(10, 42, 46, .10);
+}
+
+/* ---------------------------------------------------------------- En-têtes de page */
+.page-header { align-items: flex-end; margin-bottom: 26px; }
+.page-title { font-family: var(--font-display); font-weight: 500; font-size: 38px; line-height: 1.08; letter-spacing: -.025em; color: var(--ep-ink); }
+.page-subtitle { font-size: 14px; color: #5B6F72; }
+.page-actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+
+/* ---------------------------------------------------------------- Bandeaux de chiffres */
+.page-kpi-strip { gap: 18px; margin-bottom: 26px; }
+.dashboard-kpi, .kpi-grid.page-kpi-strip .kpi-tile { border: 1px solid var(--ep-line); border-radius: 20px; background: #fff; box-shadow: var(--ep-card); padding: 20px 22px; }
+.dashboard-kpi-main strong { font-family: var(--font-display); font-size: 34px; font-weight: 500; letter-spacing: -.03em; color: var(--ep-ink); font-variant-numeric: tabular-nums; }
+.dashboard-kpi-main span { font-size: 12.5px; font-weight: 600; color: #5B6F72; }
+.dashboard-kpi-icon { border-radius: 14px; }
+.dashboard-kpi-icon.green, .dashboard-kpi-icon.blue { background: var(--ep-teal-soft); color: var(--ep-teal); }
+.dashboard-kpi-icon.amber, .dashboard-kpi-icon.purple { background: var(--ep-copper-soft); color: var(--ep-copper); }
+
+/* ---------------------------------------------------------------- Accueil administrateur */
+.admin-dashboard { max-width: 1480px; padding-top: 12px; }
+.admin-dashboard-hero { padding: 8px 0 6px; border: 0; border-radius: 0; background: none; box-shadow: none; margin-bottom: 26px; }
+.admin-dashboard-kicker { color: var(--ep-copper); font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; }
+.admin-dashboard-hero h1 { margin: 10px 0 8px; font-family: var(--font-display); font-weight: 500; font-size: 46px; line-height: 1.08; letter-spacing: -.03em; color: var(--ep-ink); }
+.admin-dashboard-hero h1 span { color: var(--ep-teal); }
+.admin-dashboard-hero p { font-size: 14px; color: #5B6F72; }
+
+.cash-grid { gap: 18px; margin-bottom: 26px; }
+.cash-card { border: 0; border-radius: 24px; min-height: 172px; padding: 24px 26px; box-shadow: 0 18px 40px -22px rgba(10, 42, 46, .55); }
+.cash-latent { background: var(--ep-teal); }
+.cash-invoice { background: var(--ep-ink); }
+.cash-outstanding { background: var(--ep-copper); }
+.cash-card strong { font-family: var(--font-display); font-weight: 500; font-size: 42px; letter-spacing: -.03em; font-variant-numeric: tabular-nums; }
+.cash-card-top span { font-size: 11.5px; font-weight: 700; letter-spacing: .1em; }
+
+.admin-dashboard-columns { gap: 22px; margin-bottom: 22px; }
+.admin-panel { border: 1px solid var(--ep-line); border-radius: 24px; box-shadow: var(--ep-card); }
+.admin-panel-head { padding: 22px 26px 16px; border-bottom: 1px solid #EFEBE3; }
+.admin-panel-head h2 { margin: 6px 0 0; font-family: var(--font-display); font-weight: 500; font-size: 23px; letter-spacing: -.02em; color: var(--ep-ink); }
+.admin-panel-kicker { color: var(--ep-copper); font-size: 11px; letter-spacing: .14em; }
+.admin-live { color: var(--ep-teal); }
+.admin-live i { background: #3FA3A1; box-shadow: 0 0 0 5px var(--ep-teal-soft); }
+.admin-count-badge { background: var(--ep-copper-soft); color: var(--ep-copper); }
+
+/* ---------------------------------------------------------------- Pipeline des prospects */
+.pl-stat { border-radius: 20px; border-color: var(--ep-line); box-shadow: var(--ep-card); padding: 16px 20px; }
+.pl-stat strong { font-family: var(--font-display); font-weight: 500; font-size: 28px; letter-spacing: -.02em; }
+.pl-stat-hot::before { background: var(--ep-copper); }
+.pl-stat-late::before { background: #C98A5E; }
+.pl-lane { background: #EBE7DF; border: 0; border-radius: 24px; flex-basis: 272px; }
+.pl-lane-head { border-bottom: 0; padding: 16px 18px 12px; }
+.pl-lane-title { font-family: var(--font-body); font-weight: 700; font-size: 14.5px; color: var(--ep-ink); }
+.pl-lane-count { background: #fff; border: 0; color: #5B6F72; font-weight: 700; }
+.pl-lane-money strong { font-family: var(--font-display); font-weight: 500; font-size: 19px; }
+.pl-lane-bar { height: 5px; }
+.pl-lane-body { padding: 4px 12px 14px; gap: 12px; }
+.pl-card { border-radius: 18px; border: 1px solid var(--ep-line); box-shadow: 0 1px 2px rgba(10, 42, 46, .04), 0 8px 20px -14px rgba(10, 42, 46, .18); padding: 16px; }
+.pl-card:hover { box-shadow: 0 2px 4px rgba(10, 42, 46, .06), 0 14px 28px -14px rgba(10, 42, 46, .24); }
+.pl-amount { font-family: var(--font-display); font-weight: 500; letter-spacing: -.02em; }
+.pl-avatar { background: var(--ep-teal-soft); color: var(--ep-teal); }
+
+/* ---------------------------------------------------------------- Bascule Liste / Pipeline */
+.vue-switch { display: inline-flex; padding: 4px; border-radius: 14px; background: #EBE7DF; }
+.vue-switch button { padding: 8px 18px; border-radius: 10px; font-size: 13.5px; font-weight: 600; color: #5B6F72; }
+.vue-switch button.on { background: #fff; color: var(--ep-ink); font-weight: 700; box-shadow: 0 1px 2px rgba(10, 42, 46, .14); }
+
+/* ---------------------------------------------------------------- Pipeline des dossiers */
+.dossier-board { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; align-items: start; }
+.dossier-col { display: flex; flex-direction: column; gap: 14px; padding: 16px; border-radius: 24px; background: #EBE7DF; min-width: 0; }
+.dossier-col-head { display: flex; align-items: center; gap: 10px; padding: 4px 6px 2px; }
+.dossier-col-dot { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.dossier-col-title { font-size: 14.5px; font-weight: 700; color: var(--ep-ink); }
+.dossier-col-count { font-size: 12px; font-weight: 700; color: #5B6F72; background: #fff; border-radius: 999px; padding: 2px 9px; }
+.dossier-col-total { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ep-ink); font-variant-numeric: tabular-nums; }
+.dossier-card { display: flex; flex-direction: column; gap: 14px; width: 100%; text-align: left; padding: 18px; border: 1px solid var(--ep-line); border-radius: 18px; background: #fff; color: #14262A; box-shadow: 0 1px 2px rgba(10, 42, 46, .04), 0 8px 20px -14px rgba(10, 42, 46, .18); cursor: pointer; transition: box-shadow .2s, transform .2s; }
+.dossier-card:hover { box-shadow: 0 2px 4px rgba(10, 42, 46, .06), 0 14px 28px -14px rgba(10, 42, 46, .26); transform: translateY(-1px); }
+.dossier-card-top { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.dossier-card-avatar { display: flex; align-items: center; justify-content: center; flex: none; width: 40px; height: 40px; border-radius: 50%; background: var(--ep-teal-soft); color: var(--ep-teal); font-size: 13px; font-weight: 700; }
+.dossier-card-id { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dossier-card-id b { font-size: 14.5px; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dossier-card-id small { font-size: 12px; color: #5B6F72; }
+.dossier-card-montant { font-family: var(--font-display); font-size: 26px; font-weight: 500; letter-spacing: -.02em; color: var(--ep-ink); font-variant-numeric: tabular-nums; }
+.dossier-col-more { padding: 4px 8px 6px; font-size: 12.5px; font-weight: 600; color: #5B6F72; }
+
+/* ---------------------------------------------------------------- Fiche dossier */
+.fiche-head { display: flex; flex-direction: column; gap: 20px; }
+.fiche-identite { display: flex; align-items: center; gap: 16px; }
+.fiche-avatar { display: flex; align-items: center; justify-content: center; flex: none; width: 60px; height: 60px; border-radius: 50%; background: var(--ep-teal); color: #fff; font-family: var(--font-display); font-size: 24px; font-weight: 500; }
+.fiche-identite small { display: block; font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--ep-copper); }
+.fiche-identite h2 { margin: 4px 0 0; font-family: var(--font-display); font-weight: 500; font-size: 30px; letter-spacing: -.02em; color: var(--ep-ink); }
+.fiche-frise { display: flex; flex-wrap: wrap; gap: 12px 0; margin: 0; padding: 18px 22px; list-style: none; border: 1px solid var(--ep-line); border-radius: 20px; background: #fff; }
+.fiche-frise li { flex: 1 1 150px; display: flex; align-items: center; gap: 12px; position: relative; }
+.fiche-frise li > span { display: flex; align-items: center; justify-content: center; flex: none; width: 30px; height: 30px; border-radius: 50%; background: #EBE7DF; color: #5B6F72; font-size: 13px; font-weight: 700; }
+.fiche-frise li > div { display: flex; flex-direction: column; gap: 2px; }
+.fiche-frise li b { font-size: 14px; color: #5B6F72; }
+.fiche-frise li small { font-size: 12px; color: #5B6F72; }
+.fiche-frise li.fait > span { background: var(--ep-teal); color: #fff; }
+.fiche-frise li.fait b, .fiche-frise li.courant b { color: var(--ep-ink); }
+.fiche-frise li.courant > span { background: var(--ep-copper); color: #fff; }
+.fiche-frise li:not(:last-child)::after { content: ''; flex: 1; height: 2px; margin: 0 14px; min-width: 14px; background: #E6E1D8; }
+.fiche-frise li.fait:not(:last-child)::after { background: var(--ep-teal); }
+.fiche-montant { display: flex; flex-direction: column; gap: 12px; padding: 24px 26px; border-radius: 22px; background: var(--ep-ink); color: #fff; box-shadow: 0 16px 40px -22px rgba(10, 42, 46, .6); }
+.fiche-montant small { font-size: 12.5px; font-weight: 600; color: #9CC0BE; }
+.fiche-montant strong { font-family: var(--font-display); font-size: 44px; font-weight: 500; letter-spacing: -.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+.fiche-barre { height: 8px; border-radius: 999px; background: #164A4F; overflow: hidden; }
+.fiche-barre i { display: block; height: 100%; border-radius: inherit; background: #F0B48C; }
+.fiche-ligne { display: flex; justify-content: space-between; font-size: 14px; }
+.fiche-ligne span { color: #9CC0BE; }
+.fiche-ligne b { font-variant-numeric: tabular-nums; }
+
+/* ---------------------------------------------------------------- Fenêtres */
+.modal { border-radius: 24px; }
+.modal-title { font-family: var(--font-display); font-weight: 500; font-size: 22px; letter-spacing: -.02em; }
+
+@media (max-width: 760px) {
+  .page-title { font-size: 30px; }
+  .admin-dashboard-hero h1 { font-size: 32px; }
+  .cash-card strong { font-size: 34px; }
+}

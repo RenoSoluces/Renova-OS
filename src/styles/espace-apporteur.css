@@ -42,7 +42,7 @@
 .eap-etapes li.actuel em { color: var(--c-primary); font-weight: 700; }
 .eap-reco-pied { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13.5px; color: var(--c-text-secondary); border-top: 1px dashed var(--c-border-light); padding-top: 10px; }
 .eap-reco-pied .com b { color: var(--c-primary); }
-.eap-voile { position: fixed; inset: 0; z-index: 1100; background: rgba(11, 25, 20, .45); backdrop-filter: blur(6px); display: flex; align-items: flex-end; justify-content: center; animation: fadeIn .2s ease; }
+.eap-voile { position: fixed; inset: 0; z-index: 1100; background: rgba(6,30,32, .45); backdrop-filter: blur(6px); display: flex; align-items: flex-end; justify-content: center; animation: fadeIn .2s ease; }
 .eap-feuille { width: 100%; max-width: 620px; max-height: 94dvh; overflow: auto; background: var(--c-bg-alt); border-radius: 22px 22px 0 0; padding: 20px 20px calc(20px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 16px; animation: slideUp .3s ease; }
 @media (min-width: 700px) { .eap-voile { align-items: center; } .eap-feuille { border-radius: 22px; } }
 .eap-feuille-tete { display: flex; justify-content: space-between; align-items: center; }

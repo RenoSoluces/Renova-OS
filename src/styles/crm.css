@@ -227,7 +227,7 @@
   font-size: 12.5px; padding: 10px 12px; border-radius: var(--r-sm);
 }
 .login-info {
-  background: var(--c-primary-50, #EAF4EE); color: var(--c-primary-700);
+  background: var(--c-primary-50, #E8F2F1); color: var(--c-primary-700);
   font-size: 12.5px; padding: 10px 12px; border-radius: var(--r-sm); line-height: 1.5;
 }
 
@@ -273,7 +273,7 @@
 .login-regles li { display: flex; align-items: center; gap: 6px; }
 .login-regles li.ok { color: var(--c-success, #2D8659); font-weight: 600; }
 
-.invitation-lien { margin-top: 12px; padding: 14px; border-radius: var(--r-md, 10px); border: 1px solid var(--c-primary-100, #CFE5D8); background: var(--c-primary-50, #EAF4EE); display: flex; flex-direction: column; gap: 10px; }
+.invitation-lien { margin-top: 12px; padding: 14px; border-radius: var(--r-md, 10px); border: 1px solid var(--c-primary-100, #CFE5D8); background: var(--c-primary-50, #E8F2F1); display: flex; flex-direction: column; gap: 10px; }
 .invitation-lien-titre { font-weight: 700; font-size: 13.5px; color: var(--c-primary, #0F5C5E); }
 .invitation-lien code { display: block; padding: 8px 10px; border-radius: 8px; background: #fff; border: 1px solid var(--c-border-light, #E3E9E5); font-size: 12px; word-break: break-all; }
 .invitation-lien-actions { display: flex; flex-wrap: wrap; gap: 8px; }
@@ -281,7 +281,7 @@
 .invitation-lien p { margin: 0; font-size: 12px; color: var(--c-text-muted); }
 
 /* Ma journée */
-.journee-fiche { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--c-bg-soft, #F3F6F4); font-size: 12.5px; color: var(--c-text-secondary, #4A5751); display: flex; flex-direction: column; gap: 3px; }
+.journee-fiche { margin-top: 8px; padding: 8px 10px; border-radius: 8px; background: var(--c-bg-soft, #F4F1EC); font-size: 12.5px; color: var(--c-text-secondary, #4A5751); display: flex; flex-direction: column; gap: 3px; }
 .journee-fiche svg { vertical-align: -2px; margin-right: 3px; }
 .journee-relance { display: flex; gap: 12px; align-items: flex-start; padding: 16px; border-bottom: 1px solid var(--c-border, #e5e7eb); }
 .journee-relance:last-child { border-bottom: 0; }
@@ -292,7 +292,7 @@
 .abo-agenda { margin-bottom: 16px; overflow: hidden; }
 .abo-agenda-tete { width: 100%; display: flex; align-items: center; gap: 12px; padding: 14px 16px; background: none; border: 0; text-align: left; cursor: pointer; color: var(--c-text); }
 .abo-agenda-tete .tourne { transform: rotate(180deg); }
-.abo-agenda-icone { width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--c-primary-50, #EAF4EE); color: var(--c-primary); }
+.abo-agenda-icone { width: 38px; height: 38px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: var(--c-primary-50, #E8F2F1); color: var(--c-primary); }
 .abo-agenda-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
 .abo-agenda-texte strong { font-size: 14px; }
 .abo-agenda-texte small { font-size: 12.5px; color: var(--c-text-muted); }
@@ -328,7 +328,7 @@
 .google-agenda-texte small svg { vertical-align: -2px; color: var(--c-success, #2D8659); }
 .google-agenda-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .google-agenda-actions .btn { display: inline-flex; align-items: center; gap: 6px; }
-.google-agenda-message { margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--c-primary-50, #EAF4EE); font-size: 12.5px; color: var(--c-text-secondary); }
+.google-agenda-message { margin: 10px 0 0; padding: 8px 10px; border-radius: 8px; background: var(--c-primary-50, #E8F2F1); font-size: 12.5px; color: var(--c-text-secondary); }
 .google-agenda-message.erreur { background: #FDEDED; color: var(--c-error); }
 
 /* Import des RDV Google */

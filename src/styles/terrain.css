@@ -62,7 +62,7 @@
 .tr-porte-etat { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 700; white-space: nowrap; }
 
 /* Feuille de saisie */
-.tr-voile { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-4); background: rgba(10,20,15,.5); }
+.tr-voile { position: fixed; inset: 0; z-index: 1000; display: flex; align-items: center; justify-content: center; padding: var(--sp-4); background: rgba(6,30,32,.5); }
 .tr-feuille { width: min(560px, 100%); max-height: 92dvh; overflow-y: auto; padding: var(--sp-5); border-radius: var(--r-xl); background: var(--c-bg-alt); box-shadow: var(--sh-xl); display: flex; flex-direction: column; gap: var(--sp-3); }
 .tr-feuille-tete { display: flex; align-items: center; justify-content: space-between; }
 .tr-feuille-tete h2 { margin: 0; font-family: var(--font-display); font-size: 20px; }

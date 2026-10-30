@@ -18,6 +18,7 @@ import './styles/espace-apporteur.css'
 import './styles/prospects.css'
 import './index.css'
 import './styles/premium.css'
+import './styles/ecrans-premium.css'
 import { installerRapportErreurs } from './lib/fiabilite/rapportErreurs'
 
 installerRapportErreurs()

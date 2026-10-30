@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, ArrowUpRight, Ban, BellRing, Bot, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, FileCheck2, FileOutput, Gauge, RefreshCw, Send, ShieldCheck, Sparkles, Target, TrendingUp, Users, Trophy } from 'lucide-react'
+import { Activity, AlertTriangle, ArrowUpRight, Ban, BellRing, Bot, CheckCircle2, ChevronRight, CircleDollarSign, Clock3, FileCheck2, FileOutput, Gauge, RefreshCw, Send, ShieldCheck, Target, TrendingUp, Users, Trophy } from 'lucide-react'
 import { jsPDF } from 'jspdf'
 import { supabase } from '../../lib/supabase'
 import { lireTout } from '../../lib/lireTout'
@@ -7,6 +7,7 @@ import { logAuditEvent } from '../../lib/auditLog'
 import { euro, timeAgo } from '../../lib/crm/constants'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
+import { useAuth } from '../../lib/auth/AuthContext'
 import type { Devis, Prospect, Commission, Dossier } from '../../types'
 
 interface Installer { id:string; nom:string; telephone?:string; email?:string; ville?:string; zone_intervention?:string; actif:boolean }
@@ -16,6 +17,9 @@ interface CommercialScore { id:string; nom:string; leads:number; signed:number; 
 interface AlertItem { id:string; kind:'sleep'|'litige'|'payment'; title:string; detail:string; action:string; prospectId?:string }
 
 export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
+  const { profile: profilConnecte } = useAuth()
+  const prenom = (profilConnecte?.nom_complet || '').trim().split(/\s+/)[0] || ''
+  const dateDuJour = new Date().toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
   const [prospects,setProspects]=useState<Prospect[]>([]),[devis,setDevis]=useState<Devis[]>([]),[dossiers,setDossiers]=useState<Dossier[]>([]),[commissions,setCommissions]=useState<Commission[]>([])
   const [installateurs,setInstallateurs]=useState<Installer[]>([]),[vts,setVts]=useState<any[]>([]),[baremes,setBaremes]=useState<Bareme[]>([]),[lines,setLines]=useState<any[]>([]),[interactions,setInteractions]=useState<any[]>([]),[profiles,setProfiles]=useState<any[]>([])
   const [health,setHealth]=useState({unqualifiedVT:0,zeroCommissions:0,installedWithoutCommission:0})
@@ -346,10 +350,10 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
     <div className="admin-dashboard-hero">
       <div>
         <div className="admin-dashboard-kicker">
-          <Sparkles size={13}/> ADMIN CONTROL CENTER
+          {dateDuJour}
         </div>
-        <h1>Le cockpit de votre activité</h1>
-        <p>Cash, partenaires, relances et signatures — tout ce qui mérite une action est visible ici.</p>
+        <h1>{prenom ? `Bonjour ${prenom},` : 'Bonjour,'}<br/><span>voici l’essentiel de votre activité.</span></h1>
+        <p>Cash, partenaires, relances et signatures : tout ce qui mérite une action est visible ici.</p>
       </div>
 
       <div className="admin-hero-actions">

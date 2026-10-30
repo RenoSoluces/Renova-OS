@@ -283,7 +283,7 @@
   padding:var(--sp-5) var(--sp-5) var(--sp-4);border-bottom:1px solid rgba(255,255,255,.06);
 }
 .audit-back{
-  display:flex;align-items:center;gap:8px;color:rgba(216,243,220,.7);font-size:12px;
+  display:flex;align-items:center;gap:8px;color:rgba(227,239,238,.7);font-size:12px;
   margin-bottom:var(--sp-4);transition:color var(--tr-fast);
 }
 .audit-back:hover:not(:disabled){color:#fff}
@@ -299,25 +299,25 @@
 }
 .audit-prospect-info{min-width:0}
 .audit-prospect-name{font-family:var(--font-display);font-size:14px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.audit-prospect-addr{font-size:11px;color:rgba(216,243,220,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
+.audit-prospect-addr{font-size:11px;color:rgba(227,239,238,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:2px}
 
 /* Progress in sidebar */
 .audit-progress{padding:var(--sp-4) var(--sp-5);border-bottom:1px solid rgba(255,255,255,.06)}
-.audit-progress-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:rgba(216,243,220,.45);margin-bottom:var(--sp-2)}
+.audit-progress-label{font-size:11px;text-transform:uppercase;letter-spacing:.1em;color:rgba(227,239,238,.45);margin-bottom:var(--sp-2)}
 .audit-progress-bar{height:6px;background:rgba(255,255,255,.1);border-radius:3px;overflow:hidden}
 .audit-progress-fill{height:100%;background:linear-gradient(90deg,var(--c-primary-300),var(--c-primary-200));border-radius:3px;transition:width var(--tr-mid)}
-.audit-progress-text{font-size:12px;color:rgba(216,243,220,.65);margin-top:var(--sp-2);display:flex;justify-content:space-between}
+.audit-progress-text{font-size:12px;color:rgba(227,239,238,.65);margin-top:var(--sp-2);display:flex;justify-content:space-between}
 
 /* Section nav */
 .audit-nav{flex:1;overflow-y:auto;padding:var(--sp-3) var(--sp-2)}
 .audit-nav-group{margin-bottom:var(--sp-4)}
 .audit-nav-group-label{
   padding:var(--sp-2) var(--sp-3);font-size:10px;text-transform:uppercase;letter-spacing:.1em;
-  color:rgba(216,243,220,.4);font-weight:600;
+  color:rgba(227,239,238,.4);font-weight:600;
 }
 .audit-nav-item{
   display:flex;align-items:center;gap:10px;width:100%;padding:9px var(--sp-3);border-radius:var(--r-sm);
-  color:rgba(216,243,220,.68);font-size:13px;font-weight:500;cursor:pointer;text-align:left;
+  color:rgba(227,239,238,.68);font-size:13px;font-weight:500;cursor:pointer;text-align:left;
   transition:all var(--tr-fast);position:relative;
 }
 .audit-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
@@ -456,7 +456,7 @@
   .audit-mobilebar-back:disabled{opacity:.4}
   .audit-mobilebar-who{flex:1;min-width:0;display:flex;flex-direction:column}
   .audit-mobilebar-who b{font-family:var(--font-display);font-size:15px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .audit-mobilebar-who span{font-size:12px;color:rgba(216,243,220,.75)}
+  .audit-mobilebar-who span{font-size:12px;color:rgba(227,239,238,.75)}
   .audit-mobilebar .badge{flex-shrink:0;font-size:10px}
   .audit-chips{
     display:flex;gap:8px;overflow-x:auto;flex-shrink:0;padding:10px var(--sp-4);
