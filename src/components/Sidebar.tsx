@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
-  Gauge,
+  Gauge, ChevronDown,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -18,49 +18,53 @@ interface SidebarProps {
   prospectsBadge?: number
 }
 
-const NAV_GROUPS: (prospectCount?: number) => { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = (prospectCount) => [
-  { label: 'Accueil', items: [{ key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard }] },
-  { label: 'Ma Journée', items: [
+type NavItem = { key: PageKey; label: string; icon: any; badge?: number }
+type NavGroup = { id: string; label: string; items: NavItem[]; collapsible?: boolean }
+
+// Organisation par usage : les rubriques du quotidien sont toujours visibles,
+// la gestion (catalogue, réglages, historique…) est repliée par défaut.
+const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
+  { id: 'aujourdhui', label: 'Aujourd’hui', items: [
+    { key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { key: 'a_traiter', label: 'Ma journée', icon: ClipboardCheck },
-    { key: 'planning', label: 'Agenda ', icon: Calendar },
+    { key: 'planning', label: 'Agenda', icon: Calendar },
   ] },
-  { label: 'Ventes', items: [
+  { id: 'ventes', label: 'Ventes', items: [
     { key: 'prospects', label: 'Prospects', icon: Users, badge: prospectCount },
-    { key: 'devis', label: 'Devis', icon: FileSignature },
-    { key: 'dossiers', label: 'Dossiers CEE', icon: FolderOpen },
-    { key: 'simulations', label: 'Simulation des aides', icon: Calculator },
-    { key: 'facturation', label: 'Facturation client', icon: Receipt },
+    { key: 'dossiers', label: 'Dossiers', icon: FolderOpen },
     { key: 'pipeline', label: 'Pipeline', icon: BarChart3 },
-    { key: 'prospection', label: 'Prospection Téléphone', icon: PhoneCall },
-    { key: 'prospection_terrain', label: 'Prospection Terrain', icon: MapPinned },
+    { key: 'devis', label: 'Devis', icon: FileSignature },
+    { key: 'facturation', label: 'Facturation', icon: Receipt },
+    { key: 'prospection', label: 'Prospection téléphone', icon: PhoneCall },
+    { key: 'prospection_terrain', label: 'Prospection terrain', icon: MapPinned },
   ] },
-  { label: 'Terrain', items: [
-    { key: 'visites', label: 'Visite technique', icon: ClipboardCheck },
-    { key: 'solaire', label: 'Simulateur solaire', icon: Sun },
+  { id: 'chantiers', label: 'Chantiers', items: [
+    { key: 'visites', label: 'Visites techniques', icon: ClipboardCheck },
     { key: 'suivi_chantier', label: 'Suivi chantier', icon: HardHat },
-  ] },
-  { label: 'Suivi', items: [
-    { key: 'commissions', label: 'Commissions', icon: Wallet },
-    { key: 'partenaires', label: 'Mon réseau', icon: Users },
-    { key: 'challenges', label: 'Challenges & classements', icon: Trophy },
-    { key: 'installateurs', label: 'Installateurs', icon: Building2 },
-    { key: 'pilotage', label: 'Pilotage équipe', icon: Gauge },
-    { key: 'performance', label: 'Performances & CA', icon: BarChart3 },
-    { key: 'activite', label: 'Historique & activités', icon: History },
+    { key: 'simulations', label: 'Simulation des aides', icon: Calculator },
+    { key: 'solaire', label: 'Simulateur solaire', icon: Sun },
     { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
   ] },
-  { label: 'Système', items: [
+  { id: 'equipe', label: 'Équipe et performance', items: [
+    { key: 'commissions', label: 'Commissions', icon: Wallet },
+    { key: 'partenaires', label: 'Mon réseau', icon: Users },
+    { key: 'pilotage', label: 'Pilotage équipe', icon: Gauge },
+    { key: 'performance', label: 'Performances et CA', icon: BarChart3 },
+    { key: 'challenges', label: 'Challenges et classements', icon: Trophy },
+  ] },
+  { id: 'gestion', label: 'Gestion', collapsible: true, items: [
+    { key: 'installateurs', label: 'Installateurs', icon: Building2 },
     { key: 'catalogue', label: 'Catalogue produits', icon: Package },
     { key: 'fiches_techniques', label: 'Fiches techniques', icon: BookOpen },
-    { key: 'documents', label: 'Documents & archives', icon: FileText },
-    { key: 'parametres', label: 'Paramètres', icon: Settings },
-    { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
+    { key: 'documents', label: 'Documents et archives', icon: FileText },
+    { key: 'activite', label: 'Historique et activités', icon: History },
     { key: 'organisation', label: 'Organigramme', icon: Network },
+    { key: 'sante_systeme', label: 'Santé du système', icon: ShieldCheck },
   ] },
 ]
 
-const NAV_APPORTEUR: { label: string; items: { key: PageKey; label: string; icon: any; badge?: number }[] }[] = [
-  { label: 'Mon espace', items: [
+const NAV_APPORTEUR: NavGroup[] = [
+  { id: 'mon_espace', label: 'Mon espace', items: [
     { key: 'espace_apporteur', label: 'Tableau de bord', icon: LayoutDashboard },
     { key: 'prospects', label: 'Mes prospects', icon: Users },
     { key: 'commissions', label: 'Mes commissions', icon: Wallet },
@@ -71,6 +75,23 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
   const { profile } = useAuth()
   const [prospectCount, setProspectCount] = useState(prospectsBadge ?? 0)
   const [hasDirectReports, setHasDirectReports] = useState(false)
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
+    try { return JSON.parse(localStorage.getItem('renova.sidebar.groups') || '{}') } catch { return {} }
+  })
+  const toggleGroup = (id: string) => setOpenGroups(prev => {
+    const next = { ...prev, [id]: !prev[id] }
+    try { localStorage.setItem('renova.sidebar.groups', JSON.stringify(next)) } catch { /* stockage indisponible */ }
+    return next
+  })
+  const adminRoles = ['admin', 'manager', 'partner_admin', 'company_admin']
+  const canSee = (item: NavItem) => {
+    const role = profile?.role || ''
+    if (['performance', 'sante_systeme', 'pilotage'].includes(item.key) && !adminRoles.includes(role)) return false
+    if (item.key === 'pilotage' && !['admin', 'manager'].includes(role)) return false
+    if (item.key === 'installateurs' && !adminRoles.includes(role)) return false
+    if (item.key === 'organisation' && !adminRoles.includes(role) && !hasDirectReports) return false
+    return true
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -112,29 +133,60 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
       </button>
 
       <nav className="sidebar-nav">
-        {(profile?.role === 'apporteur' ? NAV_APPORTEUR : NAV_GROUPS(prospectCount)).map(group => (
-          <div key={group.label}>
-            {!collapsed && <div className="sidebar-section-label">{group.label}</div>}
-            {group.items.filter(item => (item.key !== 'performance' && item.key !== 'sante_systeme' && item.key !== 'pilotage') || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'pilotage' || ['admin','manager'].includes(profile?.role || '')).filter(item => item.key !== 'installateurs' || ['admin','manager','partner_admin','company_admin'].includes(profile?.role || '')).filter(item => item.key !== 'organisation' || ['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '') || hasDirectReports).map(item => {
-              const Icon = item.icon
-              return (
+        {(profile?.role === 'apporteur' ? NAV_APPORTEUR : NAV_GROUPS(prospectCount)).map(group => {
+          const items = group.items.filter(canSee)
+          if (!items.length) return null
+          const containsCurrent = items.some(item => item.key === current)
+          const open = !group.collapsible || collapsed || containsCurrent || Boolean(openGroups[group.id])
+          return (
+            <div key={group.id}>
+              {!collapsed && (group.collapsible ? (
                 <button
-                  key={item.key}
-                  className={`sidebar-item ${current === item.key || (current === 'a_traiter' && item.key === 'a_traiter') ? 'active' : ''}`}
-                  onClick={() => onNavigate(item.key)}
-                  title={collapsed ? item.label : undefined}
+                  className="sidebar-section-label"
+                  onClick={() => toggleGroup(group.id)}
+                  aria-expanded={open}
+                  style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', cursor: 'pointer', background: 'none', border: 0, textAlign: 'left' }}
                 >
-                  <Icon />
-                  {!collapsed && <span className="sidebar-item-label">{item.label}</span>}
-                  {!collapsed && !!item.badge && <span className="sidebar-item-badge">{item.badge}</span>}
+                  <span>{group.label}</span>
+                  <ChevronDown size={14} style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }} />
                 </button>
-              )
-            })}
-          </div>
-        ))}
+              ) : <div className="sidebar-section-label">{group.label}</div>)}
+              {open && items.map(item => {
+                const Icon = item.icon
+                return (
+                  <button
+                    key={item.key}
+                    className={`sidebar-item ${current === item.key ? 'active' : ''}`}
+                    onClick={() => onNavigate(item.key)}
+                    title={collapsed ? item.label : undefined}
+                  >
+                    <Icon />
+                    {!collapsed && <span className="sidebar-item-label">{item.label}</span>}
+                    {!collapsed && !!item.badge && <span className="sidebar-item-badge">{item.badge}</span>}
+                  </button>
+                )
+              })}
+              {!open && !collapsed && (
+                <div style={{ padding: '2px 14px 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(216,243,220,.45)' }}>
+                  {items.slice(0, 3).map(item => item.label).join(', ')}…
+                </div>
+              )}
+            </div>
+          )
+        })}
       </nav>
 
       <div className="sidebar-footer">
+        {profile?.role !== 'apporteur' && (
+          <button
+            className={`sidebar-item ${current === 'parametres' ? 'active' : ''}`}
+            onClick={() => onNavigate('parametres')}
+            title={collapsed ? 'Paramètres' : undefined}
+          >
+            <Settings />
+            {!collapsed && <span className="sidebar-item-label">Paramètres</span>}
+          </button>
+        )}
         <div className="sidebar-user">
           <div className="sidebar-user-avatar">{initials}</div>
           {!collapsed && (
