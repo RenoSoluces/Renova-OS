@@ -1,5 +1,5 @@
 /* Renova OS — habillage « devis & catalogue » (repris de la maquette validée). Tout est scopé sous .rv */
-.rv{--rv-bg:#f3f6f4;--rv-panel:#fff;--rv-ink:#12261f;--rv-mute:#5d716a;--rv-line:#dde6e1;--rv-navy:#0d2b45;--rv-green:#1f7a3d;--rv-green-soft:#e4f3e8;--rv-blue:#1d6fa5;--rv-blue-soft:#e3f0f8;--rv-warn:#a85d00;--rv-warn-soft:#fdf0dc;--rv-bad:#b3261e;--rv-bad-soft:#fbe6e4;--rv-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--rv-ink)}
+.rv{--rv-bg:#F4F1EC;--rv-panel:#fff;--rv-ink:#14262A;--rv-mute:#5B6F72;--rv-line:#E6E1D8;--rv-navy:#0A2A2E;--rv-green:#0F5C5E;--rv-green-soft:#E3EFEE;--rv-blue:#1d6fa5;--rv-blue-soft:#e3f0f8;--rv-warn:#a85d00;--rv-warn-soft:#fdf0dc;--rv-bad:#b3261e;--rv-bad-soft:#fbe6e4;--rv-mono:'IBM Plex Mono',ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--rv-ink)}
 .rv *{box-sizing:border-box}
 .rv h2.rv-h{font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:var(--rv-mute);margin:0 0 12px;font-weight:700}
 .rv .panel{background:var(--rv-panel);border:1px solid var(--rv-line);border-radius:12px;padding:18px}
@@ -44,21 +44,21 @@
 .rv .lines input.cell.n{width:100%;text-align:right}
 .rv .lines td{overflow-wrap:anywhere}.rv .lines details .grid{grid-template-columns:repeat(2,minmax(0,1fr))}
 .rv .pn{font-weight:700}.rv .pn small{display:block;font-weight:500;color:var(--rv-mute);font-size:12px}
-.rv tr.famrow td{background:#eaf0ec;color:#1f4536;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-left:3px solid #1f4536;padding:7px 10px}
+.rv tr.famrow td{background:#eaf0ec;color:#0C4A4C;font-weight:700;font-size:11px;letter-spacing:.04em;text-transform:uppercase;border-left:3px solid #0C4A4C;padding:7px 10px}
 .rv .lines details .lab{font-size:12px}
 .rv .iconbtn{border:0;background:none;color:var(--rv-mute);cursor:pointer;padding:4px;border-radius:6px;display:inline-grid;place-items:center}.rv .iconbtn:hover{background:var(--rv-bg);color:var(--rv-bad)}
-.rv .sheet{background:#fff;color:#17202a;border-radius:6px;padding:30px 32px;box-shadow:0 10px 30px rgba(13,43,69,.16);font-size:11.5px;line-height:1.45;margin-top:16px}
+.rv .sheet{background:#fff;color:#17202a;border-radius:6px;padding:30px 32px;box-shadow:0 10px 30px rgba(10,42,46,.16);font-size:11.5px;line-height:1.45;margin-top:16px}
 .rv .sheet h3{margin:0;font-size:20px;letter-spacing:.5px}
-.rv .sheet .hd{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid #0d2b45;padding-bottom:12px;margin-bottom:12px}
+.rv .sheet .hd{display:flex;justify-content:space-between;gap:14px;border-bottom:2px solid #0A2A2E;padding-bottom:12px;margin-bottom:12px}
 .rv .sheet .co{font-size:10.5px;color:#4b5864}
 .rv .sheet table{width:100%;border-collapse:collapse;margin:10px 0}
-.rv .sheet th{background:#0d2b45;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:6px;text-align:left}
+.rv .sheet th{background:#0A2A2E;color:#fff;font-size:10px;text-transform:uppercase;letter-spacing:.5px;padding:6px;text-align:left}
 .rv .sheet td{padding:7px 6px;border-bottom:1px solid #e3e8e5;vertical-align:top}
 .rv .sheet .r{text-align:right}
-.rv .sheet tr.famrow td{background:#eaf0ec;color:#1f4536;border-left:3px solid #1f4536;font-size:10px}
+.rv .sheet tr.famrow td{background:#eaf0ec;color:#0C4A4C;border-left:3px solid #0C4A4C;font-size:10px}
 .rv .sheet .tot{margin-left:auto;width:62%}
 .rv .sheet .tot div{display:flex;justify-content:space-between;padding:3px 0}
-.rv .sheet .tot .big{border-top:2px solid #0d2b45;font-weight:800;font-size:13px;margin-top:4px;padding-top:6px}
+.rv .sheet .tot .big{border-top:2px solid #0A2A2E;font-weight:800;font-size:13px;margin-top:4px;padding-top:6px}
 .rv .sheet .leg{font-size:9.5px;color:#4b5864;border-top:1px solid #dde3df;margin-top:12px;padding-top:8px}
 .rv .sheet .spec{color:#5a6772;font-size:10px}
 .rv .sheet .ph{background:#fff3c4;border-radius:3px;padding:0 3px}
@@ -82,27 +82,27 @@
 .rv .cat tr.off td{opacity:.5}
 
 /* tiroir produit */
-.rv-drawer{position:fixed;inset:0;background:rgba(8,20,31,.5);display:flex;justify-content:flex-end;z-index:60}
-.rv-dw{width:min(760px,100%);height:100%;background:#f3f6f4;overflow:auto;padding:22px 22px 90px;position:relative;color:#12261f}
+.rv-drawer{position:fixed;inset:0;background:rgba(6,32,36,.5);display:flex;justify-content:flex-end;z-index:60}
+.rv-dw{width:min(760px,100%);height:100%;background:#F4F1EC;overflow:auto;padding:22px 22px 90px;position:relative;color:#14262A}
 .rv-dw .head{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;margin-bottom:16px}
 .rv-dw .head h1{font-size:22px;margin:4px 0 0;letter-spacing:-.2px}
 .rv-dw .sect{margin-bottom:14px}
 .rv-dw .fr{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:12px}
-.rv-dw .foot{position:sticky;bottom:-90px;margin:20px -22px -90px;padding:12px 22px;background:#fff;border-top:1px solid #dde6e1;display:flex;gap:10px;justify-content:flex-end}
+.rv-dw .foot{position:sticky;bottom:-90px;margin:20px -22px -90px;padding:12px 22px;background:#fff;border-top:1px solid #E6E1D8;display:flex;gap:10px;justify-content:flex-end}
 @media (max-width:980px){.rv .devis{grid-template-columns:1fr}.rv .side{position:static;max-height:none}.rv .g3{grid-template-columns:1fr 1fr}}
 @media (max-width:640px){.rv .g2,.rv .g3,.rv-dw .fr{grid-template-columns:1fr}.rv .fam{grid-template-columns:1fr}.rv .fam>b{padding-top:0}}
 
 /* formulaire produit dans le tiroir (reprend les classes existantes) */
-.rv-dw .field{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:#5d716a;min-width:0}
-.rv-dw .field input,.rv-dw .field select,.rv-dw .field textarea{border:1px solid #dde6e1;background:#f3f6f4;border-radius:8px;padding:9px 11px;font-weight:500;color:#12261f;min-width:0;width:100%;font-size:13.5px}
+.rv-dw .field{display:flex;flex-direction:column;gap:5px;font-size:12.5px;font-weight:600;color:#5B6F72;min-width:0}
+.rv-dw .field input,.rv-dw .field select,.rv-dw .field textarea{border:1px solid #E6E1D8;background:#F4F1EC;border-radius:8px;padding:9px 11px;font-weight:500;color:#14262A;min-width:0;width:100%;font-size:13.5px}
 .rv-dw .grid-2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
 .rv-dw .grid-3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
-.rv-dw .field-label{font-size:12.5px;font-weight:700;color:#12261f}
+.rv-dw .field-label{font-size:12.5px;font-weight:700;color:#14262A}
 .rv-dw .checkbox-field{display:flex;gap:9px;align-items:center;font-size:13px}
-.rv-dw .panel{background:#fff;border:1px solid #dde6e1;border-radius:12px;padding:18px;margin-bottom:14px}
-.rv-dw .grp-head{display:flex;gap:10px;align-items:center;margin-bottom:8px}.rv-dw .grp-head h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#5d716a}
+.rv-dw .panel{background:#fff;border:1px solid #E6E1D8;border-radius:12px;padding:18px;margin-bottom:14px}
+.rv-dw .grp-head{display:flex;gap:10px;align-items:center;margin-bottom:8px}.rv-dw .grp-head h3{margin:0;font-size:12px;text-transform:uppercase;letter-spacing:.8px;color:#5B6F72}
 .rv-dw .status{border-radius:9px;padding:10px 12px;font-weight:600;margin-bottom:10px;font-size:13px}
-.rv-dw .status.no{background:#fdf0dc;color:#a85d00}.rv-dw .status.ok{background:#e4f3e8;color:#1f7a3d}
+.rv-dw .status.no{background:#fdf0dc;color:#a85d00}.rv-dw .status.ok{background:#E3EFEE;color:#0F5C5E}
 .rv-dw .check{display:flex;gap:9px;align-items:flex-start;padding:5px 0;font-size:13px}
 .rv-dw .dot{flex:none;width:18px;height:18px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:800;margin-top:1px}
 .rv-dw .dot.no{background:#fdf0dc;color:#a85d00}.rv-dw .dot.inf{background:#e3f0f8;color:#1d6fa5}

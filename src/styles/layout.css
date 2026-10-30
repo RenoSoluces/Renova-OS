@@ -25,12 +25,12 @@
 .sidebar-section-label{
   padding:var(--sp-4) var(--sp-3) var(--sp-1);
   font-size:10px;text-transform:uppercase;letter-spacing:.1em;
-  color:rgba(216,243,220,.4);font-weight:600;
+  color:rgba(227,239,238,.4);font-weight:600;
   white-space:nowrap;overflow:hidden;
 }
 .sidebar-item{
   display:flex;align-items:center;gap:12px;padding:10px var(--sp-3);
-  border-radius:var(--r-sm);color:rgba(216,243,220,.7);
+  border-radius:var(--r-sm);color:rgba(227,239,238,.7);
   font-size:14px;font-weight:500;position:relative;
   transition:background var(--tr-fast),color var(--tr-fast);
   white-space:nowrap;

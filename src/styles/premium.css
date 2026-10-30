@@ -3,10 +3,10 @@
  * cohérentes sur toute l'application, sans changer la structure des écrans.
  */
 :root {
-  --sh-sm: 0 1px 2px rgba(16, 32, 26, .04), 0 1px 1px rgba(16, 32, 26, .03);
-  --sh-md: 0 2px 4px rgba(16, 32, 26, .04), 0 6px 16px -6px rgba(16, 32, 26, .10);
-  --sh-lg: 0 4px 10px rgba(16, 32, 26, .05), 0 18px 36px -12px rgba(16, 32, 26, .16);
-  --sh-xl: 0 10px 24px rgba(16, 32, 26, .08), 0 32px 64px -20px rgba(16, 32, 26, .28);
+  --sh-sm: 0 1px 2px rgba(10,42,46, .04), 0 1px 1px rgba(10,42,46, .03);
+  --sh-md: 0 2px 4px rgba(10,42,46, .04), 0 6px 16px -6px rgba(10,42,46, .10);
+  --sh-lg: 0 4px 10px rgba(10,42,46, .05), 0 18px 36px -12px rgba(10,42,46, .16);
+  --sh-xl: 0 10px 24px rgba(10,42,46, .08), 0 32px 64px -20px rgba(10,42,46, .28);
   --c-border: #E6E1D8;
   --c-border-light: #EFEBE3;
   --c-bg: #F4F1EC;
@@ -30,9 +30,9 @@ body { background: var(--c-bg); color: #14262A; text-rendering: optimizeLegibili
 }
 .sidebar-brand { border-bottom-color: rgba(255, 255, 255, .06); }
 .sidebar-brand-logo { box-shadow: 0 6px 16px -6px rgba(63,163,161, .7), inset 0 1px 0 rgba(255, 255, 255, .35); }
-.sidebar-section-label { color: rgba(216, 243, 220, .38); font-size: 10px; letter-spacing: .14em; }
+.sidebar-section-label { color: rgba(227,239,238, .38); font-size: 10px; letter-spacing: .14em; }
 .sidebar-nav { gap: 1px; }
-.sidebar-item { width: 100%; justify-content: flex-start; text-align: left; border-radius: 10px; color: rgba(222, 236, 230, .72); font-weight: 500; padding: 9px 12px; }
+.sidebar-item { width: 100%; justify-content: flex-start; text-align: left; border-radius: 10px; color: rgba(226,238,236, .72); font-weight: 500; padding: 9px 12px; }
 .sidebar-item svg { width: 18px; height: 18px; opacity: .85; transition: opacity var(--tr-fast), transform var(--tr-fast); }
 .sidebar-item:hover { background: rgba(255, 255, 255, .06); color: #fff; }
 .sidebar-item:hover svg { opacity: 1; }
@@ -43,7 +43,7 @@ body { background: var(--c-bg); color: #14262A; text-rendering: optimizeLegibili
 }
 .sidebar-item.active svg { opacity: 1; color: #9AD2CF; }
 .sidebar-item.active::before { left: -8px; top: 9px; bottom: 9px; width: 3px; background: #6EC0BD; box-shadow: 0 0 12px rgba(110,192,189, .8); }
-.sidebar-item-badge { background: #E5484D; box-shadow: 0 0 0 2px rgba(11, 34, 54, .9); }
+.sidebar-item-badge { background: #E5484D; box-shadow: 0 0 0 2px rgba(10,42,46, .9); }
 .sidebar-footer { border-top-color: rgba(255, 255, 255, .06); }
 .sidebar-user { border-radius: 12px; }
 .sidebar-user-avatar { background: linear-gradient(135deg, #6EC0BD, #3FA3A1); box-shadow: 0 0 0 2px rgba(255, 255, 255, .08); }
@@ -53,7 +53,7 @@ body { background: var(--c-bg); color: #14262A; text-rendering: optimizeLegibili
   background: rgba(255, 255, 255, .82);
   backdrop-filter: saturate(1.6) blur(14px);
   -webkit-backdrop-filter: saturate(1.6) blur(14px);
-  border-bottom: 1px solid rgba(16, 32, 26, .06);
+  border-bottom: 1px solid rgba(10,42,46, .06);
   position: relative; z-index: 20;
 }
 .topbar-title { letter-spacing: -.025em; }
@@ -88,9 +88,9 @@ body { background: var(--c-bg); color: #14262A; text-rendering: optimizeLegibili
 .btn:active:not(:disabled) { transform: translateY(1px) scale(.99); }
 .btn-primary {
   background: linear-gradient(180deg, #176B6D 0%, var(--c-primary) 100%);
-  box-shadow: 0 1px 2px rgba(16, 32, 26, .18), 0 4px 12px -4px rgba(15,92,94, .45), inset 0 1px 0 rgba(255, 255, 255, .12);
+  box-shadow: 0 1px 2px rgba(10,42,46, .18), 0 4px 12px -4px rgba(15,92,94, .45), inset 0 1px 0 rgba(255, 255, 255, .12);
 }
-.btn-primary:hover { background: linear-gradient(180deg, #0F5254 0%, var(--c-primary-600) 100%); box-shadow: 0 2px 4px rgba(16, 32, 26, .2), 0 8px 20px -6px rgba(15,92,94, .55), inset 0 1px 0 rgba(255, 255, 255, .12); }
+.btn-primary:hover { background: linear-gradient(180deg, #0F5254 0%, var(--c-primary-600) 100%); box-shadow: 0 2px 4px rgba(10,42,46, .2), 0 8px 20px -6px rgba(15,92,94, .55), inset 0 1px 0 rgba(255, 255, 255, .12); }
 .btn-secondary { border-color: var(--c-border); box-shadow: var(--sh-sm); }
 .btn-secondary:hover { border-color: #D6D0C4; background: #FAF8F4; }
 .btn-danger { background: linear-gradient(180deg, #E5484D, #CD2B31); box-shadow: 0 4px 12px -4px rgba(205, 43, 49, .45); }
@@ -111,7 +111,7 @@ body { background: var(--c-bg); color: #14262A; text-rendering: optimizeLegibili
 .table tbody tr:hover { background: #F6F3EC; }
 
 /* ---------------------------------------------------------------- Fenêtres */
-.modal-overlay { background: rgba(11, 25, 20, .42); backdrop-filter: blur(6px) saturate(1.2); }
+.modal-overlay { background: rgba(6,30,32, .42); backdrop-filter: blur(6px) saturate(1.2); }
 .modal { border-radius: 18px; box-shadow: var(--sh-xl); border: 1px solid rgba(255, 255, 255, .6); animation: modal-in .32s var(--ease-out); }
 @keyframes modal-in { from { opacity: 0; transform: translateY(14px) scale(.985); } to { opacity: 1; transform: none; } }
 .modal-header { padding: 18px 24px; }

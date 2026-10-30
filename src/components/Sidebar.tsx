@@ -125,7 +125,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
         onClick={onToggleCollapse}
         style={{
           padding: '8px 12px', margin: '8px 8px 0', borderRadius: 6,
-          color: 'rgba(216,243,220,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: 'rgba(227,239,238,.5)', display: 'flex', alignItems: 'center', justifyContent: 'center',
           transition: 'color .15s', width: collapsed ? 'auto' : 'auto',
         }}
       >
@@ -167,7 +167,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
                 )
               })}
               {!open && !collapsed && (
-                <div style={{ padding: '2px 14px 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(216,243,220,.45)' }}>
+                <div style={{ padding: '2px 14px 0', fontSize: 12, lineHeight: 1.5, color: 'rgba(227,239,238,.45)' }}>
                   {items.slice(0, 3).map(item => item.label).join(', ')}…
                 </div>
               )}
