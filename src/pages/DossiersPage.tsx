@@ -97,6 +97,9 @@ export function DossiersPage({
   const [vue, setVue] = useState<'liste' | 'pipeline'>(() => {
     try { return localStorage.getItem('renova.dossiers.vue') === 'liste' ? 'liste' : 'pipeline' } catch { return 'pipeline' }
   })
+  const [dragId, setDragId] = useState<string | null>(null)
+  const [overCol, setOverCol] = useState<string | null>(null)
+  const [messagePipeline, setMessagePipeline] = useState('')
   const changerVue = (v: 'liste' | 'pipeline') => {
     setVue(v)
     try { localStorage.setItem('renova.dossiers.vue', v) } catch { /* stockage indisponible */ }
@@ -902,6 +905,41 @@ export function DossiersPage({
     }
   }
 
+  const STATUT_PAR_COLONNE: Record<string, string> = { creation: 'creation', signe: 'signe', installation: 'installation', installe: 'installe', refuse: 'refuse' }
+
+  async function deplacerDossier(dossierId: string, colonneId: string) {
+    const d = rows.find(r => r.id === dossierId)
+    const cible = STATUT_PAR_COLONNE[colonneId]
+    if (!d || !cible) return
+    const colonneActuelle = COLONNES_DOSSIER.find(c => c.statuts.includes((d.statut || '').toLowerCase()))
+    if (colonneActuelle?.id === colonneId) return
+    if (!isAdmin) {
+      setMessagePipeline('Seul l’administrateur peut changer le statut d’un dossier.')
+      return
+    }
+    if (cible === 'installe' && !d.date_installation) {
+      // Règle existante : la date réelle d'installation est obligatoire pour passer en « Installé ».
+      ouvrirDetail(d)
+      setDetailStatut('installe')
+      setDetailMessage('Indiquez la date réelle d’installation avant de passer le dossier en « Installé ».')
+      return
+    }
+    setMessagePipeline('')
+    const ancien = d.statut
+    setRows(prev => prev.map(r => (r.id === dossierId ? { ...r, statut: cible } : r)))
+    const { error } = await supabase.from('dossiers').update({ statut: cible }).eq('id', dossierId)
+    if (error) {
+      console.error('Erreur déplacement dossier:', error)
+      setRows(prev => prev.map(r => (r.id === dossierId ? { ...r, statut: ancien } : r)))
+      setMessagePipeline('Le statut n’a pas pu être modifié. Réessayez.')
+      return
+    }
+    if (d.prospect_id) {
+      const statutProspect = cible === 'installe' ? 'Installé' : (cible === 'installation' || cible === 'signe') ? 'Installation' : null
+      if (statutProspect) await setProspectStatus(d.prospect_id, statutProspect, `statut dossier ${cible}`)
+    }
+  }
+
   const total = rows.length
 
   const enCours = rows.filter(d => {
@@ -1004,13 +1042,20 @@ export function DossiersPage({
         {kpis.slice(0,4).map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':'purple'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong>{k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">Pilotage</span></div>)}
       </section>
 
+      {vue === 'pipeline' && messagePipeline && <div className="dossier-board-message" role="status">{messagePipeline}</div>}
       {vue === 'pipeline' && !loading && rows.length > 0 && (
         <section className="dossier-board" aria-label="Dossiers par étape">
           {COLONNES_DOSSIER.map(col => {
             const items = rows.filter(d => col.statuts.includes((d.statut || '').toLowerCase()))
             const total = items.reduce((sum, d) => sum + (Number(d.montant_total) || 0), 0)
             return (
-              <div className="dossier-col" key={col.id}>
+              <div
+                className={`dossier-col${overCol === col.id ? ' is-over' : ''}`}
+                key={col.id}
+                onDragOver={e => { if (dragId) { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; if (overCol !== col.id) setOverCol(col.id) } }}
+                onDragLeave={e => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverCol(null) }}
+                onDrop={e => { e.preventDefault(); const id = dragId || e.dataTransfer.getData('text/plain'); setDragId(null); setOverCol(null); if (id) deplacerDossier(id, col.id) }}
+              >
                 <div className="dossier-col-head">
                   <span className="dossier-col-dot" style={{ background: col.couleur }} />
                   <span className="dossier-col-title">{col.label}</span>
@@ -1021,13 +1066,32 @@ export function DossiersPage({
                   const nom = d.prospect ? `${d.prospect.prenom || ''} ${d.prospect.nom || ''}`.trim() : '—'
                   const initiales = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?'
                   return (
-                    <button type="button" className="dossier-card" key={d.id} onClick={() => ouvrirDetail(d)}>
-                      <span className="dossier-card-top">
-                        <span className="dossier-card-avatar">{initiales}</span>
-                        <span className="dossier-card-id"><b>{nom}</b><small>{d.reference || d.id.slice(0, 8)}</small></span>
-                      </span>
-                      <span className="dossier-card-montant">{euro(d.montant_total)}</span>
-                    </button>
+                    <div
+                      className={`dossier-card${dragId === d.id ? ' is-drag' : ''}${isAdmin ? ' glissable' : ''}`}
+                      key={d.id}
+                      draggable={isAdmin}
+                      onDragStart={e => { setDragId(d.id); e.dataTransfer.effectAllowed = 'move'; e.dataTransfer.setData('text/plain', d.id) }}
+                      onDragEnd={() => { setDragId(null); setOverCol(null) }}
+                    >
+                      <button type="button" className="dossier-card-open" onClick={() => ouvrirDetail(d)}>
+                        <span className="dossier-card-top">
+                          <span className="dossier-card-avatar">{initiales}</span>
+                          <span className="dossier-card-id"><b>{nom}</b><small>{d.reference || d.id.slice(0, 8)}</small></span>
+                        </span>
+                        <span className="dossier-card-montant">{euro(d.montant_total)}</span>
+                      </button>
+                      {isAdmin && (
+                        <select
+                          className="dossier-card-move"
+                          aria-label={`Déplacer le dossier de ${nom}`}
+                          value=""
+                          onChange={e => { if (e.target.value) deplacerDossier(d.id, e.target.value) }}
+                        >
+                          <option value="">Déplacer vers…</option>
+                          {COLONNES_DOSSIER.filter(c => c.id !== col.id).map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+                        </select>
+                      )}
+                    </div>
                   )
                 })}
                 {items.length > 12 && <div className="dossier-col-more">+ {items.length - 12} autres dossiers · passez en vue Liste pour tout voir</div>}
