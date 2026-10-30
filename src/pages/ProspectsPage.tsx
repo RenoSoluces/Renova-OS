@@ -148,6 +148,18 @@ const EMPTY_FORM = {
   source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
 
+interface DossierFiche {
+  id: string
+  statut: string
+  installateur_id: string | null
+  created_at: string
+  devis: { numero: string | null; montant_ht: number | null } | null
+}
+
+const LIBELLES_STATUT_DOSSIER: Record<string, string> = {
+  creation: 'En création', signe: 'Signé', installation: 'Installation en cours', installe: 'Installé',
+}
+
 export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialView = 'liste', initialProspectId, onInitialProspectHandled }: Props) {
   const { profile } = useAuth()
   // Apporteur / call : consulte ses prospects (fiche, chat, historique, rappels) sans modifier la fiche.
@@ -175,6 +187,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   useEffect(() => { setView(initialView) }, [initialView])
   const [tasksByProspect, setTasksByProspect] = useState<Record<string, CrmTask[]>>({})
   const [linkedCounts, setLinkedCounts] = useState<{ visites: number; simulations: number; devis: number; dossiers: number } | null>(null)
+  // Un client peut avoir plusieurs dossiers (un par devis signé), chacun avec son installateur.
+  const [dossiersProspect, setDossiersProspect] = useState<DossierFiche[]>([])
+  const [dossierEnCours, setDossierEnCours] = useState<string | null>(null)
   const [tagInput, setTagInput] = useState('')
   const [timelineRefresh, setTimelineRefresh] = useState(0)
   const [prospectDocuments, setProspectDocuments] = useState<any[]>([])
@@ -280,15 +295,26 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
   async function fetchLinkedCounts(prospectId: string) {
     setLinkedCounts(null)
+    setDossiersProspect([])
     const [v, s, d, dos] = await Promise.all([
       supabase.from('visites').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
       supabase.from('simulations').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
       supabase.from('devis').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
-      supabase.from('dossiers').select('id', { count: 'exact', head: true }).eq('prospect_id', prospectId),
+      supabase.from('dossiers').select('id, statut, installateur_id, created_at, devis:devis!dossiers_devis_id_fkey(numero, montant_ht)').eq('prospect_id', prospectId).order('created_at'),
     ])
+    const listeDossiers = (dos.data || []) as unknown as DossierFiche[]
+    setDossiersProspect(listeDossiers)
     setLinkedCounts({
-      visites: v.count || 0, simulations: s.count || 0, devis: d.count || 0, dossiers: dos.count || 0,
+      visites: v.count || 0, simulations: s.count || 0, devis: d.count || 0, dossiers: listeDossiers.length,
     })
+  }
+
+  async function changerInstallateurDossier(dossierId: string, installateurId: string) {
+    setDossierEnCours(dossierId)
+    const { error } = await supabase.from('dossiers').update({ installateur_id: installateurId || null }).eq('id', dossierId)
+    setDossierEnCours(null)
+    if (error) { window.alert(`Installateur du dossier non modifié : ${error.message}`); return }
+    setDossiersProspect(prev => prev.map(d => d.id === dossierId ? { ...d, installateur_id: installateurId || null } : d))
   }
 
   useEffect(() => {
@@ -997,12 +1023,37 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 )}
                 {isAdmin && (
                   <div className="right-mini-section">
-                    <div className="right-mini-section-label">Partenaire installateur</div>
+                    <div className="right-mini-section-label">Installateur par défaut</div>
                     <select className="pipeline-inline-input" value={(selected as any).installateur_id || ''} onChange={ev => updateProspectField('installateur_id', ev.target.value || null)}>
                       <option value="">Aucun partenaire</option>
                       {installateurs.map(i => <option key={i.id} value={i.id}>{i.nom}</option>)}
                     </select>
-                    <div className="text-xs text-muted" style={{marginTop:6}}>L’Admin peut modifier l’attribution à tout moment.</div>
+                    <div className="text-xs text-muted" style={{marginTop:6}}>Proposé pour les nouveaux devis. Chaque dossier garde ensuite son propre installateur.</div>
+                  </div>
+                )}
+                {dossiersProspect.length > 0 && (
+                  <div className="right-mini-section">
+                    <div className="right-mini-section-label">Dossiers ({dossiersProspect.length})</div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                      {dossiersProspect.map(d => (
+                        <div key={d.id} style={{ display: 'flex', flexDirection: 'column', gap: 4, paddingBottom: 8, borderBottom: '1px solid var(--c-border-light)' }}>
+                          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8, fontSize: 13 }}>
+                            <strong>{d.devis?.numero || 'Sans devis'}</strong>
+                            <span className="text-muted">{d.devis?.montant_ht != null ? `${Number(d.devis.montant_ht).toLocaleString('fr-FR', { maximumFractionDigits: 0 })} € HT` : ''}</span>
+                          </div>
+                          <span className="text-xs text-muted">{LIBELLES_STATUT_DOSSIER[d.statut] || d.statut}</span>
+                          {isAdmin ? (
+                            <select className="pipeline-inline-input" value={d.installateur_id || ''} disabled={dossierEnCours === d.id}
+                              onChange={ev => void changerInstallateurDossier(d.id, ev.target.value)} aria-label={`Installateur du dossier ${d.devis?.numero || ''}`}>
+                              <option value="">Installateur à affecter</option>
+                              {installateurs.map(i => <option key={i.id} value={i.id}>{i.nom}</option>)}
+                            </select>
+                          ) : (
+                            <span className="text-sm">{installateurs.find(i => i.id === d.installateur_id)?.nom || 'Installateur à affecter'}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
                   </div>
                 )}
                 {profile?.role === 'admin' && <ProspectShareControl prospectId={selected.id} />}
