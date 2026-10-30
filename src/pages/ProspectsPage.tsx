@@ -114,7 +114,7 @@ function statutLabel(statut: string): string {
   return found?.label || statut || 'Nouveau'
 }
 
-const AVATAR_COLORS = ['#2D6A4F', '#1B4332', '#52B788', '#3A86C8', '#D4A574', '#E8A317', '#D62828', '#7B2D8E']
+const AVATAR_COLORS = ['#1B7A7C', '#0F5C5E', '#3FA3A1', '#3A86C8', '#C98A5E', '#E8A317', '#D62828', '#7B2D8E']
 
 function avatarColor(name: string): string {
   let hash = 0

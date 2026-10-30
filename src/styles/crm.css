@@ -274,7 +274,7 @@
 .login-regles li.ok { color: var(--c-success, #2D8659); font-weight: 600; }
 
 .invitation-lien { margin-top: 12px; padding: 14px; border-radius: var(--r-md, 10px); border: 1px solid var(--c-primary-100, #CFE5D8); background: var(--c-primary-50, #EAF4EE); display: flex; flex-direction: column; gap: 10px; }
-.invitation-lien-titre { font-weight: 700; font-size: 13.5px; color: var(--c-primary, #1B4332); }
+.invitation-lien-titre { font-weight: 700; font-size: 13.5px; color: var(--c-primary, #0F5C5E); }
 .invitation-lien code { display: block; padding: 8px 10px; border-radius: 8px; background: #fff; border: 1px solid var(--c-border-light, #E3E9E5); font-size: 12px; word-break: break-all; }
 .invitation-lien-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .invitation-lien-actions .btn { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
@@ -364,12 +364,12 @@
 .import-g-prenom button:hover { background: var(--c-bg-soft); color: var(--c-primary); }
 
 /* Invitation à activer les notifications */
-.invit-notif { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border-radius: var(--r-lg, 14px); background: linear-gradient(120deg, var(--c-primary, #1B4332), var(--c-primary-400, #2D6A4F)); color: #fff; box-shadow: var(--sh-md); }
+.invit-notif { display: flex; align-items: center; gap: 12px; margin-bottom: 16px; padding: 12px 14px; border-radius: var(--r-lg, 14px); background: linear-gradient(120deg, var(--c-primary, #0F5C5E), var(--c-primary-400, #1B7A7C)); color: #fff; box-shadow: var(--sh-md); }
 .invit-notif-icone { width: 36px; height: 36px; flex-shrink: 0; display: grid; place-items: center; border-radius: 10px; background: rgba(255,255,255,.16); }
 .invit-notif-texte { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; font-size: 13px; }
 .invit-notif-texte strong { font-size: 14px; }
 .invit-notif-texte span { opacity: .88; }
-.invit-notif .btn-primary { background: #fff; color: var(--c-primary, #1B4332); border-color: #fff; }
+.invit-notif .btn-primary { background: #fff; color: var(--c-primary, #0F5C5E); border-color: #fff; }
 .invit-notif-fermer { width: 30px; height: 30px; flex-shrink: 0; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: #fff; opacity: .8; cursor: pointer; }
 .invit-notif-fermer:hover { opacity: 1; background: rgba(255,255,255,.12); }
 

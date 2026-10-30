@@ -44,7 +44,7 @@
 .tr-pin-conteneur { background: none; border: 0; }
 .tr-pin { position: relative; display: grid; place-items: center; width: 34px; height: 34px; border-radius: 50% 50% 50% 0; transform: rotate(-45deg); background: var(--pin); border: 3px solid #fff; box-shadow: 0 3px 8px rgba(0,0,0,.35); }
 .tr-pin b { transform: rotate(45deg); color: #fff; font-size: 12px; font-weight: 700; }
-.tr-pin.actif { box-shadow: 0 0 0 4px rgba(27,67,50,.45), 0 3px 8px rgba(0,0,0,.35); }
+.tr-pin.actif { box-shadow: 0 0 0 4px rgba(15,92,94,.45), 0 3px 8px rgba(0,0,0,.35); }
 
 .tr-panneau { background: var(--c-bg-alt); border: 1px solid var(--c-border-light); border-radius: var(--r-lg); box-shadow: var(--sh-sm); overflow: hidden; }
 .tr-onglets { display: grid; grid-template-columns: repeat(3, 1fr); border-bottom: 1px solid var(--c-border-light); }
@@ -115,7 +115,7 @@
 .tr-classement li { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 10px; border-radius: var(--r-md); background: var(--c-bg-soft); }
 .tr-classement li.moi { background: var(--c-primary-50); outline: 2px solid var(--c-primary-300); }
 .tr-rang { width: 28px; height: 28px; display: grid; place-items: center; border-radius: 50%; background: #fff; font-weight: 800; font-size: 13px; color: var(--c-primary); }
-.tr-classement li:first-child .tr-rang { background: var(--c-accent, #D4A574); color: #fff; }
+.tr-classement li:first-child .tr-rang { background: var(--c-accent, #C98A5E); color: #fff; }
 .tr-classement-nom { font-weight: 600; font-size: 14px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tr-classement-chiffres { font-size: 12px; color: var(--c-text-secondary); white-space: nowrap; }
 .tr-classement-chiffres b { color: var(--c-success, #2D8659); font-size: 15px; }

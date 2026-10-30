@@ -2,7 +2,7 @@ import { useId } from 'react'
 import { MOIS, ORIENTATIONS, type OrientationToit, type ResultatSolaire } from '../../lib/photovoltaique/simulateurSolaire'
 
 const COULEURS = {
-  auto: '#2D6A4F', surplus: '#E8B04A', conso: '#1A1A1A', prod: '#52B788',
+  auto: '#1B7A7C', surplus: '#E8B04A', conso: '#1A1A1A', prod: '#3FA3A1',
   soleil: '#F4B63F', positif: '#2D8659', negatif: '#D9822B',
 }
 

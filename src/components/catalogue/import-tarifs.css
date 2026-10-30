@@ -3,7 +3,7 @@
 .it-modes button { flex: 1; display: inline-flex; align-items: center; justify-content: center; gap: 7px; padding: 9px 10px; border: 0; border-radius: 9px; background: transparent; font: inherit; font-size: 13.5px; font-weight: 600; color: var(--text-2, #5d716a); cursor: pointer; }
 .it-modes button.on { background: var(--surface, #fff); color: var(--text, #12261f); box-shadow: 0 1px 3px rgba(18, 38, 31, .12); }
 .it-depot { display: grid; justify-items: center; gap: 6px; padding: 26px 18px; border: 1.5px dashed var(--border, #d4dfd9); border-radius: 14px; text-align: center; cursor: pointer; color: var(--text-2, #5d716a); transition: border-color .15s, background .15s; }
-.it-depot:hover { border-color: var(--primary, #1b4332); background: rgba(27, 67, 50, .03); }
+.it-depot:hover { border-color: var(--primary, #0F5C5E); background: rgba(15,92,94, .03); }
 .it-depot input { display: none; }
 .it-depot b { color: var(--text, #12261f); font-size: 14.5px; }
 .it-depot small { max-width: 460px; font-size: 12.5px; }

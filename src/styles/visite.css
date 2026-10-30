@@ -321,7 +321,7 @@
   transition:all var(--tr-fast);position:relative;
 }
 .audit-nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
-.audit-nav-item.active{background:rgba(82,183,136,.18);color:#fff}
+.audit-nav-item.active{background:rgba(63,163,161,.18);color:#fff}
 .audit-nav-item.active::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:3px;background:var(--c-primary-200);border-radius:2px}
 .audit-nav-item .num{
   width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.09);
@@ -528,7 +528,7 @@
 .compass-btn:hover{border-color:var(--c-primary-300);color:var(--c-primary-600)}
 .compass-btn.selected{
   background:var(--c-primary-400);border-color:var(--c-primary-400);color:#fff;
-  transform:scale(1.1);box-shadow:0 0 0 4px rgba(82,183,136,.2);
+  transform:scale(1.1);box-shadow:0 0 0 4px rgba(63,163,161,.2);
 }
 .compass-btn.N{top:0;left:50%;transform:translateX(-50%)}
 .compass-btn.N.selected{transform:translateX(-50%) scale(1.1)}

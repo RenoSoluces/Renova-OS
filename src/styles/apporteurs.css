@@ -126,7 +126,7 @@
 .acc-type span { display: flex; flex-direction: column; gap: 2px; }
 .acc-type strong { font-size: 14px; color: var(--c-text); }
 .acc-type small { font-size: 12px; color: var(--c-text-muted); line-height: 1.35; }
-.acc-type.on { border-color: var(--c-primary-400); background: var(--c-primary-50); box-shadow: 0 0 0 3px rgba(82, 183, 136, .16); }
+.acc-type.on { border-color: var(--c-primary-400); background: var(--c-primary-50); box-shadow: 0 0 0 3px rgba(63,163,161, .16); }
 .acc-type.on > svg { color: var(--c-primary); }
 .acc-grille { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 14px; }
 .acc-grille .acc-large { grid-column: 1 / -1; }
@@ -140,7 +140,7 @@
 .acc-mdp small.ok { color: var(--c-success); }
 .acc-mdp-champ { position: relative; }
 .acc-mdp-champ input { width: 100%; height: 44px; border: 1px solid var(--c-border); border-radius: 10px; padding: 0 44px 0 14px; font-family: 'IBM Plex Mono', ui-monospace, monospace; font-size: 15px; letter-spacing: .04em; background: #fff; }
-.acc-mdp-champ input:focus { outline: none; border-color: var(--c-primary-300); box-shadow: var(--ring, 0 0 0 3px rgba(82,183,136,.25)); }
+.acc-mdp-champ input:focus { outline: none; border-color: var(--c-primary-300); box-shadow: var(--ring, 0 0 0 3px rgba(63,163,161,.25)); }
 .acc-mdp-champ button { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); width: 32px; height: 32px; display: grid; place-items: center; color: var(--c-text-muted); border-radius: 8px; }
 .acc-note { margin: 0; font-size: 12.5px; color: var(--c-text-muted); line-height: 1.45; }
 .acc-erreur { padding: 10px 12px; border-radius: 10px; background: #FBE6E4; color: #8F1D14; font-size: 13.5px; }
@@ -177,7 +177,7 @@
 .acl-vide { display: flex; align-items: center; gap: 8px; }
 .acl-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .acl-liste li { display: grid; grid-template-columns: 36px minmax(0, 1fr) auto auto auto; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--c-border, #e2e9e5); border-radius: 12px; background: var(--c-bg-alt, #fff); }
-.acl-icone { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #eef4f1; color: #1b4332; }
+.acl-icone { display: grid; place-items: center; width: 36px; height: 36px; border-radius: 10px; background: #eef4f1; color: #0F5C5E; }
 .acl-icone.partenaire { background: #eaf2fb; color: #1d5e9e; }
 .acl-icone.apporteur { background: #fdf3e4; color: #9a5b00; }
 .acl-qui { display: grid; min-width: 0; }
