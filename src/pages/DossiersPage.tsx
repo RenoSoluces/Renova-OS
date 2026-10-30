@@ -58,6 +58,21 @@ const STATUTS_DOSSIER = [
   { value: 'refuse', label: 'Refusé' },
 ]
 
+const COLONNES_DOSSIER = [
+  { id: 'creation', label: 'Création', couleur: '#3FA3A1', statuts: ['creation', 'en_cours', 'attente', 'en_attente'] },
+  { id: 'signe', label: 'Signé', couleur: '#C98A5E', statuts: ['signe', 'accepte'] },
+  { id: 'installation', label: 'Installation', couleur: '#A4562A', statuts: ['installation'] },
+  { id: 'installe', label: 'Installé', couleur: '#0F5C5E', statuts: ['installe'] },
+  { id: 'refuse', label: 'Refusé', couleur: '#8A9A9C', statuts: ['refuse'] },
+]
+
+const ETAPES_FRISE = [
+  { label: 'Création', statuts: ['creation', 'en_cours', 'attente', 'en_attente'] },
+  { label: 'Signé', statuts: ['signe', 'accepte'] },
+  { label: 'Installation', statuts: ['installation'] },
+  { label: 'Installé', statuts: ['installe'] },
+]
+
 interface DossiersPageProps {
   initialProspectId?: string | null
   onInitialProspectHandled?: () => void
@@ -79,6 +94,13 @@ export function DossiersPage({
   const canViewCompanyCommission = isAdmin || ['super_admin', 'partner_admin', 'company_admin'].includes(profile?.role || '')
 
   const [rows, setRows] = useState<DossierAvecRelations[]>([])
+  const [vue, setVue] = useState<'liste' | 'pipeline'>(() => {
+    try { return localStorage.getItem('renova.dossiers.vue') === 'liste' ? 'liste' : 'pipeline' } catch { return 'pipeline' }
+  })
+  const changerVue = (v: 'liste' | 'pipeline') => {
+    setVue(v)
+    try { localStorage.setItem('renova.dossiers.vue', v) } catch { /* stockage indisponible */ }
+  }
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -964,6 +986,10 @@ export function DossiersPage({
         </div>
 
         <div className="page-actions">
+          <div className="vue-switch" role="group" aria-label="Affichage des dossiers">
+            <button type="button" className={vue === 'liste' ? 'on' : ''} onClick={() => changerVue('liste')}>Liste</button>
+            <button type="button" className={vue === 'pipeline' ? 'on' : ''} onClick={() => changerVue('pipeline')}>Pipeline</button>
+          </div>
           <Button
             variant="primary"
             onClick={() => setNewModalOpen(true)}
@@ -978,7 +1004,41 @@ export function DossiersPage({
         {kpis.slice(0,4).map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':'purple'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong>{k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">Pilotage</span></div>)}
       </section>
 
-      <div className="card">
+      {vue === 'pipeline' && !loading && rows.length > 0 && (
+        <section className="dossier-board" aria-label="Dossiers par étape">
+          {COLONNES_DOSSIER.map(col => {
+            const items = rows.filter(d => col.statuts.includes((d.statut || '').toLowerCase()))
+            const total = items.reduce((sum, d) => sum + (Number(d.montant_total) || 0), 0)
+            return (
+              <div className="dossier-col" key={col.id}>
+                <div className="dossier-col-head">
+                  <span className="dossier-col-dot" style={{ background: col.couleur }} />
+                  <span className="dossier-col-title">{col.label}</span>
+                  <span className="dossier-col-count">{items.length}</span>
+                  <span className="dossier-col-total">{euro(total)}</span>
+                </div>
+                {items.slice(0, 12).map(d => {
+                  const nom = d.prospect ? `${d.prospect.prenom || ''} ${d.prospect.nom || ''}`.trim() : '—'
+                  const initiales = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?'
+                  return (
+                    <button type="button" className="dossier-card" key={d.id} onClick={() => ouvrirDetail(d)}>
+                      <span className="dossier-card-top">
+                        <span className="dossier-card-avatar">{initiales}</span>
+                        <span className="dossier-card-id"><b>{nom}</b><small>{d.reference || d.id.slice(0, 8)}</small></span>
+                      </span>
+                      <span className="dossier-card-montant">{euro(d.montant_total)}</span>
+                    </button>
+                  )
+                })}
+                {items.length > 12 && <div className="dossier-col-more">+ {items.length - 12} autres dossiers · passez en vue Liste pour tout voir</div>}
+                {items.length === 0 && <div className="dossier-col-more">Aucun dossier</div>}
+              </div>
+            )
+          })}
+        </section>
+      )}
+
+      <div className="card" style={vue === 'pipeline' && !loading && rows.length > 0 ? { display: 'none' } : undefined}>
         {loading ? (
           <div className="card-pad text-muted">
             Chargement…
@@ -1206,19 +1266,52 @@ export function DossiersPage({
               </div>
             )}
 
-            {/* CLIENT */}
+            {/* IDENTITÉ, AVANCEMENT ET MONTANT */}
 
-            <div>
-              <div className="text-sm text-muted">
-                Client
-              </div>
+            {(() => {
+              const nom = detail.prospect ? `${detail.prospect.prenom || ''} ${detail.prospect.nom || ''}`.trim() : '—'
+              const initiales = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(x => x[0]).join('').toUpperCase() || '?'
+              const statutCourant = (detail.statut || '').toLowerCase()
+              const etape = ETAPES_FRISE.findIndex(e => e.statuts.includes(statutCourant))
+              const lignes = facturation.filter(l => l.statut !== 'annulee')
+              const ht = (l: DossierFacturation) => Number(l.montant_ht) || 0
+              const somme = (statut: string) => lignes.filter(l => l.statut === statut).reduce((t, l) => t + ht(l), 0)
+              const encaisse = somme('payee')
+              const aEncaisser = somme('facturee')
+              const aFacturer = somme('a_facturer')
+              const totalLignes = encaisse + aEncaisser + aFacturer
+              const montantDossier = Number(detail.montant_total) || totalLignes
+              const pct = montantDossier > 0 ? Math.min(100, Math.round((encaisse / montantDossier) * 100)) : 0
+              return (
+                <div className="fiche-head">
+                  <div className="fiche-identite">
+                    <span className="fiche-avatar">{initiales}</span>
+                    <div>
+                      <small>Dossier {detail.reference || detail.id.slice(0, 8)}</small>
+                      <h2>{nom}</h2>
+                    </div>
+                  </div>
 
-              <div className="font-semibold">
-                {detail.prospect
-                  ? `${detail.prospect.prenom} ${detail.prospect.nom}`
-                  : '—'}
-              </div>
-            </div>
+                  <ol className="fiche-frise" aria-label="Avancement du dossier">
+                    {ETAPES_FRISE.map((e, i) => (
+                      <li key={e.label} className={i < etape ? 'fait' : i === etape ? 'courant' : ''}>
+                        <span>{i + 1}</span>
+                        <div><b>{e.label}</b><small>{i < etape ? 'Terminé' : i === etape ? 'Étape actuelle' : 'À venir'}</small></div>
+                      </li>
+                    ))}
+                  </ol>
+
+                  <div className="fiche-montant">
+                    <small>Montant du dossier</small>
+                    <strong>{euro(montantDossier)}</strong>
+                    <div className="fiche-barre"><i style={{ width: `${pct}%` }} /></div>
+                    <div className="fiche-ligne"><span>Encaissé (HT)</span><b>{euro(encaisse)}</b></div>
+                    <div className="fiche-ligne"><span>À encaisser (HT)</span><b>{euro(aEncaisser)}</b></div>
+                    <div className="fiche-ligne"><span>À facturer (HT)</span><b>{euro(aFacturer)}</b></div>
+                  </div>
+                </div>
+              )
+            })()}
 
             {/* MONTANTS EXISTANTS */}
 
