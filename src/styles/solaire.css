@@ -1,7 +1,7 @@
 /* =============================================================================
    Simulateur solaire — parcours dédié (préfixe sol-)
    ============================================================================= */
-.sol { --sol-or: #E8B04A; --sol-auto: #2D6A4F; max-width: 1180px; margin: 0 auto; padding: var(--sp-6) var(--sp-6) var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-5); }
+.sol { --sol-or: #E8B04A; --sol-auto: #1B7A7C; max-width: 1180px; margin: 0 auto; padding: var(--sp-6) var(--sp-6) var(--sp-12); display: flex; flex-direction: column; gap: var(--sp-5); }
 
 .sol-hero {
   display: flex; align-items: center; gap: var(--sp-5);
@@ -57,7 +57,7 @@
   background: var(--c-bg-alt); border: 1px solid var(--c-border); border-radius: var(--r-sm);
   transition: border-color var(--tr-fast), box-shadow var(--tr-fast);
 }
-.sol-champ input:focus, .sol-champ select:focus { outline: none; border-color: var(--c-border-focus); box-shadow: 0 0 0 3px rgba(82,183,136,.18); }
+.sol-champ input:focus, .sol-champ select:focus { outline: none; border-color: var(--c-border-focus); box-shadow: 0 0 0 3px rgba(63,163,161,.18); }
 .sol-prix-saisie { display: flex; align-items: center; gap: 10px; }
 .sol-prix-saisie em { font-style: normal; font-weight: 600; color: var(--c-text-muted); white-space: nowrap; }
 .sol-prix .sol-prix-saisie input { font-family: var(--font-display); font-size: 24px; font-weight: 600; min-height: 58px; border-color: var(--c-accent); background: color-mix(in srgb, var(--c-accent) 8%, #fff); }
@@ -143,7 +143,7 @@ input[type=range] { width: 100%; height: 36px; accent-color: var(--c-primary-400
 .sol-legende { list-style: none; margin: 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: var(--sp-3); }
 .sol-legende li { display: flex; align-items: flex-start; gap: 10px; }
 .sol-legende i, .sol-legende-ligne i { display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-top: 3px; flex-shrink: 0; }
-.sol-legende i.auto, .sol-legende-ligne i.auto { background: #2D6A4F; } .sol-legende i.surplus, .sol-legende-ligne i.surplus { background: #E8B04A; }
+.sol-legende i.auto, .sol-legende-ligne i.auto { background: #1B7A7C; } .sol-legende i.surplus, .sol-legende-ligne i.surplus { background: #E8B04A; }
 .sol-legende-ligne i.conso { background: transparent; border-top: 2px dashed #1A1A1A; height: 0; width: 16px; border-radius: 0; margin-top: 8px; }
 .sol-legende strong { font-size: 15px; } .sol-legende small { display: block; font-size: 12px; color: var(--c-text-muted); }
 .sol-carte-tete { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: var(--sp-3); margin-bottom: var(--sp-3); }

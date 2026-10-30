@@ -17,7 +17,7 @@ export default defineConfig({
         name: 'Renova OS',
         short_name: 'Renova OS',
         description: 'Logiciel de gestion pour la rénovation énergétique',
-        theme_color: '#1B4332',
+        theme_color: '#0F5C5E',
         background_color: '#F6F8F7',
         display: 'standalone',
         start_url: '/',

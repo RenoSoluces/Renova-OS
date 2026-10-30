@@ -11,8 +11,8 @@ export interface PipelineStage {
 
 export const PIPELINE_STAGES: PipelineStage[] = [
   { value: 'Nouveau', label: 'Nouveau', color: '#3A86C8', description: 'Vient d\'entrer dans le pipeline' },
-  { value: 'Qualifié', label: 'Qualifié', color: '#52B788', description: 'Contact confirmé, besoin identifié' },
-  { value: 'Visite planifiée', label: 'Visite planifiée', color: '#D4A574', description: 'RDV technique posé' },
+  { value: 'Qualifié', label: 'Qualifié', color: '#3FA3A1', description: 'Contact confirmé, besoin identifié' },
+  { value: 'Visite planifiée', label: 'Visite planifiée', color: '#C98A5E', description: 'RDV technique posé' },
   { value: 'Visite faite', label: 'Visite faite', color: '#E8A317', description: 'Audit réalisé, en attente de proposition' },
   { value: 'Dossier', label: 'Dossier', color: '#8A6FD4', description: 'Devis envoyé / dossier en cours' },
   { value: 'Signé', label: 'Signé', color: '#2D8659', description: 'Affaire gagnée' },
@@ -49,10 +49,10 @@ export const TEMPERATURES: { value: string; label: string; color: string }[] = [
 export const INTERACTION_TYPES: { value: string; label: string; color: string }[] = [
   { value: 'appel', label: 'Appel téléphonique', color: '#3A86C8' },
   { value: 'email', label: 'Email', color: '#8A6FD4' },
-  { value: 'sms', label: 'SMS', color: '#52B788' },
-  { value: 'rdv', label: 'Rendez-vous', color: '#D4A574' },
+  { value: 'sms', label: 'SMS', color: '#3FA3A1' },
+  { value: 'rdv', label: 'Rendez-vous', color: '#C98A5E' },
   { value: 'note', label: 'Note', color: '#7A7A7A' },
-  { value: 'statut', label: 'Changement de statut', color: '#1B4332' },
+  { value: 'statut', label: 'Changement de statut', color: '#0F5C5E' },
   { value: 'visite', label: 'Visite technique', color: '#E8A317' },
   { value: 'devis', label: 'Devis', color: '#2D8659' },
   { value: 'dossier', label: 'Dossier', color: '#D62828' },
