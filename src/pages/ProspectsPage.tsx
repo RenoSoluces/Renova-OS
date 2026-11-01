@@ -390,7 +390,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       const matchesTemperature = !temperatureFilter || (p.temperature || 'tiede') === temperatureFilter
       const matchesSource = !sourceFilter || p.source === sourceFilter
       const matchesTag = !tagFilter || (p.tags || []).includes(tagFilter)
-      const matchesCommercial = !commercialFilter || p.commercial_id === commercialFilter
+      const matchesCommercial = !commercialFilter || p.commercial_id === commercialFilter || (p as any).apporteur_user_id === commercialFilter
       const matchesPool = !potCommunOnly || !!(p as any).pot_commun
       return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPool
     })
