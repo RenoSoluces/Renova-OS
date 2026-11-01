@@ -37,7 +37,7 @@ export function PerformancePage() {
       supabase.from('commissions_safe').select('id,reference_type,reference_id,statut,date_paiement_societe').in('reference_type',['visites','planning_events']).neq('statut','annulee'),
     ]).then(([p, c, d, pr, dv, co, vt, df, vtCom]) => {
       setPartners((p.data || []) as Partner[])
-      setCommercials((c.data || []).filter((x: Commercial) => x.role === 'commercial') as Commercial[])
+      setCommercials((c.data || []).filter((x: Commercial) => !/reno\s*soluces/i.test(x.nom_complet || '')) as Commercial[])
       setDossiers((d.data || []) as Dossier[])
       setProspects((pr.data || []) as ProspectRef[])
       setDevis((dv.data || []) as DevisRef[])
