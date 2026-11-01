@@ -123,6 +123,12 @@ interface Props {
   onInitialProspectHandled?: () => void
 }
 
+const LIBELLES_CATEGORIES_VT: Record<string, string> = {
+  vt_complete: 'Visite technique complète',
+  vt_produit: 'Visite technique produit',
+  vt_diagnostic_3cl: 'Diagnostic / analyse 3CL',
+}
+
 export function VisitesPage({
   onBack,
   onCreateDevis,
@@ -893,6 +899,12 @@ export function VisitesPage({
     },
     [],
   )
+
+  // Seuls les types de visite technique du catalogue sont proposés (et non les ~900 produits).
+  const typesDeVt = useMemo(() => catalogueProduits
+    .filter((p: any) => p.actif !== false && (p.catalogue_groupe === 'visite_technique' || String(p.categorie || '').startsWith('vt_')))
+    .sort((a: any, b: any) => String(a.categorie || '').localeCompare(String(b.categorie || ''), 'fr') || String(a.nom || '').localeCompare(String(b.nom || ''), 'fr', { numeric: true })),
+  [catalogueProduits])
 
   const qualifyVisite = useCallback(async () => {
     if (!admin || !qualificationVisite || !qualificationProduitId) return
@@ -1686,7 +1698,7 @@ export function VisitesPage({
                 onChange={setQualificationProduitId}
                 options={[
                   { value: '', label: 'Sélectionner le type de VT' },
-                  ...catalogueProduits.filter((p: any) => p.actif !== false).map((p: any) => ({ value: p.id, label: p.nom })),
+                  ...typesDeVt.map((p: any) => ({ value: p.id, label: `${LIBELLES_CATEGORIES_VT[p.categorie] || 'Visite technique'} · ${String(p.nom || '').replace(/^Visite technique\s*/i, '') || p.nom}` })),
                 ]}
               />
             </div>
