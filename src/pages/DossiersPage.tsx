@@ -139,9 +139,22 @@ export function DossiersPage({
   const [addingPiece, setAddingPiece] = useState(false)
   const extraFileInputRef = useRef<HTMLInputElement>(null)
 
+  // Nom de l'apporteur d'affaires du prospect (affiché sur la fiche dossier).
+  const [apporteurNom, setApporteurNom] = useState<string | null>(null)
+
   const [commissionsParDevis, setCommissionsParDevis] = useState<
     Record<string, { montant_commercial: number; montant_societe: number }>
   >({})
+
+  const apporteurId = (detail as any)?.prospect?.apporteur_user_id as string | undefined
+  useEffect(() => {
+    let annule = false
+    setApporteurNom(null)
+    if (!apporteurId) return
+    supabase.from('profiles').select('nom_complet').eq('id', apporteurId).maybeSingle()
+      .then(({ data }) => { if (!annule) setApporteurNom(data?.nom_complet || null) })
+    return () => { annule = true }
+  }, [apporteurId])
 
   // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   function fetchListe() {
@@ -1353,6 +1366,7 @@ export function DossiersPage({
                     <div>
                       <small>Dossier {detail.reference || detail.id.slice(0, 8)}</small>
                       <h2>{nom}</h2>
+                      {apporteurNom && <small className="fiche-apporteur">Apporteur : <strong>{apporteurNom}</strong></small>}
                     </div>
                   </div>
 
