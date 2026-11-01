@@ -186,7 +186,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
     .sort((a,b)=>b.score-a.score)
 
   const commercialLeaderboard:CommercialScore[]=profiles
-    .filter(p=>p.role==='commercial')
+    .filter(p=>!/reno\s*soluces/i.test(p.nom_complet||''))
     .map(p=>{
       const assigned=prospects.filter(x=>x.commercial_id===p.id)
       const signed=assigned.filter(x=>signedByProspect.has(x.id)).length
@@ -616,7 +616,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
 
       <div className="admin-mini-stat-grid">
 
-        {profiles.filter(p=>p.role==='commercial').map(p=>
+        {profiles.filter(p=>!/reno\s*soluces/i.test(p.nom_complet||'')).map(p=>
           <div key={p.id}>
 
             <span>{p.nom_complet||'Commercial'}</span>
@@ -645,7 +645,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
           </div>
         )}
 
-        {profiles.filter(p=>p.role==='commercial').length===0&&
+        {profiles.filter(p=>!/reno\s*soluces/i.test(p.nom_complet||'')).length===0&&
           <div className="admin-empty">
             <Users size={20}/>
             <div>
