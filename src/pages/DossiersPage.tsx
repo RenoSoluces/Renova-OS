@@ -1075,7 +1075,8 @@ export function DossiersPage({
       ? new Intl.NumberFormat('fr-FR', {
           style: 'currency',
           currency: 'EUR',
-          maximumFractionDigits: 0,
+          minimumFractionDigits: 0,
+          maximumFractionDigits: 2,
         }).format(Number(n) || 0)
       : '—'
 
@@ -1264,9 +1265,7 @@ export function DossiersPage({
 
               <tbody>
                 {rowsFiltrees.map(d => {
-                  const commission = d.devis_id
-                    ? commissionsParDevis[d.devis_id]
-                    : undefined
+                  const commission = (d.devis_id && commissionsParDevis[d.devis_id]) || commissionsParDevis[d.id]
 
                   return (
                     <tr

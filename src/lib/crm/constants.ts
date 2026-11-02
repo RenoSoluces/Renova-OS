@@ -73,7 +73,7 @@ export const TASK_PRIORITES: { value: string; label: string; color: string }[] =
 ]
 
 export function euro(n: number | null | undefined): string {
-  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(Number(n) || 0)
+  return new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(Number(n) || 0)
 }
 
 export function timeAgo(iso: string | null | undefined): string {
