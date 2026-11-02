@@ -142,6 +142,16 @@ export function DossiersPage({
   // Nom de l'apporteur d'affaires du prospect (affiché sur la fiche dossier).
   const [apporteurNom, setApporteurNom] = useState<string | null>(null)
 
+  // Filtres de la liste / du pipeline
+  const [recherche, setRecherche] = useState('')
+  const [filtreEtape, setFiltreEtape] = useState('')
+  const [filtrePersonne, setFiltrePersonne] = useState('')
+  const [personnes, setPersonnes] = useState<{ id: string; nom_complet: string }[]>([])
+  useEffect(() => {
+    supabase.from('profiles').select('id,nom_complet,role').in('role', ['commercial', 'manager', 'admin', 'apporteur']).order('nom_complet')
+      .then(({ data }) => setPersonnes((data || []).filter((x: any) => !/reno\s*soluces/i.test(x.nom_complet || '')) as any))
+  }, [])
+
   const [commissionsParDevis, setCommissionsParDevis] = useState<
     Record<string, { montant_commercial: number; montant_societe: number }>
   >({})
@@ -953,6 +963,23 @@ export function DossiersPage({
     }
   }
 
+  const normaliser = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  const rowsFiltrees = rows.filter(d => {
+    const pr: any = d.prospect || {}
+    if (recherche.trim()) {
+      const q = normaliser(recherche.trim())
+      const texte = normaliser([d.reference, pr.prenom, pr.nom, `${pr.prenom || ''} ${pr.nom || ''}`, `${pr.nom || ''} ${pr.prenom || ''}`, pr.ville, pr.code_postal, pr.telephone, pr.email].join(' '))
+      if (!q.split(/\s+/).every(m => texte.includes(m))) return false
+    }
+    if (filtreEtape) {
+      const col = COLONNES_DOSSIER.find(c => c.id === filtreEtape)
+      if (col && !col.statuts.includes((d.statut || '').toLowerCase())) return false
+    }
+    if (filtrePersonne && pr.commercial_id !== filtrePersonne && pr.apporteur_user_id !== filtrePersonne) return false
+    return true
+  })
+  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne].filter(Boolean).length
+
   const total = rows.length
 
   const enCours = rows.filter(d => {
@@ -1055,11 +1082,36 @@ export function DossiersPage({
         {kpis.slice(0,4).map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':'purple'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong>{k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">Pilotage</span></div>)}
       </section>
 
+      <div className="dossier-filtres" role="search">
+        <input
+          type="search"
+          className="input"
+          placeholder="Rechercher un nom, une référence, une ville, un téléphone…"
+          value={recherche}
+          onChange={e => setRecherche(e.target.value)}
+          aria-label="Rechercher un dossier"
+        />
+        <select className="input" value={filtreEtape} onChange={e => setFiltreEtape(e.target.value)} aria-label="Filtrer par étape">
+          <option value="">Toutes les étapes</option>
+          {COLONNES_DOSSIER.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
+        </select>
+        <select className="input" value={filtrePersonne} onChange={e => setFiltrePersonne(e.target.value)} aria-label="Filtrer par commercial ou apporteur">
+          <option value="">Tous les commerciaux / apporteurs</option>
+          {personnes.map(x => <option key={x.id} value={x.id}>{x.nom_complet}</option>)}
+        </select>
+        {filtresActifs > 0 && (
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne('') }}>
+            Réinitialiser ({filtresActifs})
+          </button>
+        )}
+        <span className="dossier-filtres-compte">{rowsFiltrees.length} / {rows.length} dossier{rows.length > 1 ? 's' : ''}</span>
+      </div>
+
       {vue === 'pipeline' && messagePipeline && <div className="dossier-board-message" role="status">{messagePipeline}</div>}
       {vue === 'pipeline' && !loading && rows.length > 0 && (
         <section className="dossier-board" aria-label="Dossiers par étape">
           {COLONNES_DOSSIER.map(col => {
-            const items = rows.filter(d => col.statuts.includes((d.statut || '').toLowerCase()))
+            const items = rowsFiltrees.filter(d => col.statuts.includes((d.statut || '').toLowerCase()))
             const total = items.reduce((sum, d) => sum + (Number(d.montant_total) || 0), 0)
             return (
               <div
@@ -1154,7 +1206,7 @@ export function DossiersPage({
               </thead>
 
               <tbody>
-                {rows.map(d => {
+                {rowsFiltrees.map(d => {
                   const commission = d.devis_id
                     ? commissionsParDevis[d.devis_id]
                     : undefined
