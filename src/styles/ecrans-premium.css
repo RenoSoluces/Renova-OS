@@ -163,3 +163,8 @@
 @media(max-width:760px){.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(4):last-child){grid-template-columns:1fr}}
 .dossier-filtres .input{height:42px;padding:0 14px;border:1px solid var(--ep-line,#d9e2e0);border-radius:12px;background:#fff;font:inherit;font-size:14px;color:inherit}
 .dossier-filtres .input:focus{outline:2px solid var(--ep-teal,#0F5C5E);outline-offset:1px}
+
+.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child){grid-template-columns:repeat(5,minmax(0,1fr))}
+.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child) .dashboard-kpi-main strong{font-size:28px}
+@media(max-width:1280px){.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}}
+@media(max-width:760px){.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child){grid-template-columns:1fr}}

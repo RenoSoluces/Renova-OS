@@ -153,7 +153,7 @@ export function DossiersPage({
   const [filtrePersonne, setFiltrePersonne] = useState('')
   // « En cours » masque les dossiers entièrement soldés ; ils restent toujours accessibles (Terminés / Tous / recherche).
   const [affichage, setAffichage] = useState<'actifs' | 'termines' | 'tous'>('actifs')
-  const [statutsFacturation, setStatutsFacturation] = useState<Record<string, string[]>>({})
+  const [lignesFacturation, setLignesFacturation] = useState<Record<string, { statut: string; ht: number }[]>>({})
   const [commissionsSoldees, setCommissionsSoldees] = useState<Record<string, boolean>>({})
   const [personnes, setPersonnes] = useState<{ id: string; nom_complet: string }[]>([])
   useEffect(() => {
@@ -202,11 +202,11 @@ export function DossiersPage({
         setPiecesParDossier(parDossier)
       })
 
-    lireTout<{ dossier_id: string; statut: string }>(() => supabase.from('dossier_facturation').select('dossier_id,statut').order('id'))
+    lireTout<{ dossier_id: string; statut: string; montant_ht: number | null }>(() => supabase.from('dossier_facturation').select('dossier_id,statut,montant_ht').order('id'))
       .then(({ data }) => {
-        const par: Record<string, string[]> = {}
-        for (const f of data || []) (par[f.dossier_id] ||= []).push(f.statut)
-        setStatutsFacturation(par)
+        const par: Record<string, { statut: string; ht: number }[]> = {}
+        for (const f of data || []) (par[f.dossier_id] ||= []).push({ statut: f.statut, ht: Number(f.montant_ht) || 0 })
+        setLignesFacturation(par)
       })
 
     // La commission d'un dossier est celle générée automatiquement (barème)
@@ -1039,8 +1039,8 @@ export function DossiersPage({
   // Dossier « soldé » : installé, toutes les échéances (hors annulées) payées, commissions payées (s'il y en a).
   const estSolde = (d: DossierAvecRelations) => {
     if ((d.statut || '').toLowerCase() !== 'installe') return false
-    const lignes = (statutsFacturation[d.id] || []).filter(x => x !== 'annulee')
-    if (lignes.length === 0 || lignes.some(x => x !== 'payee')) return false
+    const lignes = (lignesFacturation[d.id] || []).filter(x => x.statut !== 'annulee')
+    if (lignes.length === 0 || lignes.some(x => x.statut !== 'payee')) return false
     const cles = [d.id, d.devis_id].filter(Boolean) as string[]
     return cles.every(k => commissionsSoldees[k] !== false)
   }
@@ -1085,17 +1085,12 @@ export function DossiersPage({
     return s === 'signe' || s === 'accepte'
   }).length
 
-  const montantTotal = rows.reduce(
-    (sum, d) =>
-      sum +
-      (
-        Number(
-          d.montant_total ??
-          (d as any).ca_potentiel
-        ) || 0
-      ),
-    0
-  )
+  // CA chantier = montant du chantier chez le partenaire (TTC, champ montant_total).
+  const chantiersRenseignes = rows.filter(d => d.montant_total != null && Number(d.montant_total) > 0)
+  const caChantiers = chantiersRenseignes.reduce((sum, d) => sum + Number(d.montant_total), 0)
+  // Facturé aux partenaires = nos factures (HT) : échéances émises ou payées, hors annulées.
+  const factureDossier = (id: string) => (lignesFacturation[id] || []).filter(l => l.statut === 'facturee' || l.statut === 'payee').reduce((t, l) => t + l.ht, 0)
+  const montantFacture = rows.reduce((sum, d) => sum + factureDossier(d.id), 0)
 
   const euro = (
     n: number | null | undefined
@@ -1134,8 +1129,16 @@ export function DossiersPage({
     },
     {
       icon: <Wallet size={20} />,
-      value: euro(montantTotal),
-      label: 'Montant total',
+      value: euro(caChantiers),
+      label: 'CA chantiers partenaires (TTC)',
+      note: `${chantiersRenseignes.length} / ${total} renseignés`,
+      tone: 'accent',
+    },
+    {
+      icon: <Receipt size={20} />,
+      value: euro(montantFacture),
+      label: 'Facturé aux partenaires (HT)',
+      note: 'Échéances émises ou payées',
       tone: 'accent',
     },
   ]
@@ -1166,7 +1169,7 @@ export function DossiersPage({
       </div>
 
       <section className="dashboard-kpis page-kpi-strip">
-        {kpis.slice(0,4).map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':'purple'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong>{k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">Pilotage</span></div>)}
+        {kpis.map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':idx===3?'purple':'amber'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong>{k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">{(k as any).note || 'Pilotage'}</span></div>)}
       </section>
 
       <div className="dossier-filtres" role="search">
@@ -1207,7 +1210,7 @@ export function DossiersPage({
         <section className="dossier-board" aria-label="Dossiers par étape">
           {COLONNES_DOSSIER.map(col => {
             const items = rowsFiltrees.filter(d => col.statuts.includes((d.statut || '').toLowerCase()))
-            const total = items.reduce((sum, d) => sum + (Number(d.montant_total) || 0), 0)
+            const total = items.reduce((sum, d) => sum + factureDossier(d.id), 0)
             return (
               <div
                 className={`dossier-col${overCol === col.id ? ' is-over' : ''}`}
@@ -1238,7 +1241,7 @@ export function DossiersPage({
                           <span className="dossier-card-avatar">{initiales}</span>
                           <span className="dossier-card-id"><b>{nom}</b><small>{d.reference || d.id.slice(0, 8)}</small></span>
                         </span>
-                        <span className="dossier-card-montant">{euro(d.montant_total)}</span>
+                        <span className="dossier-card-montant" title="Facturé au partenaire (HT)">{euro(factureDossier(d.id))} HT</span>
                       </button>
                       {isAdmin && (
                         <select
@@ -1294,7 +1297,8 @@ export function DossiersPage({
                   <th>Référence</th>
                   <th>Prospect</th>
                   <th>Statut</th>
-                  <th>CA (devis TTC)</th>
+                  <th>CA chantier (TTC)</th>
+                  <th>Facturé partenaire (HT)</th>
                   {canViewCompanyCommission && <th>Commission société</th>}
                   <th>Commission commerciale</th>
                 </tr>
@@ -1340,6 +1344,10 @@ export function DossiersPage({
 
                       <td>
                         {euro(d.montant_total)}
+                      </td>
+
+                      <td>
+                        {euro(factureDossier(d.id))}
                       </td>
 
                       {isAdmin && (
@@ -1503,7 +1511,7 @@ export function DossiersPage({
               const aEncaisser = somme('facturee')
               const aFacturer = somme('a_facturer')
               const totalLignes = encaisse + aEncaisser + aFacturer
-              const montantDossier = Number(detail.montant_total) || totalLignes
+              const montantDossier = totalLignes
               const pct = montantDossier > 0 ? Math.min(100, Math.round((encaisse / montantDossier) * 100)) : 0
               return (
                 <div className="fiche-head">
@@ -1526,7 +1534,7 @@ export function DossiersPage({
                   </ol>
 
                   <div className="fiche-montant">
-                    <small>Montant du dossier</small>
+                    <small>Facturé au partenaire (HT)</small>
                     <strong>{euro(montantDossier)}</strong>
                     <div className="fiche-barre"><i style={{ width: `${pct}%` }} /></div>
                     <div className="fiche-ligne"><span>Encaissé (HT)</span><b>{euro(encaisse)}</b></div>
@@ -1548,7 +1556,7 @@ export function DossiersPage({
             >
               <div>
                 <div className="text-sm text-muted">
-                  Montant total
+                  CA chantier (TTC)
                 </div>
 
                 <div className="font-semibold">
@@ -1628,7 +1636,7 @@ export function DossiersPage({
                     className="text-sm text-muted"
                     style={{ marginBottom: 5 }}
                   >
-                    CA (devis TTC)
+                    CA chantier (TTC)
                   </div>
 
                   <div className="font-semibold" style={{ fontSize: 16 }}>
