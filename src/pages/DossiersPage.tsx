@@ -1608,8 +1608,8 @@ export function DossiersPage({
                     </div>
 
                     <div className="font-semibold" style={{ fontSize: 16 }}>
-                      {detail.devis_id && commissionsParDevis[detail.devis_id]
-                        ? euro(commissionsParDevis[detail.devis_id].montant_societe)
+                      {commissionsParDevis[detail.devis_id || detail.id]
+                        ? euro(commissionsParDevis[detail.devis_id || detail.id].montant_societe)
                         : '—'}
                     </div>
                   </div>
@@ -1624,14 +1624,14 @@ export function DossiersPage({
                   </div>
 
                   <div className="font-semibold" style={{ fontSize: 16 }}>
-                    {detail.devis_id && commissionsParDevis[detail.devis_id]
-                      ? euro(commissionsParDevis[detail.devis_id].montant_commercial)
+                    {commissionsParDevis[detail.devis_id || detail.id]
+                      ? euro(commissionsParDevis[detail.devis_id || detail.id].montant_commercial)
                       : '—'}
                   </div>
                 </div>
               </div>
 
-              {(!detail.devis_id || !commissionsParDevis[detail.devis_id]) && (
+              {!commissionsParDevis[detail.devis_id || detail.id] && (
                 <div
                   className="text-sm text-muted"
                   style={{ marginTop: 12 }}
@@ -1746,7 +1746,7 @@ export function DossiersPage({
                 <Button variant="secondary" onClick={editingFacturationId ? enregistrerModificationEcheance : ajouterEcheanceFacturation} disabled={factureSaving}><PlusCircle size={14}/> {editingFacturationId ? 'Enregistrer' : 'Ajouter'}</Button>{editingFacturationId && <Button variant="ghost" onClick={()=>setEditingFacturationId(null)}>Annuler</Button>}
               </div>
               <div style={{marginTop:12,display:'flex',alignItems:'center',justifyContent:'space-between',gap:12,flexWrap:'wrap'}}>
-                <div className="text-sm text-muted">Chaque échéance peut donner lieu à une facture distincte : installation, paiement MaPrimeRénov’ ou autre jalon. Commission société du dossier : <strong>{detail.devis_id && commissionsParDevis[detail.devis_id] ? euro(commissionsParDevis[detail.devis_id].montant_societe) : '—'}</strong>.</div>
+                <div className="text-sm text-muted">Chaque échéance peut donner lieu à une facture distincte : installation, paiement MaPrimeRénov’ ou autre jalon. Commission société du dossier : <strong>{commissionsParDevis[detail.devis_id || detail.id] ? euro(commissionsParDevis[detail.devis_id || detail.id].montant_societe) : '—'}</strong>.</div>
                 {!editingFacturationId && <Button variant="primary" onClick={genererFactureDepuisCommission} disabled={factureSaving}><Receipt size={14}/> {factureSaving ? 'Génération…' : 'Ajouter et générer la facture'}</Button>}
               </div>
               {facturation.length===0 ? <div className="text-sm text-muted" style={{marginTop:12}}>Aucune échéance enregistrée pour le moment.</div> : <div style={{marginTop:14,display:'flex',flexDirection:'column',gap:8}}>
