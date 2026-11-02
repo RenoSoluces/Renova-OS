@@ -19,7 +19,6 @@ import {
   CalendarCheck2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
-import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { Dossier, Prospect, Devis, Document as DocumentPiece, DossierFacturation } from '../types'
 import { Modal } from '../components/ui/Modal'
@@ -30,6 +29,7 @@ import { removeDocumentStorageObject, resolveDocumentRows, resolveDocumentUrl } 
 import { jsPDF } from 'jspdf'
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
+import { lireTout } from '../lib/lireTout'
 import { numeroDevis } from '../lib/devis/numeroDevis'
 import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
 
@@ -151,6 +151,10 @@ export function DossiersPage({
   const [recherche, setRecherche] = useState('')
   const [filtreEtape, setFiltreEtape] = useState('')
   const [filtrePersonne, setFiltrePersonne] = useState('')
+  // « En cours » masque les dossiers entièrement soldés ; ils restent toujours accessibles (Terminés / Tous / recherche).
+  const [affichage, setAffichage] = useState<'actifs' | 'termines' | 'tous'>('actifs')
+  const [statutsFacturation, setStatutsFacturation] = useState<Record<string, string[]>>({})
+  const [commissionsSoldees, setCommissionsSoldees] = useState<Record<string, boolean>>({})
   const [personnes, setPersonnes] = useState<{ id: string; nom_complet: string }[]>([])
   useEffect(() => {
     supabase.from('profiles').select('id,nom_complet,role').in('role', ['commercial', 'manager', 'admin', 'apporteur']).order('nom_complet')
@@ -198,11 +202,18 @@ export function DossiersPage({
         setPiecesParDossier(parDossier)
       })
 
+    lireTout<{ dossier_id: string; statut: string }>(() => supabase.from('dossier_facturation').select('dossier_id,statut').order('id'))
+      .then(({ data }) => {
+        const par: Record<string, string[]> = {}
+        for (const f of data || []) (par[f.dossier_id] ||= []).push(f.statut)
+        setStatutsFacturation(par)
+      })
+
     // La commission d'un dossier est celle générée automatiquement (barème)
     // au moment de la signature du devis qui lui est associé.
     supabase
       .from('commissions_safe')
-      .select('reference_id, montant_commercial, montant_societe')
+      .select('reference_id, montant_commercial, montant_societe, statut, date_paiement_commercial, date_paiement_societe')
       .in('reference_type', ['devis', 'dossiers'])
       .then(async ({ data, error }) => {
         if (error) {
@@ -211,6 +222,7 @@ export function DossiersPage({
         }
 
         const map: Record<string, { montant_commercial: number; montant_societe: number }> = {}
+        const soldees: Record<string, boolean> = {}
         const commissionRows = data || []
         const devisIds = commissionRows.map(c => c.reference_id).filter(Boolean) as string[]
         const { data: liensDevis, error: liensError } = devisIds.length
@@ -228,9 +240,12 @@ export function DossiersPage({
           map[c.reference_id] = value
           const lien = (liensDevis || []).find(v => v.id === c.reference_id)
           if (lien?.dossier_id) map[lien.dossier_id] = value
+          const payee = (c as any).statut === 'payee' || (!!(c as any).date_paiement_commercial && !!(c as any).date_paiement_societe)
+          for (const cle of [c.reference_id, lien?.dossier_id].filter(Boolean) as string[]) soldees[cle] = (soldees[cle] ?? true) && payee
         }
 
         setCommissionsParDevis(map)
+        setCommissionsSoldees(soldees)
       })
   }
 
@@ -1021,8 +1036,22 @@ export function DossiersPage({
   }
 
   const normaliser = (t: unknown) => String(t ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  // Dossier « soldé » : installé, toutes les échéances (hors annulées) payées, commissions payées (s'il y en a).
+  const estSolde = (d: DossierAvecRelations) => {
+    if ((d.statut || '').toLowerCase() !== 'installe') return false
+    const lignes = (statutsFacturation[d.id] || []).filter(x => x !== 'annulee')
+    if (lignes.length === 0 || lignes.some(x => x !== 'payee')) return false
+    const cles = [d.id, d.devis_id].filter(Boolean) as string[]
+    return cles.every(k => commissionsSoldees[k] !== false)
+  }
+  const nbSoldes = rows.filter(estSolde).length
   const rowsFiltrees = rows.filter(d => {
     const pr: any = d.prospect || {}
+    // Une recherche porte toujours sur l'ensemble des dossiers, soldés compris.
+    if (!recherche.trim()) {
+      if (affichage === 'actifs' && estSolde(d)) return false
+      if (affichage === 'termines' && !estSolde(d)) return false
+    }
     if (recherche.trim()) {
       const q = normaliser(recherche.trim())
       const texte = normaliser([d.reference, pr.prenom, pr.nom, `${pr.prenom || ''} ${pr.nom || ''}`, `${pr.nom || ''} ${pr.prenom || ''}`, pr.ville, pr.code_postal, pr.telephone, pr.email].join(' '))
@@ -1035,7 +1064,7 @@ export function DossiersPage({
     if (filtrePersonne && pr.commercial_id !== filtrePersonne && pr.apporteur_user_id !== filtrePersonne) return false
     return true
   })
-  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne].filter(Boolean).length
+  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
 
   const total = rows.length
 
@@ -1149,6 +1178,11 @@ export function DossiersPage({
           onChange={e => setRecherche(e.target.value)}
           aria-label="Rechercher un dossier"
         />
+        <select className="input" value={affichage} onChange={e => setAffichage(e.target.value as any)} aria-label="Dossiers en cours ou soldés">
+          <option value="actifs">En cours</option>
+          <option value="termines">Soldés ({nbSoldes})</option>
+          <option value="tous">Tous les dossiers</option>
+        </select>
         <select className="input" value={filtreEtape} onChange={e => setFiltreEtape(e.target.value)} aria-label="Filtrer par étape">
           <option value="">Toutes les étapes</option>
           {COLONNES_DOSSIER.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
@@ -1158,11 +1192,14 @@ export function DossiersPage({
           {personnes.map(x => <option key={x.id} value={x.id}>{x.nom_complet}</option>)}
         </select>
         {filtresActifs > 0 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne('') }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne(''); setAffichage('actifs') }}>
             Réinitialiser ({filtresActifs})
           </button>
         )}
-        <span className="dossier-filtres-compte">{rowsFiltrees.length} / {rows.length} dossier{rows.length > 1 ? 's' : ''}</span>
+        <span className="dossier-filtres-compte">
+          {rowsFiltrees.length} / {rows.length} dossier{rows.length > 1 ? 's' : ''}
+          {affichage === 'actifs' && !recherche.trim() && nbSoldes > 0 && <> · {nbSoldes} soldé{nbSoldes > 1 ? 's' : ''} masqué{nbSoldes > 1 ? 's' : ''} (la recherche les retrouve)</>}
+        </span>
       </div>
 
       {vue === 'pipeline' && messagePipeline && <div className="dossier-board-message" role="status">{messagePipeline}</div>}
@@ -1292,6 +1329,7 @@ export function DossiersPage({
                         >
                           {d.statut || '—'}
                         </span>
+                        {estSolde(d) && <span className="badge badge-success" style={{ marginLeft: 6 }} title="Installé, factures et commissions payées">Soldé</span>}
                         {(() => {
                           const aides = ((d as any).aides || []) as Aide[]
                           if (!aides.length) return null
