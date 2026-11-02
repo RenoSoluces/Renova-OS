@@ -142,6 +142,11 @@ export function DossiersPage({
   // Nom de l'apporteur d'affaires du prospect (affiché sur la fiche dossier).
   const [apporteurNom, setApporteurNom] = useState<string | null>(null)
 
+  // Saisie manuelle (dossiers anciens / importés sans devis signé) : montant chantier + commissions.
+  const [saisieFin, setSaisieFin] = useState({ montant: '', societe: '', commercial: '' })
+  const [saisieFinSaving, setSaisieFinSaving] = useState(false)
+  const [saisieFinMessage, setSaisieFinMessage] = useState('')
+
   // Filtres de la liste / du pipeline
   const [recherche, setRecherche] = useState('')
   const [filtreEtape, setFiltreEtape] = useState('')
@@ -198,7 +203,7 @@ export function DossiersPage({
     supabase
       .from('commissions_safe')
       .select('reference_id, montant_commercial, montant_societe')
-      .eq('reference_type', 'devis')
+      .in('reference_type', ['devis', 'dossiers'])
       .then(async ({ data, error }) => {
         if (error) {
           console.error('Erreur chargement commissions des dossiers:', error)
@@ -344,6 +349,15 @@ export function DossiersPage({
       d.devis_id ? supabase.from('devis').select('signature_date').eq('id', d.devis_id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     setSignatureDevisDetail((devisSigne as any)?.signature_date || null)
+    {
+      const co = commissionsParDevis[d.devis_id || d.id]
+      setSaisieFin({
+        montant: d.montant_total != null ? String(d.montant_total) : '',
+        societe: co ? String(co.montant_societe) : '',
+        commercial: co ? String(co.montant_commercial) : '',
+      })
+      setSaisieFinMessage('')
+    }
 
     setPieces(await resolveDocumentRows((data || []) as DocumentPiece[]))
     setFacturation((factures || []) as DossierFacturation[])
@@ -356,6 +370,49 @@ export function DossiersPage({
       taux_tva: '20',
       declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
     })
+  }
+
+  async function enregistrerSaisieFinanciere() {
+    if (!detail || !isAdmin) return
+    const nombre = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.').replace(/\s/g, '')))
+    const montant = nombre(saisieFin.montant)
+    const societe = nombre(saisieFin.societe)
+    const commercial = nombre(saisieFin.commercial)
+    if ([montant, societe, commercial].some(v => v !== null && !Number.isFinite(v))) {
+      setSaisieFinMessage('Un des montants n’est pas un nombre valide.')
+      return
+    }
+    setSaisieFinSaving(true)
+    setSaisieFinMessage('')
+    try {
+      if (montant !== null) {
+        const { error } = await supabase.from('dossiers').update({ montant_total: montant }).eq('id', detail.id)
+        if (error) throw error
+        setDetail(d => d ? { ...d, montant_total: montant } as any : d)
+        setRows(prev => prev.map(r => r.id === detail.id ? { ...r, montant_total: montant } as any : r))
+      }
+      if ((societe !== null || commercial !== null) && !detail.devis_id) {
+        const commercialId = (detail.prospect as any)?.commercial_id
+        if (!commercialId) throw new Error('Aucun commercial rattaché au prospect : impossible d’enregistrer la commission.')
+        const { data: existante, error: lectureErreur } = await supabase.from('commissions')
+          .select('id').eq('reference_type', 'dossiers').eq('reference_id', detail.id).maybeSingle()
+        if (lectureErreur) throw lectureErreur
+        const valeurs = { montant_societe: societe ?? 0, montant_commercial: commercial ?? 0 }
+        const { error } = existante
+          ? await supabase.from('commissions').update(valeurs).eq('id', (existante as any).id)
+          : await supabase.from('commissions').insert({
+              ...valeurs, commercial_id: commercialId, type: 'dossier', reference_type: 'dossiers', reference_id: detail.id, organisation_id: (detail as any).organisation_id ?? undefined,
+              libelle: `Dossier ${detail.reference || detail.id.slice(0, 8)} — saisie manuelle`, statut: 'en_attente',
+            })
+        if (error) throw error
+        setCommissionsParDevis(prev => ({ ...prev, [detail.id]: { montant_societe: valeurs.montant_societe, montant_commercial: valeurs.montant_commercial } }))
+      }
+      setSaisieFinMessage('Enregistré.')
+    } catch (e: any) {
+      setSaisieFinMessage(`Échec de l’enregistrement : ${e?.message || e}`)
+    } finally {
+      setSaisieFinSaving(false)
+    }
   }
 
   /** Recharge les pièces et le suivi des aides du dossier ouvert. */
@@ -1583,6 +1640,33 @@ export function DossiersPage({
                   {detail.devis_id
                     ? "Pas encore de règle de rémunération applicable dans le barème pour ce devis — la commission s'affichera ici une fois la règle créée."
                     : "Ce dossier n'est rattaché à aucun devis signé."}
+                </div>
+              )}
+
+              {isAdmin && (
+                <div className="saisie-financiere" style={{ marginTop: 14, paddingTop: 12, borderTop: '1px dashed var(--border, #d9dfdf)' }}>
+                  <div className="text-sm font-semibold" style={{ marginBottom: 8 }}>
+                    {detail.devis_id ? 'Ajuster le montant du chantier' : 'Saisie manuelle (dossier sans devis signé)'}
+                  </div>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(170px, 1fr))', gap: 12, alignItems: 'end' }}>
+                    <label className="text-sm">Montant du chantier (€ TTC)
+                      <input className="input" inputMode="decimal" value={saisieFin.montant} onChange={e => setSaisieFin(f => ({ ...f, montant: e.target.value }))} />
+                    </label>
+                    {!detail.devis_id && (
+                      <>
+                        <label className="text-sm">Commission société (€)
+                          <input className="input" inputMode="decimal" value={saisieFin.societe} onChange={e => setSaisieFin(f => ({ ...f, societe: e.target.value }))} />
+                        </label>
+                        <label className="text-sm">Commission commerciale (€)
+                          <input className="input" inputMode="decimal" value={saisieFin.commercial} onChange={e => setSaisieFin(f => ({ ...f, commercial: e.target.value }))} />
+                        </label>
+                      </>
+                    )}
+                    <Button variant="primary" onClick={enregistrerSaisieFinanciere} disabled={saisieFinSaving}>
+                      {saisieFinSaving ? 'Enregistrement…' : 'Enregistrer'}
+                    </Button>
+                  </div>
+                  {saisieFinMessage && <div className="text-sm text-muted" style={{ marginTop: 8 }} role="status">{saisieFinMessage}</div>}
                 </div>
               )}
             </div>
