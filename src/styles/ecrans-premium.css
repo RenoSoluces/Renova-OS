@@ -21,7 +21,13 @@
 
 /* ---------------------------------------------------------------- Bandeaux de chiffres */
 .page-kpi-strip { gap: 18px; margin-bottom: 26px; }
-.dashboard-kpi, .kpi-grid.page-kpi-strip .kpi-tile { border: 1px solid var(--ep-line); border-radius: 20px; background: #fff; box-shadow: var(--ep-card); padding: 20px 22px; }
+.dashboard-kpi { border: 1px solid var(--ep-line); border-radius: 20px; background: #fff; box-shadow: var(--ep-card); padding: 20px 22px; }
+.kpi-grid.page-kpi-strip .kpi-tile { border-radius: 20px; }
+/* Au-delà de 4 tuiles, on recycle les dégradés sombres pour garder le texte blanc lisible. */
+.kpi-grid.page-kpi-strip .kpi-tile:nth-child(5) { background: linear-gradient(135deg,#0C3338,#0C4A4C); }
+.kpi-grid.page-kpi-strip .kpi-tile:nth-child(6) { background: linear-gradient(135deg,#103A3F,#2B6368); }
+.kpi-grid.page-kpi-strip .kpi-tile:nth-child(7) { background: linear-gradient(135deg,#2a263e,#4d3d72); }
+.kpi-grid.page-kpi-strip .kpi-tile:nth-child(8) { background: linear-gradient(135deg,#243a35,#28684f); }
 .dashboard-kpi-main strong { font-family: var(--font-display); font-size: 34px; font-weight: 500; letter-spacing: -.03em; color: var(--ep-ink); font-variant-numeric: tabular-nums; }
 .dashboard-kpi-main span { font-size: 12.5px; font-weight: 600; color: #5B6F72; }
 .dashboard-kpi-icon { border-radius: 14px; }
@@ -145,3 +151,9 @@
 .dossier-filtres input[type=search]{flex:1 1 280px;min-width:220px}
 .dossier-filtres select{flex:0 1 220px}
 .dossier-filtres-compte{margin-left:auto;font-size:13px;color:var(--text-muted,#5b6b6b)}
+
+/* Bandeau de 4 tuiles : une seule ligne ; 2 tuiles : deux colonnes. */
+.kpi-grid.page-kpi-strip:has(.kpi-tile:nth-child(4):last-child){grid-template-columns:repeat(4,minmax(0,1fr))}
+.kpi-grid.page-kpi-strip:has(.kpi-tile:nth-child(2):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}
+@media(max-width:1100px){.kpi-grid.page-kpi-strip:has(.kpi-tile:nth-child(4):last-child){grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.kpi-grid.page-kpi-strip:has(.kpi-tile:nth-child(2):last-child),.kpi-grid.page-kpi-strip:has(.kpi-tile:nth-child(4):last-child){grid-template-columns:1fr}}

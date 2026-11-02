@@ -1476,7 +1476,7 @@ export function CommissionsPage() {
                 </div>
 
                 <div className="kpi-tile-label">
-                  Commission potentielle {nomSociete}
+                  Commission potentielle {nomSociete}{' '}
                   en cours
                 </div>
               </div>
