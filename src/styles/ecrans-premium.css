@@ -140,3 +140,8 @@
 
 .fiche-apporteur{display:block;margin-top:2px;color:var(--text-muted,#5b6b6b)}
 .fiche-apporteur strong{color:var(--copper,#b87333);font-weight:600}
+
+.dossier-filtres{display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin:0 0 14px}
+.dossier-filtres input[type=search]{flex:1 1 280px;min-width:220px}
+.dossier-filtres select{flex:0 1 220px}
+.dossier-filtres-compte{margin-left:auto;font-size:13px;color:var(--text-muted,#5b6b6b)}
