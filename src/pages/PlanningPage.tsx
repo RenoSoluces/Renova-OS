@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { jourLocal } from '../lib/jourLocal'
 import { Plus, Calendar, MapPin, Clock, ChevronLeft, ChevronRight, Users, User as UserIcon, Wallet } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -74,8 +75,8 @@ export function PlanningPage() {
     let query = supabase
       .from('planning_events')
       .select('*')
-      .gte('date', start.toISOString().slice(0, 10))
-      .lte('date', end.toISOString().slice(0, 10))
+      .gte('date', jourLocal(start))
+      .lte('date', jourLocal(end))
       .order('date', { ascending: true })
       .order('heure', { ascending: true })
 
@@ -136,11 +137,11 @@ export function PlanningPage() {
   for (let i = 0; i < 7; i++) {
     const d = new Date(start)
     d.setDate(d.getDate() + i)
-    const key = d.toISOString().slice(0, 10)
+    const key = jourLocal(d)
     days.push({ date: d, events: events.filter(e => (e.date || '').slice(0, 10) === key) })
   }
 
-  const todayKey = new Date().toISOString().slice(0, 10)
+  const todayKey = jourLocal()
   const fmtDay = (d: Date) =>
     d.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'short' })
 
@@ -237,9 +238,9 @@ export function PlanningPage() {
       ) : (
         <div className="grid grid-2 gap-4">
           {days.map(d => {
-            const dateKey = d.date.toISOString().slice(0, 10)
+            const dateKey = jourLocal(d.date)
             return (
-              <div className="card" key={d.date.toISOString()}>
+              <div className="card" key={dateKey}>
                 <div className="card-header">
                   <div className="card-title flex items-center gap-2">
                     <span>{fmtDay(d.date)}</span>

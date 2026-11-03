@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { jourLocal } from '../lib/jourLocal'
 import {
   Plus,
   Users,
@@ -62,7 +63,7 @@ export function DashboardPage({
 
   useEffect(() => {
     const today = new Date()
-    const todayKey = today.toISOString().slice(0, 10)
+    const todayKey = jourLocal(today)
 
     const inSevenDays = new Date(today)
     inSevenDays.setDate(inSevenDays.getDate() + 6)
@@ -71,7 +72,7 @@ export function DashboardPage({
       .from('planning_events')
       .select('*')
       .gte('date', todayKey)
-      .lte('date', inSevenDays.toISOString().slice(0, 10))
+      .lte('date', jourLocal(inSevenDays))
       .order('date', { ascending: true })
       .order('heure', { ascending: true })
       .limit(8)
