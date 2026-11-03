@@ -264,3 +264,12 @@
 .eap-complet-corps{margin-top:10px}
 .eap-ligne{display:grid;gap:4px;margin-bottom:10px;font-size:13px}
 .eap-ligne select{height:42px;padding:0 10px;border:1px solid var(--ep-line,#d9e2e0);border-radius:10px;font:inherit}
+
+/* Suivi Anah (MaPrimeRénov' / MonProjetAnah) */
+.mpr-alerte { display: flex; align-items: center; gap: 8px; padding: 10px 12px; margin: 0 0 12px; border-radius: 10px; background: #fff4e5; color: #8a4b00; font-size: 13px; }
+.mpr-historique { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+.mpr-historique li { display: grid; grid-template-columns: 92px 1fr; gap: 2px 10px; font-size: 13px; }
+.mpr-historique li small { grid-column: 2; color: var(--text-muted, #6b7280); }
+.mpr-historique-date { color: var(--text-muted, #6b7280); }
+.import-anah-depot { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px dashed #c4cad4; border-radius: 12px; cursor: pointer; font-size: 14px; }
+.import-anah-depot input { display: none; }

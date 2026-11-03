@@ -22,6 +22,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { Dossier, Prospect, Devis, Document as DocumentPiece, DossierFacturation } from '../types'
 import { Modal } from '../components/ui/Modal'
+import { SuiviMprDossier } from '../components/dossiers/SuiviMprDossier'
+import { ImportExportAnah } from '../components/dossiers/ImportExportAnah'
+import { actionRequise } from '../lib/mpr/suiviAnah'
 import { Button } from '../components/ui/Button'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { uploadDocument } from '../lib/storage/uploadDocument'
@@ -166,6 +169,7 @@ export function DossiersPage({
     supabase.from('cee_grille_prix').select('*').then(({ data }) => setCeeGrille(((data || []) as any[]).map(l => ({ ...l, prix_eur_par_mwh_cumac: Number(l.prix_eur_par_mwh_cumac), bonification_pct: Number(l.bonification_pct) }))))
   }, [isAdmin])
   const [parcoursSaving, setParcoursSaving] = useState(false)
+  const [importAnahOpen, setImportAnahOpen] = useState(false)
   // « En cours » masque les dossiers entièrement soldés ; ils restent toujours accessibles (Terminés / Tous / recherche).
   const [affichage, setAffichage] = useState<'actifs' | 'termines' | 'tous'>('actifs')
   const [lignesFacturation, setLignesFacturation] = useState<Record<string, { statut: string; ht: number }[]>>({})
@@ -1074,6 +1078,7 @@ export function DossiersPage({
     return cles.every(k => commissionsSoldees[k] !== false)
   }
   const nbSoldes = rows.filter(estSolde).length
+  const nbActionAnah = rows.filter(d => actionRequise((d as any).mpr_statut)).length
   const rowsFiltrees = rows.filter(d => {
     const pr: any = d.prospect || {}
     // Une recherche porte toujours sur l'ensemble des dossiers, soldés compris.
@@ -1189,6 +1194,7 @@ export function DossiersPage({
             <button type="button" className={vue === 'liste' ? 'on' : ''} onClick={() => changerVue('liste')}>Liste</button>
             <button type="button" className={vue === 'pipeline' ? 'on' : ''} onClick={() => changerVue('pipeline')}>Pipeline</button>
           </div>
+          {isAdmin && <Button variant="ghost" onClick={() => setImportAnahOpen(true)}>Mettre à jour depuis l'Anah{nbActionAnah > 0 ? ` (${nbActionAnah} à traiter)` : ''}</Button>}
           <Button
             variant="primary"
             onClick={() => setNewModalOpen(true)}
@@ -1415,6 +1421,13 @@ export function DossiersPage({
           CRÉATION MANUELLE
           ===================================================== */}
 
+      <ImportExportAnah
+        open={importAnahOpen}
+        onClose={() => setImportAnahOpen(false)}
+        dossiers={rows.map(d => ({ id: d.id, reference: (d as any).reference || null, mpr_numero_dossier: (d as any).mpr_numero_dossier || null, mpr_statut: (d as any).mpr_statut || null, nom: d.prospect?.nom || '', prenom: d.prospect?.prenom || '' }))}
+        onApplique={fetchListe}
+      />
+
       <Modal
         open={newModalOpen}
         onClose={() => setNewModalOpen(false)}
@@ -1613,6 +1626,9 @@ export function DossiersPage({
                 </div>
               )
             })()}
+
+            {/* SUIVI ANAH */}
+            <SuiviMprDossier dossier={detail as any} lecture={!isAdmin} onSauve={champs => { setDetail(d => d ? { ...d, ...champs } as any : d); setRows(r => r.map(x => x.id === detail.id ? { ...x, ...champs } as any : x)) }} />
 
             {/* CEE PAR DÉLÉGATAIRE */}
             {isAdmin && (
