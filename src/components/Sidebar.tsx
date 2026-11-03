@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
-  Gauge, ChevronDown,
+  Gauge, ChevronDown, Wrench,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -41,6 +41,7 @@ const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
   { id: 'chantiers', label: 'Chantiers', items: [
     { key: 'visites', label: 'Visites techniques', icon: ClipboardCheck },
     { key: 'suivi_chantier', label: 'Suivi chantier', icon: HardHat },
+    { key: 'sav', label: 'SAV', icon: Wrench },
     { key: 'simulations', label: 'Simulation des aides', icon: Calculator },
     { key: 'solaire', label: 'Simulateur solaire', icon: Sun },
     { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
