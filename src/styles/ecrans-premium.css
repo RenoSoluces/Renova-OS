@@ -273,3 +273,13 @@
 .mpr-historique-date { color: var(--text-muted, #6b7280); }
 .import-anah-depot { display: flex; align-items: center; gap: 10px; padding: 14px; border: 1px dashed #c4cad4; border-radius: 12px; cursor: pointer; font-size: 14px; }
 .import-anah-depot input { display: none; }
+
+/* Pièces du dossier installateur */
+.pieces-liste { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.pieces-liste li { display: grid; grid-template-columns: 22px 1fr auto; gap: 10px; align-items: start; }
+.pieces-liste li > div:nth-child(2) small { display: block; color: var(--text-muted, #6b7280); font-size: 12px; margin-top: 2px; }
+.pieces-liste .ok { color: #1a7f4b; } .pieces-liste .ko { color: #b8c0c8; }
+.pieces-avert { color: #8a4b00 !important; }
+.pieces-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.lien { background: none; border: 0; color: var(--c-primary, #0f5c5e); text-decoration: underline; cursor: pointer; font-size: 12px; margin-left: 4px; }
+@media (max-width: 720px) { .pieces-liste li { grid-template-columns: 22px 1fr; } .pieces-actions { grid-column: 2; justify-content: flex-start; } }
