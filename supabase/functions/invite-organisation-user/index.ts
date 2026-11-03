@@ -193,7 +193,7 @@ Deno.serve(async (req: Request) => {
 
   const { data: organisation, error: orgError } = await adminClient
     .from('organisations')
-    .select('id, nom, type, actif')
+    .select('id, nom, type, actif, licences_max, invitations_autorisees')
     .eq('id', organisationId)
     .maybeSingle()
 
@@ -202,6 +202,10 @@ Deno.serve(async (req: Request) => {
   }
   if (!isGlobalAdmin && organisationId !== caller.organisation_id) {
     return response({ error: 'Vous ne pouvez inviter que dans votre entreprise.' }, 403, origin)
+  }
+  // Licence : le titulaire d'une licence ne crée pas lui-même de comptes ; seul le Grand Admin ajoute des licences.
+  if (!isGlobalAdmin && organisation.invitations_autorisees === false) {
+    return response({ error: 'Votre licence ne permet pas de créer d’autres comptes. Contactez Reno Soluces pour ajouter une licence.' }, 403, origin)
   }
   if (requestedRole === 'admin' && organisation.type !== 'interne') {
     return response({ error: 'Le rôle Grand Admin est réservé à l’entreprise interne.' }, 400, origin)
@@ -244,6 +248,14 @@ Deno.serve(async (req: Request) => {
     userId = profilExistant.id
     renvoi = true
     await adminClient.auth.admin.updateUserById(userId, { user_metadata: metadata })
+  }
+
+  // Nombre de licences : on ne crée pas de nouveau compte au-delà du plafond de l'entreprise.
+  if (!renvoi && organisation.licences_max != null) {
+    const { count: comptes } = await adminClient.from('profiles').select('id', { count: 'exact', head: true }).eq('organisation_id', organisationId)
+    if ((comptes ?? 0) >= organisation.licences_max) {
+      return response({ error: `Nombre de licences atteint (${organisation.licences_max}). Augmentez le nombre de licences de cette entreprise avant de créer un autre compte.` }, 409, origin)
+    }
   }
 
   const mode = body.mode === 'mot_de_passe' ? 'mot_de_passe' : 'lien'

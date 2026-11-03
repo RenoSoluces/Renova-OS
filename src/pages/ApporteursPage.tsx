@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
+import { useLicence } from '../lib/organisation/useLicence'
 import { Plus, Search, Users, Save, Mail, Phone, MapPin, Building2, CheckCircle2, Clock3, UserRound, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -41,6 +42,7 @@ export function ApporteursPage() {
   const [formOpen, setFormOpen] = useState(false)
   const [form, setForm] = useState(INITIAL_FORM)
   const [saving, setSaving] = useState(false)
+  const { peutInviter } = useLicence()
   const canManage = ['admin', 'manager', 'partner'].includes(profile?.role || '')
   const isGlobalAdmin = profile?.role === 'admin'
 
@@ -129,7 +131,7 @@ export function ApporteursPage() {
       {canManage && <Button variant="primary" onClick={() => { if (formOpen && !editing) reset(); else { reset(); setFormOpen(true) } setError(''); setSuccess('') }}><Plus size={17}/> Ajouter un contact au carnet</Button>}
     </header>
 
-    <CreerAccesReseau onCree={() => { void load(); setAccesMaj(n => n + 1) }} />
+    {peutInviter && <CreerAccesReseau onCree={() => { void load(); setAccesMaj(n => n + 1) }} />}
     <ListeAcces actualisation={accesMaj} />
 
     <section className="apporteurs-stats" aria-label="Synthèse du réseau">
