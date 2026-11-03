@@ -225,3 +225,7 @@
 .foyer-fiscal-alerte{margin:6px 0 0;font-size:12px;color:#a12b2b}
 .foyer-fiscal-ajout{margin-top:2px}
 .foyer-fiscal-total{margin:12px 0 0;font-size:13px;color:#41585b}
+.foyer-fiscal-verif{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:10px}
+.foyer-fiscal-verifie{display:inline-flex;align-items:center;gap:7px;margin-left:auto;font-size:13px;color:#41585b;cursor:pointer}
+.foyer-fiscal-verifie span{display:inline-flex;align-items:center;gap:5px}
+.foyer-fiscal-verifie input:checked + span{color:#1f7a4d;font-weight:600}
