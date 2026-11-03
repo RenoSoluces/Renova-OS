@@ -245,3 +245,13 @@
 .cee-resultat > div{display:flex;justify-content:space-between;gap:12px;font-size:13px}
 .cee-resultat span{color:#5B6F72}
 .cee-prime{font-size:16px;color:var(--ep-teal,#0F5C5E)}
+
+/* ---------------------------------------------------------------- Veille réglementaire */
+.veille-liste{display:grid;gap:14px}
+.veille-carte.a-relire{border-left:4px solid #d9a400}
+.veille-badges{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px}
+.veille-titre{margin:0 0 6px;font-size:15px;line-height:1.4}
+.veille-meta{display:flex;flex-wrap:wrap;gap:6px 18px;margin-top:6px}
+.veille-impact{margin:8px 0 0}
+.veille-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
+.veille-dossiers{margin:10px 0 0;padding:10px 14px 10px 28px;border-radius:12px;background:var(--ep-teal-soft,#eef6f5);font-size:13px;display:grid;gap:4px}
