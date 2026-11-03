@@ -179,3 +179,11 @@
 .parcours-etapes li.courant button span{background:#fff;color:var(--ep-teal,#0F5C5E)}
 .parcours-etapes li.gagne.courant button{background:#1f7a4d;border-color:#1f7a4d}
 .parcours-etapes li.perdu.courant button{background:#8A9A9C;border-color:#8A9A9C}
+
+/* ---------------------------------------------------------------- Prospects : actions groupées */
+.prospect-bulk{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid var(--ep-line,#d9e2e0);background:var(--ep-teal-soft,#eef6f5);position:sticky;top:0;z-index:2}
+.prospect-bulk-tout{display:inline-flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ep-teal,#0F5C5E);cursor:pointer}
+.prospect-bulk-actions{display:flex;flex-wrap:wrap;align-items:center;gap:8px}
+.prospect-bulk-actions .pro-filter-select{min-width:130px;max-width:190px}
+.prospect-bulk-message{font-size:13px;color:#5B6F72;margin-left:auto}
+.prospect-row-coche{flex:0 0 auto;width:17px;height:17px;margin-right:4px;accent-color:var(--ep-teal,#0F5C5E);cursor:pointer}

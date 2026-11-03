@@ -18,6 +18,7 @@ import { Timeline } from '../components/crm/Timeline'
 import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
+import { setProspectStatus } from '../lib/crm/workflow'
 import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { ImportRdvGoogleModal } from '../components/crm/ImportRdvGoogleModal'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -174,6 +175,14 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [commercialFilter, setCommercialFilter] = useState('')
   const [potCommunOnly, setPotCommunOnly] = useState(false)
   const [selected, setSelected] = useState<Prospect | null>(null)
+  // Actions groupées (admin / manager) : prospects cochés dans la liste.
+  const [coches, setCoches] = useState<Set<string>>(new Set())
+  const [groupeBusy, setGroupeBusy] = useState(false)
+  const [groupeMessage, setGroupeMessage] = useState('')
+  const [groupeCommercial, setGroupeCommercial] = useState('')
+  const [groupeStatut, setGroupeStatut] = useState('')
+  const [groupeTemperature, setGroupeTemperature] = useState('')
+  const [groupeTag, setGroupeTag] = useState('')
   const [wizardOpen, setWizardOpen] = useState(false)
   const [emailOuvert, setEmailOuvert] = useState(false)
   const [importGoogle, setImportGoogle] = useState(false)
@@ -347,6 +356,66 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     })
     setTimelineRefresh(r => r + 1)
   }
+
+  const basculerCoche = (id: string) => setCoches(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
+  const viderSelection = () => { setCoches(new Set()); setGroupeCommercial(''); setGroupeStatut(''); setGroupeTemperature(''); setGroupeTag('') }
+
+  /** Exécute une action sur tous les prospects cochés, avec confirmation, puis recharge la liste. */
+  async function actionGroupee(libelle: string, operation: (ids: string[]) => Promise<{ echecs: number }>) {
+    const ids = Array.from(coches)
+    if (ids.length === 0 || !isAdmin) return
+    if (!window.confirm(`${libelle} pour ${ids.length} prospect${ids.length > 1 ? 's' : ''} ?`)) return
+    setGroupeBusy(true)
+    setGroupeMessage('')
+    try {
+      const { echecs } = await operation(ids)
+      await fetchProspects()
+      setGroupeMessage(echecs ? `${ids.length - echecs} prospect(s) modifié(s), ${echecs} en échec.` : `${ids.length} prospect${ids.length > 1 ? 's' : ''} modifié${ids.length > 1 ? 's' : ''}.`)
+      if (!echecs) viderSelection()
+    } catch (e: any) {
+      setGroupeMessage(`Action impossible : ${e?.message || e}`)
+    } finally {
+      setGroupeBusy(false)
+    }
+  }
+
+  const groupeAffecter = () => actionGroupee(
+    groupeCommercial ? `Affecter à ${commerciaux.find(c => c.id === groupeCommercial)?.nom_complet || 'ce commercial'}` : 'Remettre dans le pot commun',
+    async ids => {
+      const nom = commerciaux.find(c => c.id === groupeCommercial)?.nom_complet || null
+      const champs: Record<string, unknown> = { commercial_id: groupeCommercial || null, commercial: nom }
+      if (groupeCommercial) champs.commercial_historique_id = null
+      const { error } = await supabase.from('prospects').update(champs).in('id', ids)
+      if (error) throw new Error(error.message)
+      return { echecs: 0 }
+    })
+
+  const groupeChangerEtat = () => actionGroupee(`Passer à l'état « ${groupeStatut} »`, async ids => {
+    let echecs = 0
+    for (let i = 0; i < ids.length; i += 5) {
+      const resultats = await Promise.allSettled(ids.slice(i, i + 5).map(id => setProspectStatus(id, groupeStatut, 'action groupée')))
+      echecs += resultats.filter(r => r.status === 'rejected').length
+    }
+    return { echecs }
+  })
+
+  const groupeTemperatureAppliquer = () => actionGroupee(`Passer la température à « ${TEMPERATURES.find(t => t.value === groupeTemperature)?.label || groupeTemperature} »`, async ids => {
+    const { error } = await supabase.from('prospects').update({ temperature: groupeTemperature }).in('id', ids)
+    if (error) throw new Error(error.message)
+    return { echecs: 0 }
+  })
+
+  const groupeAjouterTag = () => actionGroupee(`Ajouter le tag « ${groupeTag.trim()} »`, async ids => {
+    const tag = groupeTag.trim()
+    let echecs = 0
+    for (const id of ids) {
+      const p = prospects.find(x => x.id === id)
+      const tags = Array.from(new Set([...(p?.tags || []), tag]))
+      const { error } = await supabase.from('prospects').update({ tags }).eq('id', id)
+      if (error) echecs++
+    }
+    return { echecs }
+  })
 
   async function updateProspectField(field: string, value: unknown) {
     if (!selected) return
@@ -1326,6 +1395,41 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
           </div>
         ) : (
           <div className="prospect-list-card">
+            {isAdmin && !lectureSeule && (
+              <div className="prospect-bulk">
+                <label className="prospect-bulk-tout">
+                  <input
+                    type="checkbox"
+                    checked={filtered.length > 0 && filtered.every(p => coches.has(p.id))}
+                    onChange={ev => setCoches(ev.target.checked ? new Set(filtered.map(p => p.id)) : new Set())}
+                  />
+                  <span>{coches.size > 0 ? `${coches.size} sélectionné${coches.size > 1 ? 's' : ''}` : `Tout sélectionner (${filtered.length})`}</span>
+                </label>
+                {coches.size > 0 && (
+                  <div className="prospect-bulk-actions">
+                    <select className="pro-filter-select" value={groupeCommercial} onChange={ev => setGroupeCommercial(ev.target.value)} aria-label="Commercial">
+                      <option value="">Pot commun (non attribué)</option>
+                      {commerciaux.map(c => <option key={c.id} value={c.id}>{c.nom_complet || c.role}</option>)}
+                    </select>
+                    <button className="btn btn-secondary btn-sm" disabled={groupeBusy} onClick={() => void groupeAffecter()}>Affecter</button>
+                    <select className="pro-filter-select" value={groupeStatut} onChange={ev => setGroupeStatut(ev.target.value)} aria-label="État">
+                      <option value="">État…</option>
+                      {STATUTS.map(st => <option key={st.value} value={st.value}>{st.label}</option>)}
+                    </select>
+                    <button className="btn btn-secondary btn-sm" disabled={groupeBusy || !groupeStatut} onClick={() => void groupeChangerEtat()}>Changer l’état</button>
+                    <select className="pro-filter-select" value={groupeTemperature} onChange={ev => setGroupeTemperature(ev.target.value)} aria-label="Température">
+                      <option value="">Température…</option>
+                      {TEMPERATURES.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                    <button className="btn btn-secondary btn-sm" disabled={groupeBusy || !groupeTemperature} onClick={() => void groupeTemperatureAppliquer()}>Appliquer</button>
+                    <input className="pro-filter-select" placeholder="Tag à ajouter" value={groupeTag} onChange={ev => setGroupeTag(ev.target.value)} aria-label="Tag à ajouter" />
+                    <button className="btn btn-secondary btn-sm" disabled={groupeBusy || !groupeTag.trim()} onClick={() => void groupeAjouterTag()}>Ajouter</button>
+                    <button className="btn btn-ghost btn-sm" disabled={groupeBusy} onClick={viderSelection}>Annuler la sélection</button>
+                  </div>
+                )}
+                {groupeMessage && <span className="prospect-bulk-message" role="status">{groupeMessage}</span>}
+              </div>
+            )}
             {filtered.map(p => {
               const e = extended(p)
               const ceeCount = (e.fiches_cee || []).length
@@ -1335,6 +1439,16 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                   className="prospect-row"
                   onClick={() => onProspectClick ? onProspectClick(p) : setSelected(p)}
                 >
+                  {isAdmin && !lectureSeule && (
+                    <input
+                      type="checkbox"
+                      className="prospect-row-coche"
+                      checked={coches.has(p.id)}
+                      onClick={ev => ev.stopPropagation()}
+                      onChange={() => basculerCoche(p.id)}
+                      aria-label={`Sélectionner ${p.prenom} ${p.nom}`}
+                    />
+                  )}
                   <div
                     className="prospect-row-avatar"
                     style={{ background: avatarColor(`${p.prenom} ${p.nom}`) }}
