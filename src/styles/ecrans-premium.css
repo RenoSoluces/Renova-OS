@@ -195,9 +195,17 @@
 .etats-barres{list-style:none;margin:0;padding:0;display:grid;gap:8px}
 .etats-barres li{display:grid;grid-template-columns:128px 1fr 34px;align-items:center;gap:10px;font-size:13px}
 .etats-barres-label{color:#41585b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.etats-barres-piste{height:9px;border-radius:99px;background:var(--ep-teal-soft,#e3f0ef);overflow:hidden}
-.etats-barres-piste i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ep-teal,#0F5C5E),var(--ep-copper,#b87333))}
+.etats-barres-piste{display:block;height:10px;border-radius:99px;background:var(--ep-teal-soft,#e3f0ef);overflow:hidden}
+.etats-barres-piste i{display:block;height:100%;min-width:6px;border-radius:99px;background:linear-gradient(90deg,var(--ep-teal,#0F5C5E),var(--ep-copper,#b87333))}
 .etats-barres li b{text-align:right;font-variant-numeric:tabular-nums}
 .etats-sav{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
 .etats-sav li{display:flex;align-items:baseline;gap:8px;font-size:13px;color:#41585b}
 .etats-sav li b{min-width:26px;font-size:18px;color:var(--ep-ink,#10302f);font-variant-numeric:tabular-nums}
+
+/* Le panneau occupe toute la largeur de la grille à deux colonnes du tableau de bord. */
+.admin-dashboard-columns > .etats-equipe{grid-column:1 / -1;padding:24px 26px}
+.etats-equipe .admin-panel-head{margin-bottom:18px}
+.etats-grille{grid-template-columns:minmax(0,1.15fr) minmax(0,1.15fr) minmax(220px,.7fr);gap:36px}
+.etats-barres li{grid-template-columns:150px minmax(0,1fr) 44px}
+.etats-equipe-tableau{border-top:1px solid var(--ep-line,#d9e2e0);padding-top:18px}
+.etats-equipe .table td,.etats-equipe .table th{padding-left:14px;padding-right:14px}
