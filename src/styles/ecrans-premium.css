@@ -209,3 +209,19 @@
 .etats-barres li{grid-template-columns:150px minmax(0,1fr) 44px}
 .etats-equipe-tableau{border-top:1px solid var(--ep-line,#d9e2e0);padding-top:18px}
 .etats-equipe .table td,.etats-equipe .table th{padding-left:14px;padding-right:14px}
+
+/* ---------------------------------------------------------------- Fiche prospect : foyer fiscal */
+.foyer-fiscal{margin-top:22px}
+.foyer-fiscal-titre{margin-bottom:10px;font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--ep-teal,#0F5C5E)}
+.foyer-fiscal-tuiles{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin-bottom:14px}
+@media(max-width:700px){.foyer-fiscal-tuiles{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.foyer-fiscal-tuile{display:grid;gap:4px;padding:11px 13px;border:1px solid var(--ep-line,#d9e2e0);border-radius:12px;background:#fff;border-bottom:3px solid var(--ep-teal,#0F5C5E)}
+.foyer-fiscal-tuile:nth-child(2){border-bottom-color:#c0392b}.foyer-fiscal-tuile:nth-child(3){border-bottom-color:#d9a400}.foyer-fiscal-tuile:nth-child(4){border-bottom-color:#2563eb}
+.foyer-fiscal-tuile-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:#6b7c7e}
+.foyer-fiscal-tuile strong{display:inline-flex;align-items:center;gap:7px;font-size:14px;color:var(--ep-ink,#10302f)}
+.foyer-fiscal-pastille{display:inline-block;width:11px;height:11px;border-radius:50%}
+.foyer-fiscal-avis{margin-bottom:12px;padding:14px;border:1px solid var(--ep-line,#d9e2e0);border-radius:14px;background:var(--ep-teal-soft,#f3f8f7)}
+.foyer-fiscal-avis-entete{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;font-size:13px}
+.foyer-fiscal-alerte{margin:6px 0 0;font-size:12px;color:#a12b2b}
+.foyer-fiscal-ajout{margin-top:2px}
+.foyer-fiscal-total{margin:12px 0 0;font-size:13px;color:#41585b}

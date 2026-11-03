@@ -19,6 +19,8 @@ import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
 import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
 import { setProspectStatus } from '../lib/crm/workflow'
+import { FoyerFiscalAvis } from '../components/crm/FoyerFiscalAvis'
+import type { AvisImposition } from '../lib/crm/foyerFiscal'
 import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { ImportRdvGoogleModal } from '../components/crm/ImportRdvGoogleModal'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -144,7 +146,7 @@ const EMPTY_FORM = {
   civilite: 'M.', nom: '', prenom: '', telephone: '', email: '',
   adresse_rue: '', adresse_complement: '', code_postal: '', ville: '',
   statut_occupation: 'propriétaire_occupant', nombre_personnes_foyer: 1,
-  rfr: '', prenom_conjoint: '', nom_conjoint: '',
+  rfr: '', avis_imposition: [] as AvisImposition[], prenom_conjoint: '', nom_conjoint: '',
   zone_climatique: '', regime_aide_commission: '',
   source: 'Site web', commentaires: '', fiches_cee: [] as string[],
 }
@@ -554,6 +556,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       statut_occupation: form.statut_occupation,
       nombre_personnes_foyer: form.nombre_personnes_foyer,
       rfr: rfrNum || null,
+      avis_imposition: form.avis_imposition || [],
       categorie_mpr: categorie?.categorie || null,
       zone_climatique: form.zone_climatique || null,
       regime_aide_commission: form.regime_aide_commission || null,
@@ -591,6 +594,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       statut_occupation: e.statut_occupation || 'propriétaire_occupant',
       nombre_personnes_foyer: e.nombre_personnes_foyer || 1,
       rfr: e.rfr ? String(e.rfr) : '',
+      avis_imposition: (Array.isArray(e.avis_imposition) ? e.avis_imposition : []) as AvisImposition[],
       zone_climatique: e.zone_climatique || '',
       regime_aide_commission: e.regime_aide_commission || '',
       prenom_conjoint: e.prenom_conjoint || '',
@@ -624,6 +628,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       statut_occupation: editForm.statut_occupation,
       nombre_personnes_foyer: editForm.nombre_personnes_foyer,
       rfr: rfrEditNum || null,
+      avis_imposition: editForm.avis_imposition || [],
       categorie_mpr: cat?.categorie || null,
       zone_climatique: editForm.zone_climatique || null,
       regime_aide_commission: editForm.regime_aide_commission || null,
@@ -1614,35 +1619,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
             {form.type_prospect === 'particulier' && (
               <>
-                <div style={{ marginTop: 24, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
-                  Foyer fiscal — MaPrimeRénov'
-                </div>
-
-                <div className="grid grid-2 gap-3">
-                  <FloatInput
-                    label="Revenu fiscal de référence (€)"
-                    type="number"
-                    value={form.rfr}
-                    onChange={v => set('rfr', v)}
-                    placeholder="ex: 28000"
-                  />
-                  <FloatSelect
-                    label="Nombre de personnes au foyer"
-                    value={String(form.nombre_personnes_foyer)}
-                    onChange={v => set('nombre_personnes_foyer', parseInt(v))}
-                    options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: String(n), label: String(n) }))}
-                  />
-                </div>
-
-                {categorie && (
-                  <div className="foyer-card" style={{ marginTop: 16 }}>
-                    <div className="foyer-card-label">Catégorie MaPrimeRénov'</div>
-                    <div className="foyer-card-value">{categorie.label}</div>
-                    <div className="foyer-card-hint" style={{ fontSize: 12, color: 'var(--c-text-muted)', marginTop: 4 }}>
-                      RFR : {Math.round(rfrNum).toLocaleString('fr-FR')} € · {form.nombre_personnes_foyer} personne(s) · {ileDeFrance ? 'Île-de-France' : 'Hors Île-de-France'}
-                    </div>
-                  </div>
-                )}
+                <FoyerFiscalAvis form={form as any} set={set as any} />
               </>
             )}
             <div style={{ marginTop: 20, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
@@ -1765,10 +1742,7 @@ function EditFormBody({
         <FloatInput label="Ville" value={form.ville} onChange={v => set('ville', v)} />
       </div>
       <FloatSelect label="Statut d'occupation" value={form.statut_occupation} onChange={v => set('statut_occupation', v)} options={STATUTS_OCC} />
-      <div className="grid grid-2 gap-3 mt-4">
-        <FloatInput label="RFR (€)" type="number" value={form.rfr} onChange={v => set('rfr', v)} />
-        <FloatSelect label="Personnes au foyer" value={String(form.nombre_personnes_foyer)} onChange={v => set('nombre_personnes_foyer', parseInt(v))} options={[1, 2, 3, 4, 5, 6, 7, 8].map(n => ({ value: String(n), label: String(n) }))} />
-      </div>
+      <div className="mt-4"><FoyerFiscalAvis form={form as any} set={set as any} /></div>
       <div className="grid grid-2 gap-3 mt-4">
         <FloatSelect label="Zone climatique (barème commissions)" value={form.zone_climatique} onChange={v => set('zone_climatique', v)} options={[{ value: '', label: 'À renseigner' }, { value: 'H1', label: 'H1' }, { value: 'H2', label: 'H2' }, { value: 'H3', label: 'H3' }]} />
         <FloatSelect label="Régime d’aide solaire thermique" value={form.regime_aide_commission} onChange={v => set('regime_aide_commission', v)} options={[{ value: '', label: 'Sans objet / à renseigner' }, { value: 'mpr_cee', label: 'MaPrimeRénov’ + CEE' }, { value: 'full_cee', label: 'Full CEE' }]} />
