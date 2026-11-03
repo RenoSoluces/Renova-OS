@@ -410,9 +410,10 @@ export function DossiersPage({
     if (!detail || !isAdmin) return
     const nombre = (v: string) => (v.trim() === '' ? null : Number(v.replace(',', '.').replace(/\s/g, '')))
     const montant = nombre(saisieFin.montant)
-    const societe = nombre(saisieFin.societe)
+    // Commission société = montant facturé au partenaire (somme des échéances non annulées).
+    const societe = facturation.filter(l => l.statut !== 'annulee').reduce((t, l) => t + (Number(l.montant_ht) || 0), 0)
     const commercial = nombre(saisieFin.commercial)
-    if ([montant, societe, commercial].some(v => v !== null && !Number.isFinite(v))) {
+    if ([montant, commercial].some(v => v !== null && !Number.isFinite(v))) {
       setSaisieFinMessage('Un des montants n’est pas un nombre valide.')
       return
     }
@@ -425,13 +426,13 @@ export function DossiersPage({
         setDetail(d => d ? { ...d, montant_total: montant } as any : d)
         setRows(prev => prev.map(r => r.id === detail.id ? { ...r, montant_total: montant } as any : r))
       }
-      if ((societe !== null || commercial !== null) && !detail.devis_id) {
+      if (commercial !== null && !detail.devis_id) {
         const commercialId = (detail.prospect as any)?.commercial_id
         if (!commercialId) throw new Error('Aucun commercial rattaché au prospect : impossible d’enregistrer la commission.')
         const { data: existante, error: lectureErreur } = await supabase.from('commissions')
           .select('id').eq('reference_type', 'dossiers').eq('reference_id', detail.id).maybeSingle()
         if (lectureErreur) throw lectureErreur
-        const valeurs = { montant_societe: societe ?? 0, montant_commercial: commercial ?? 0 }
+        const valeurs = { montant_societe: societe, montant_commercial: commercial ?? 0 }
         const { error } = existante
           ? await supabase.from('commissions').update(valeurs).eq('id', (existante as any).id)
           : await supabase.from('commissions').insert({
@@ -1051,6 +1052,7 @@ export function DossiersPage({
   })
   const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, filtreParcours, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
 
+  const totalFactureHtDetail = facturation.filter(l => l.statut !== 'annulee').reduce((t, l) => t + (Number(l.montant_ht) || 0), 0)
   const total = rows.length
 
   const enCours = rows.filter(d => {
@@ -1288,8 +1290,7 @@ export function DossiersPage({
                   <th>Statut</th>
                   <th>Parcours</th>
                   <th>CA chantier (TTC)</th>
-                  <th>Facturé partenaire (HT)</th>
-                  {canViewCompanyCommission && <th>Commission société</th>}
+                  {canViewCompanyCommission && <th>Commission société <span className="text-muted" style={{ fontWeight: 400 }}>(facturé partenaire HT)</span></th>}
                   <th>Commission commerciale</th>
                 </tr>
               </thead>
@@ -1340,16 +1341,12 @@ export function DossiersPage({
                         {euro(d.montant_total)}
                       </td>
 
-                      <td>
-                        {euro(factureDossier(d.id))}
-                      </td>
-
                       {isAdmin && (
                         <td>
                           <strong>
                             {commission
                               ? euro(commission.montant_societe)
-                              : '—'}
+                              : factureDossier(d.id) > 0 ? euro(factureDossier(d.id)) : '—'}
                           </strong>
                         </td>
                       )}
@@ -1684,7 +1681,7 @@ export function DossiersPage({
                     <div className="font-semibold" style={{ fontSize: 16 }}>
                       {commissionsParDevis[detail.devis_id || detail.id]
                         ? euro(commissionsParDevis[detail.devis_id || detail.id].montant_societe)
-                        : '—'}
+                        : totalFactureHtDetail > 0 ? euro(totalFactureHtDetail) : '—'}
                     </div>
                   </div>
                 )}
@@ -1727,9 +1724,6 @@ export function DossiersPage({
                     </label>
                     {!detail.devis_id && (
                       <>
-                        <label className="text-sm">Commission société (€)
-                          <input className="input" inputMode="decimal" value={saisieFin.societe} onChange={e => setSaisieFin(f => ({ ...f, societe: e.target.value }))} />
-                        </label>
                         <label className="text-sm">Commission commerciale (€)
                           <input className="input" inputMode="decimal" value={saisieFin.commercial} onChange={e => setSaisieFin(f => ({ ...f, commercial: e.target.value }))} />
                         </label>
