@@ -22,6 +22,7 @@ const DevisPage = lazy(() => import('./pages/DevisPage').then(m => ({ default: m
 const ParametresPage = lazy(() => import('./pages/ParametresPage').then(m => ({ default: m.ParametresPage })))
 const ActivitePage = lazy(() => import('./pages/ActivitePage').then(m => ({ default: m.ActivitePage })))
 const CommissionsPage = lazy(() => import('./pages/CommissionsPage').then(m => ({ default: m.CommissionsPage })))
+const SavPage = lazy(() => import('./pages/SavPage').then(m => ({ default: m.SavPage })))
 const SuiviChantierPage = lazy(() => import('./pages/SuiviChantierPage').then(m => ({ default: m.SuiviChantierPage })))
 const PartenairesPage = lazy(() => import('./pages/PartenairesPage').then(m => ({ default: m.PartenairesPage })))
 const PerformancePage = lazy(() => import('./pages/PerformancePage').then(m => ({ default: m.PerformancePage })))
@@ -75,6 +76,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   activite: { title: 'Historique & activité', subtitle: 'Flux centralisé des échanges' },
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
   suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
+  sav: { title: 'SAV', subtitle: 'Interventions après installation' },
   partenaires: { title: 'Mon réseau', subtitle: 'Créez les accès de vos apporteurs et partenaires, puis envoyez-les par WhatsApp' },
   installateurs: { title: 'Installateurs', subtitle: 'Répertoire des partenaires techniques et installateurs' },
   challenges: { title: 'Challenges & classements', subtitle: 'Challenges et classements isolés par société' },
@@ -245,6 +247,7 @@ function AppContent() {
           {page === 'activite' && <ActivitePage />}
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
+          {page === 'sav' && <SavPage />}
           {page === 'partenaires' && <ApporteursPage />}
           {page === 'installateurs' && (['admin','manager','partner_admin','company_admin'].includes(profile?.role || '') ? <PartenairesPage /> : <div className="page"><div className="card card-pad"><strong>Accès réservé à la direction et aux responsables autorisés.</strong></div></div>)}
           {page === 'challenges' && <ChallengesPage />}
