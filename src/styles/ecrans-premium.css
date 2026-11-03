@@ -255,3 +255,12 @@
 .veille-impact{margin:8px 0 0}
 .veille-actions{display:flex;flex-wrap:wrap;gap:6px;margin-top:12px}
 .veille-dossiers{margin:10px 0 0;padding:10px 14px 10px 28px;border-radius:12px;background:var(--ep-teal-soft,#eef6f5);font-size:13px;display:grid;gap:4px}
+
+/* ---------------------------------------------------------------- Espace partenaire : dossier complet */
+.eap-parcours{display:inline-block;margin-right:8px;padding:3px 9px;border-radius:999px;background:var(--ep-teal-soft,#eef6f5);color:var(--ep-teal,#0F5C5E);font-size:12px;font-weight:600}
+.eap-complet{margin:14px 0;border:1px dashed var(--ep-line,#cfdad8);border-radius:14px;padding:10px 14px}
+.eap-complet-bouton{background:none;border:0;padding:4px 0;font:inherit;font-weight:600;color:var(--ep-teal,#0F5C5E);cursor:pointer}
+.eap-complet-bouton small{font-weight:400;color:#6b7c7e}
+.eap-complet-corps{margin-top:10px}
+.eap-ligne{display:grid;gap:4px;margin-bottom:10px;font-size:13px}
+.eap-ligne select{height:42px;padding:0 10px;border:1px solid var(--ep-line,#d9e2e0);border-radius:10px;font:inherit}
