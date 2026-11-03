@@ -3,11 +3,21 @@ import { Check, CheckCircle2, ChevronRight, Clock3, Gift, Loader2, Plus, Refresh
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { PageKey } from '../types'
+import { FoyerFiscalAvis } from '../components/crm/FoyerFiscalAvis'
+import { FICHES_CEE } from '../lib/crm/fichesCee'
+import type { AvisImposition } from '../lib/crm/foyerFiscal'
+import { determinerCategorieRevenu, estIleDeFrance } from '../lib/moteurAides'
+import { libelleParcours } from '../lib/dossiers/parcoursCee'
 
 interface Recommandation {
   id: string; client: string; ville: string | null; statut: string; etape: string
   cree_le: string; derniere_activite: string | null; montant_signe_ht: number | null; commission: number | null; commission_statut: string | null
+  parcours_etape?: string | null; parcours_statut?: string | null
 }
+const OCCUPATIONS = [
+  { value: 'propriétaire_occupant', label: 'Propriétaire occupant' }, { value: 'locataire', label: 'Locataire' },
+  { value: 'bailleur', label: 'Bailleur' }, { value: 'syndic', label: 'Syndic' },
+]
 
 const ETAPES = ['Reçu', 'Contacté', 'Visite technique', 'Devis envoyé', 'Signé', 'Installé']
 const PROJETS = ['Pompe à chaleur', 'Isolation', 'Panneaux solaires', 'Fenêtres', 'Chauffe-eau', 'Climatisation', 'Rénovation globale', 'Autre']
@@ -28,10 +38,15 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState('')
   const [succes, setSucces] = useState('')
+  // Dossier complet (facultatif) : foyer fiscal, occupation et travaux envisagés.
+  const [complet, setComplet] = useState(false)
+  const [occupation, setOccupation] = useState('propriétaire_occupant')
+  const [foyer, setFoyer] = useState<{ rfr: string; nombre_personnes_foyer: number; avis_imposition: AvisImposition[] }>({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] })
+  const [fiches, setFiches] = useState<string[]>([])
 
   async function charger() {
     setChargement(true)
-    const { data } = await supabase.rpc('mes_recommandations')
+    const { data } = await supabase.rpc('mes_dossiers_partenaire')
     setListe((data || []) as Recommandation[])
     setChargement(false)
   }
@@ -52,14 +67,24 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
     setErreur('')
     if (!accord) { setErreur('Confirmez que le client est d’accord pour être contacté.'); return }
     setEnvoi(true)
-    const { error } = await supabase.rpc('recommander_client', {
-      p_prenom: champs.prenom, p_nom: champs.nom, p_telephone: champs.telephone, p_email: champs.email, p_adresse: champs.adresse,
-      p_code_postal: champs.code_postal, p_ville: champs.ville, p_besoins: projets, p_commentaire: champs.commentaire, p_rappel: rappel,
-    })
+    const rfrNum = parseFloat(foyer.rfr) || 0
+    const categorie = complet && rfrNum > 0 ? determinerCategorieRevenu(rfrNum, foyer.nombre_personnes_foyer, estIleDeFrance(champs.code_postal)).categorie : null
+    const { error } = complet
+      ? await supabase.rpc('deposer_dossier', { p_donnees: {
+          prenom: champs.prenom, nom: champs.nom, telephone: champs.telephone, email: champs.email, adresse: champs.adresse,
+          code_postal: champs.code_postal, ville: champs.ville, besoins: projets, commentaire: champs.commentaire, rappel,
+          statut_occupation: occupation, nombre_personnes_foyer: foyer.nombre_personnes_foyer, rfr: rfrNum > 0 ? rfrNum : null,
+          avis_imposition: foyer.avis_imposition, categorie_mpr: categorie, fiches_cee: fiches,
+        } })
+      : await supabase.rpc('recommander_client', {
+          p_prenom: champs.prenom, p_nom: champs.nom, p_telephone: champs.telephone, p_email: champs.email, p_adresse: champs.adresse,
+          p_code_postal: champs.code_postal, p_ville: champs.ville, p_besoins: projets, p_commentaire: champs.commentaire, p_rappel: rappel,
+        })
     setEnvoi(false)
     if (error) { setErreur(error.message || 'Envoi impossible, réessayez.'); return }
     setSucces(`Merci ! ${champs.prenom || champs.nom} sera rappelé(e) rapidement. Vous suivez l’avancement ci-dessous.`)
     setChamps(VIDE); setProjets([]); setRappel(''); setAccord(false); setFormulaire(false)
+    setComplet(false); setOccupation('propriétaire_occupant'); setFoyer({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] }); setFiches([])
     void charger()
   }
 
@@ -111,7 +136,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
               title={onOuvrirProspect ? 'Voir la fiche, le chat et l’historique' : undefined}>
               <div className="eap-reco-tete">
                 <div><strong>{r.client}</strong><small>{r.ville || '—'} · recommandé le {new Date(r.cree_le).toLocaleDateString('fr-FR')}</small></div>
-                <span className="eap-reco-droite"><span className={`eap-badge e-${index}`}>{r.etape}</span>{onOuvrirProspect && <ChevronRight size={18} className="eap-reco-fleche" />}</span>
+                <span className="eap-reco-droite">{r.parcours_etape && <span className="eap-parcours" title="Étape du dossier">{libelleParcours(r.parcours_etape, r.parcours_statut)}</span>}<span className={`eap-badge e-${index}`}>{r.etape}</span>{onOuvrirProspect && <ChevronRight size={18} className="eap-reco-fleche" />}</span>
               </div>
               {!sansSuite && (
                 <ol className="eap-etapes" aria-label="Avancement">
@@ -145,6 +170,25 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
             <div className="eap-choix"><span>Son projet</span><div>{PROJETS.map(p => <button key={p} type="button" className={projets.includes(p) ? 'on' : ''} aria-pressed={projets.includes(p)} onClick={() => setProjets(x => x.includes(p) ? x.filter(y => y !== p) : [...x, p])}>{p}</button>)}</div></div>
             <div className="eap-choix"><span>Meilleur moment pour le rappeler</span><div>{RAPPELS.map(p => <button key={p} type="button" className={rappel === p ? 'on' : ''} aria-pressed={rappel === p} onClick={() => setRappel(r => r === p ? '' : p)}>{p}</button>)}</div></div>
             <label className="eap-commentaire"><span>Un mot sur la situation (facultatif)</span><textarea rows={3} value={champs.commentaire} onChange={e => maj('commentaire', e.target.value)} placeholder="Chaudière fioul en panne, maison de 120 m²…" /></label>
+            <div className="eap-complet">
+              <button type="button" className="eap-complet-bouton" aria-expanded={complet} onClick={() => setComplet(v => !v)}>
+                {complet ? '− Retirer' : '+ Ajouter'} le dossier complet <small>(foyer fiscal, travaux envisagés)</small>
+              </button>
+              {complet && (
+                <div className="eap-complet-corps">
+                  <label className="eap-ligne"><span>Statut d’occupation</span>
+                    <select value={occupation} onChange={e => setOccupation(e.target.value)}>{OCCUPATIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
+                  </label>
+                  <FoyerFiscalAvis form={{ ...foyer, code_postal: champs.code_postal }} set={(cle, valeur) => setFoyer(f => ({ ...f, [cle]: valeur }))} />
+                  <div className="eap-choix"><span>Travaux envisagés</span>
+                    <div>{FICHES_CEE.filter(f => f.code !== 'VISITE-TECHNIQUE').map(f => (
+                      <button key={f.code} type="button" className={fiches.includes(f.code) ? 'on' : ''} aria-pressed={fiches.includes(f.code)} title={f.desc}
+                        onClick={() => setFiches(x => x.includes(f.code) ? x.filter(y => y !== f.code) : [...x, f.code])}>{f.cat}</button>
+                    ))}</div>
+                  </div>
+                </div>
+              )}
+            </div>
             <label className="eap-accord"><input type="checkbox" checked={accord} onChange={e => setAccord(e.target.checked)} /><span>Le client est d’accord pour être contacté au sujet de son projet.</span></label>
             {erreur && <div className="eap-erreur" role="alert">{erreur}</div>}
             <button type="submit" className="eap-cta plein" disabled={envoi}>{envoi ? <Loader2 size={18} className="spin" /> : <Send size={18} />} Envoyer la recommandation</button>
