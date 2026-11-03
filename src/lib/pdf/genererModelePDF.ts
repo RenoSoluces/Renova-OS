@@ -11,7 +11,7 @@ const sur = (v: unknown) => String(v ?? '')
   .replace(/œ/g, 'oe').replace(/Œ/g, 'Oe')
 
 /** Document texte à signer (mandat, attestation…) : titre, corps déjà rempli, pied de page. */
-export function genererModelePDF(opts: { titre: string; corps: string; reference?: string; emetteur?: string }): Blob {
+export function genererModelePDF(opts: { titre: string; corps: string; reference?: string; emetteur?: string; sansSignature?: boolean }): Blob {
   const doc = new jsPDF({ unit: 'mm', format: 'a4' })
   const marge = 20
   const largeur = 210 - marge * 2
@@ -30,12 +30,14 @@ export function genererModelePDF(opts: { titre: string; corps: string; reference
     }
   }
   // Cadre de signature
-  if (y > 240) { doc.addPage(); y = 24 }
-  y += 6
-  doc.setDrawColor(168, 98, 52); doc.rect(marge, y, largeur / 2 - 4, 28); doc.rect(marge + largeur / 2 + 4, y, largeur / 2 - 4, 28)
-  doc.setFontSize(8); doc.setTextColor(102, 116, 118)
-  doc.text('Signature (précédée de « Lu et approuvé »)', marge + 2, y + 5)
-  doc.text('Signature du mandataire / installateur', marge + largeur / 2 + 6, y + 5)
+  if (!opts.sansSignature) {
+    if (y > 240) { doc.addPage(); y = 24 }
+    y += 6
+    doc.setDrawColor(168, 98, 52); doc.rect(marge, y, largeur / 2 - 4, 28); doc.rect(marge + largeur / 2 + 4, y, largeur / 2 - 4, 28)
+    doc.setFontSize(8); doc.setTextColor(102, 116, 118)
+    doc.text('Signature (précédée de « Lu et approuvé »)', marge + 2, y + 5)
+    doc.text('Signature du mandataire / installateur', marge + largeur / 2 + 6, y + 5)
+  }
   const pages = doc.getNumberOfPages()
   for (let i = 1; i <= pages; i++) {
     doc.setPage(i); doc.setFontSize(8); doc.setTextColor(150, 150, 150)

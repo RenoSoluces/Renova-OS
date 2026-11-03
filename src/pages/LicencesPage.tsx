@@ -6,8 +6,11 @@ import { Modal } from '../components/ui/Modal'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { conditionsLicence, VERSION_CONDITIONS } from '../lib/licence/conditionsLicence'
 import { genererModelePDF } from '../lib/pdf/genererModelePDF'
+import { calculerFacture, economieAnnuelle, numeroFacture } from '../lib/licence/facturation'
 
+interface Facture { id: string; numero: string; formule: string; periode_debut: string; periode_fin: string; montant_ht: number; montant_ttc: number; statut: string; emise_le: string; payee_le: string | null; mode_paiement: string | null }
 interface Licence {
+  formule: 'mensuel' | 'annuel'; remise_annuelle_pct: number; mandat_sepa: string
   id: string; organisation_id: string; statut: string; nb_licences: number; prix_ht_mensuel: number; engagement_mois: number; preavis_jours: number; essai_jours: number
   debut: string | null; client_raison_sociale: string | null; client_forme: string | null; client_siret: string | null
   client_adresse: string | null; client_code_postal: string | null; client_ville: string | null
@@ -26,6 +29,8 @@ export function LicencesPage() {
   const [nouveau, setNouveau] = useState(false)
   const [nomNouveau, setNomNouveau] = useState('')
   const [message, setMessage] = useState('')
+  const [factureDe, setFactureDe] = useState<Licence | null>(null)
+  const [factures, setFactures] = useState<Facture[]>([])
   const [fournisseur, setFournisseur] = useState(() => {
     try { return { ...{ nom: 'Reno Soluces', siret: '', adresse: 'Trausse (Aude)' }, ...JSON.parse(localStorage.getItem(FOURNISSEUR_CLE) || '{}') } } catch { return { nom: 'Reno Soluces', siret: '', adresse: 'Trausse (Aude)' } }
   })
@@ -65,7 +70,7 @@ export function LicencesPage() {
       fournisseur: fournisseur.nom, fournisseurSiret: fournisseur.siret, fournisseurAdresse: fournisseur.adresse,
       client: l.client_raison_sociale || l.organisation?.nom || '', clientForme: l.client_forme || undefined, clientSiret: l.client_siret || undefined,
       clientAdresse: [l.client_adresse, l.client_code_postal, l.client_ville].filter(Boolean).join(' '),
-      nbLicences: l.nb_licences, prixHtMensuel: Number(l.prix_ht_mensuel), engagementMois: l.engagement_mois, preavisJours: l.preavis_jours, essaiJours: l.essai_jours,
+      nbLicences: l.nb_licences, prixHtMensuel: Number(l.prix_ht_mensuel), formule: l.formule, remiseAnnuellePct: Number(l.remise_annuelle_pct), engagementMois: l.engagement_mois, preavisJours: l.preavis_jours, essaiJours: l.essai_jours,
       debut: l.debut ? dateFr(l.debut) : undefined,
     })
     const blob = genererModelePDF({ titre: t.titre, corps: t.corps, emetteur: fournisseur.nom })
@@ -77,6 +82,52 @@ export function LicencesPage() {
     const { error } = await supabase.from('licences').update({ conditions_version: VERSION_CONDITIONS, conditions_envoyees_le: new Date().toISOString(), acceptees_le: null, acceptees_par: null }).eq('id', l.id)
     setMessage(error ? `Impossible : ${error.message}` : 'Conditions soumises : le dirigeant du client devra les accepter à sa prochaine connexion.')
     void charger()
+  }
+
+  const chargerFactures = useCallback(async (l: Licence) => {
+    const { data } = await supabase.from('licence_factures').select('*').eq('licence_id', l.id).order('periode_debut', { ascending: false })
+    setFactures((data || []) as Facture[])
+  }, [])
+  async function ouvrirFactures(l: Licence) { setFactureDe(l); await chargerFactures(l) }
+
+  async function creerFacture(l: Licence) {
+    setMessage('')
+    const { count } = await supabase.from('licence_factures').select('id', { count: 'exact', head: true })
+    const derniere = factures.length ? [...factures.map(f => f.periode_fin)].sort().reverse()[0] : null
+    const c = calculerFacture(l, derniere, l.debut)
+    const annee = new Date().getFullYear()
+    const { error } = await supabase.from('licence_factures').insert({
+      licence_id: l.id, numero: numeroFacture(annee, (count || 0) + 1), formule: l.formule, periode_debut: c.debut, periode_fin: c.fin,
+      montant_ht: c.montant_ht, tva_taux: c.tva_taux, montant_ttc: c.montant_ttc,
+    })
+    if (error) { setMessage(`Facture non créée : ${error.message}`); return }
+    await chargerFactures(l)
+  }
+
+  async function statutFacture(l: Licence, f: Facture, statut: 'payee' | 'impayee', mode?: string) {
+    const { error } = await supabase.from('licence_factures').update({ statut, payee_le: statut === 'payee' ? new Date().toISOString().slice(0, 10) : null, mode_paiement: statut === 'payee' ? mode || 'virement' : null }).eq('id', f.id)
+    if (error) { setMessage(`Mise à jour impossible : ${error.message}`); return }
+    setMessage(statut === 'impayee' ? 'Facture impayée : la licence est suspendue, le client n\'a plus accès à Renova OS.' : 'Facture réglée : la licence est de nouveau active.')
+    await chargerFactures(l); void charger()
+  }
+
+  const pdfFacture = (l: Licence, f: Facture) => {
+    const corps = [
+      `Facture ${f.numero} du ${dateFr(f.emise_le)}`, '',
+      `Émetteur : ${fournisseur.nom}${fournisseur.siret ? `, SIRET ${fournisseur.siret}` : ''}, ${fournisseur.adresse}`,
+      `Client : ${l.client_raison_sociale || l.organisation?.nom || ''}${l.client_siret ? `, SIRET ${l.client_siret}` : ''}`,
+      [l.client_adresse, l.client_code_postal, l.client_ville].filter(Boolean).join(' '), '',
+      `Licence Renova OS — ${l.nb_licences} licence${l.nb_licences > 1 ? 's' : ''}, offre ${f.formule === 'annuel' ? 'annuelle' : 'mensuelle'}`,
+      `Période : du ${dateFr(f.periode_debut)} au ${dateFr(f.periode_fin)}`, '',
+      `Montant HT : ${Number(f.montant_ht).toFixed(2).replace('.', ',')} €`,
+      `TVA 20 % : ${(Number(f.montant_ttc) - Number(f.montant_ht)).toFixed(2).replace('.', ',')} €`,
+      `Total TTC : ${Number(f.montant_ttc).toFixed(2).replace('.', ',')} €`, '',
+      l.mandat_sepa === 'actif' ? 'Règlement par prélèvement SEPA à l\'échéance.' : 'Règlement par virement à réception de facture.',
+      'Pénalités de retard : 3 fois le taux d\'intérêt légal ; indemnité forfaitaire de recouvrement : 40 €.',
+    ].join('\n')
+    const blob = genererModelePDF({ titre: `Facture ${f.numero}`, corps, emetteur: fournisseur.nom, sansSignature: true })
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `${f.numero}.pdf`; a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 5000)
   }
 
   const num = (v: string) => (v === '' ? 0 : Number(v.replace(',', '.')) || 0)
@@ -98,7 +149,7 @@ export function LicencesPage() {
       </div>
       <div className="card">
         <table className="table">
-          <thead><tr><th>Entreprise</th><th>Statut</th><th>Licences</th><th>Prix HT/mois</th><th>Conditions</th><th></th></tr></thead>
+          <thead><tr><th>Entreprise</th><th>Statut</th><th>Licences</th><th>Offre</th><th>Conditions</th><th></th></tr></thead>
           <tbody>
             {licences.length === 0 && <tr><td colSpan={6} className="text-muted">Aucune licence. Créez-en une pour votre premier client installateur.</td></tr>}
             {licences.map(l => (
@@ -106,10 +157,11 @@ export function LicencesPage() {
                 <td><b>{l.organisation?.nom || l.client_raison_sociale}</b></td>
                 <td>{STATUTS[l.statut] || l.statut}</td>
                 <td>{l.nb_licences}</td>
-                <td>{Number(l.prix_ht_mensuel).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</td>
+                <td>{l.formule === 'annuel' ? `Annuelle (−${Number(l.remise_annuelle_pct)} %)` : 'Mensuelle'} · {Number(l.prix_ht_mensuel).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €/mois</td>
                 <td>{l.acceptees_le ? `Acceptées le ${dateFr(l.acceptees_le)} par ${l.acceptees_par}` : l.conditions_envoyees_le ? `Envoyées le ${dateFr(l.conditions_envoyees_le)}` : 'Non envoyées'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
                   <Button variant="ghost" size="sm" onClick={() => setEdition(l)}>Modifier</Button>
+                  <Button variant="ghost" size="sm" onClick={() => void ouvrirFactures(l)}>Factures</Button>
                   <Button variant="ghost" size="sm" onClick={() => pdf(l)} title="Télécharger le contrat"><Download size={14} /></Button>
                   <Button variant="ghost" size="sm" onClick={() => void envoyerConditions(l)} title="Soumettre les conditions à l'acceptation du client"><Send size={14} /></Button>
                 </td>
@@ -132,6 +184,9 @@ export function LicencesPage() {
             <FloatSelect label="Statut" value={edition.statut} onChange={v => setEdition({ ...edition, statut: v })} options={Object.entries(STATUTS).map(([value, label]) => ({ value, label }))} />
             <FloatInput label="Nombre de licences" inputMode="numeric" value={edition.nb_licences} onChange={v => setEdition({ ...edition, nb_licences: Math.max(1, Math.round(num(v))) })} />
             <FloatInput label="Prix HT par mois et par licence (€)" inputMode="decimal" value={edition.prix_ht_mensuel} onChange={v => setEdition({ ...edition, prix_ht_mensuel: num(v) })} />
+            <FloatSelect label="Offre" value={edition.formule} onChange={v => setEdition({ ...edition, formule: v as 'mensuel' | 'annuel' })} options={[{ value: 'mensuel', label: 'Mensuelle' }, { value: 'annuel', label: 'Annuelle (remise)' }]} />
+            <FloatInput label="Remise offre annuelle (%)" inputMode="decimal" value={edition.remise_annuelle_pct} onChange={v => setEdition({ ...edition, remise_annuelle_pct: Math.min(99, num(v)) })} />
+            <FloatSelect label="Mandat de prélèvement SEPA" value={edition.mandat_sepa} onChange={v => setEdition({ ...edition, mandat_sepa: v })} options={[{ value: 'aucun', label: 'Aucun (virement)' }, { value: 'en_attente', label: 'En attente de signature' }, { value: 'actif', label: 'Actif' }]} />
             <FloatInput label="Engagement (mois)" inputMode="numeric" value={edition.engagement_mois} onChange={v => setEdition({ ...edition, engagement_mois: Math.round(num(v)) })} />
             <FloatInput label="Préavis (jours)" inputMode="numeric" value={edition.preavis_jours} onChange={v => setEdition({ ...edition, preavis_jours: Math.round(num(v)) })} />
             <FloatInput label="Essai gratuit (jours)" inputMode="numeric" value={edition.essai_jours} onChange={v => setEdition({ ...edition, essai_jours: Math.round(num(v)) })} />
@@ -146,6 +201,35 @@ export function LicencesPage() {
             <FloatInput label="Fonction" value={edition.signataire_fonction} onChange={v => setEdition({ ...edition, signataire_fonction: v })} />
             <FloatInput label="E-mail du signataire" value={edition.signataire_email} onChange={v => setEdition({ ...edition, signataire_email: v })} />
           </div>
+        </Modal>
+      )}
+
+      {factureDe && (
+        <Modal open onClose={() => setFactureDe(null)} title={`Factures — ${factureDe.organisation?.nom || ''}`} width={820}
+          footer={<><Button variant="ghost" onClick={() => setFactureDe(null)}>Fermer</Button><Button variant="primary" onClick={() => void creerFacture(factureDe)}>Créer la prochaine facture</Button></>}>
+          <p className="text-sm text-muted" style={{ marginTop: 0 }}>
+            Offre {factureDe.formule === 'annuel' ? `annuelle : économie de ${economieAnnuelle(factureDe).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} € HT par an` : 'mensuelle'}.
+            Marquer une facture « impayée » suspend immédiatement la licence ; la marquer « réglée » la réactive.
+          </p>
+          <table className="table">
+            <thead><tr><th>N°</th><th>Période</th><th>TTC</th><th>Statut</th><th></th></tr></thead>
+            <tbody>
+              {factures.length === 0 && <tr><td colSpan={5} className="text-muted">Aucune facture.</td></tr>}
+              {factures.map(f => (
+                <tr key={f.id}>
+                  <td>{f.numero}</td>
+                  <td>{dateFr(f.periode_debut)} → {dateFr(f.periode_fin)}</td>
+                  <td>{Number(f.montant_ttc).toLocaleString('fr-FR', { minimumFractionDigits: 2 })} €</td>
+                  <td>{f.statut === 'payee' ? `Réglée${f.mode_paiement ? ` (${f.mode_paiement})` : ''}` : f.statut === 'impayee' ? 'Impayée' : 'Émise'}</td>
+                  <td style={{ whiteSpace: 'nowrap' }}>
+                    <Button variant="ghost" size="sm" onClick={() => pdfFacture(factureDe, f)}><Download size={14} /></Button>
+                    {f.statut !== 'payee' && <Button variant="ghost" size="sm" onClick={() => void statutFacture(factureDe, f, 'payee', factureDe.mandat_sepa === 'actif' ? 'prelevement' : 'virement')}>Réglée</Button>}
+                    {f.statut !== 'impayee' && f.statut !== 'payee' && <Button variant="ghost" size="sm" onClick={() => void statutFacture(factureDe, f, 'impayee')}>Impayée</Button>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </Modal>
       )}
     </div>

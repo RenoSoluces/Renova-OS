@@ -17,4 +17,9 @@ describe('conditionsLicence', () => {
     expect(conditionsLicence(base).corps).not.toContain('essai gratuite')
     expect(conditionsLicence({ ...base, essaiJours: 14 }).corps).toContain('essai gratuite de 14 jours')
   })
+  it('offre annuelle avec remise et suspension immédiate', () => {
+    const { corps } = conditionsLicence({ ...base, formule: 'annuel', remiseAnnuellePct: 15 })
+    expect(corps).toContain('397,80 € HT par an')
+    expect(corps).toContain('suspendu immédiatement')
+  })
 })

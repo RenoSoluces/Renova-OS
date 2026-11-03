@@ -4,7 +4,7 @@ export const VERSION_CONDITIONS = 'CGL-2026-11'
 export interface ParametresLicence {
   fournisseur: string; fournisseurSiret: string; fournisseurAdresse: string
   client: string; clientForme?: string; clientSiret?: string; clientAdresse?: string
-  nbLicences: number; prixHtMensuel: number; engagementMois: number; preavisJours: number; essaiJours: number
+  nbLicences: number; prixHtMensuel: number; formule?: 'mensuel' | 'annuel'; remiseAnnuellePct?: number; engagementMois: number; preavisJours: number; essaiJours: number
   debut?: string
 }
 
@@ -13,6 +13,11 @@ const ou = (v?: string) => (v && v.trim() ? v.trim() : '……………')
 
 export function conditionsLicence(p: ParametresLicence): { titre: string; corps: string } {
   const totalMensuel = p.nbLicences * p.prixHtMensuel
+  const annuel = p.formule === 'annuel'
+  const montantAnnuel = Math.round(totalMensuel * 12 * (1 - (p.remiseAnnuellePct ?? 0) / 100) * 100) / 100
+  const formuleTexte = annuel
+    ? ` Offre annuelle : ${euro(montantAnnuel)} par an pour ${p.nbLicences} licence${p.nbLicences > 1 ? 's' : ''} (remise de ${p.remiseAnnuellePct ?? 0} % sur 12 mensualités), facturés d'avance pour la période de 12 mois.`
+    : ' Offre mensuelle : facturation mensuelle d\'avance.'
   const engagement = p.engagementMois > 0 ? `${p.engagementMois} mois à compter du ${ou(p.debut)}, puis reconduction tacite par périodes de 1 mois` : `sans durée minimale, à compter du ${ou(p.debut)}`
   const corps = `ENTRE
 ${ou(p.fournisseur)}, SIRET ${ou(p.fournisseurSiret)}, ${ou(p.fournisseurAdresse)} (« le Fournisseur »),
@@ -29,7 +34,8 @@ Le Client dispose de ${p.nbLicences} licence${p.nbLicences > 1 ? 's' : ''} nomin
 Engagement : ${engagement}. Résiliation par lettre ou courriel avec un préavis de ${p.preavisJours} jours avant l'échéance de la période en cours.${p.essaiJours > 0 ? ` Une période d'essai gratuite de ${p.essaiJours} jours est accordée ; elle prend fin automatiquement sans engagement si le Client n'active pas la licence.` : ''}
 
 4. Prix et paiement
-Prix : ${euro(p.prixHtMensuel)} par mois et par licence, soit ${euro(totalMensuel)} par mois pour ${p.nbLicences} licence${p.nbLicences > 1 ? 's' : ''}, TVA en sus. Facturation mensuelle d'avance, paiement à 30 jours. En cas d'impayé après mise en demeure restée sans effet pendant 15 jours, le Fournisseur peut suspendre l'accès jusqu'au règlement, sans que cela n'interrompe la facturation. Le tarif peut être révisé à chaque échéance avec un préavis de 60 jours ; le Client peut alors résilier sans pénalité.
+Prix : ${euro(p.prixHtMensuel)} par mois et par licence, soit ${euro(totalMensuel)} par mois pour ${p.nbLicences} licence${p.nbLicences > 1 ? 's' : ''}, TVA en sus.${formuleTexte}
+Le paiement s'effectue par prélèvement SEPA (mandat signé par le Client) ou, à défaut, par virement à réception de facture. En cas de rejet de prélèvement ou de non-paiement à l'échéance, l'accès au service est suspendu immédiatement et sans autre formalité jusqu'au règlement intégral ; la suspension n'interrompt pas la facturation de la période en cours. Le tarif peut être révisé à chaque échéance avec un préavis de 60 jours ; le Client peut alors résilier sans pénalité.
 
 5. Données personnelles
 Pour les données de ses clients et prospects (identité, coordonnées, situation fiscale et foyer, documents), le Client est responsable de traitement et le Fournisseur est son sous-traitant au sens de l'article 28 du RGPD. Le Fournisseur : ne traite les données que sur instruction du Client et pour fournir le service ; garantit la confidentialité des personnes habilitées ; met en œuvre des mesures de sécurité appropriées (accès par rôle, cloisonnement entre entreprises, chiffrement des échanges) ; n'a recours à des sous-traitants ultérieurs (hébergement) qu'avec des garanties équivalentes ; aide le Client à répondre aux demandes d'exercice de droits ; notifie toute violation de données dans les meilleurs délais ; supprime ou restitue les données à la fin du contrat. Le Client s'engage à informer ses clients du traitement et à recueillir les consentements nécessaires (notamment pour la démarche d'aides et les échanges avec les délégataires CEE).
