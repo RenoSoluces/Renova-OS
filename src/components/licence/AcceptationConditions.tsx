@@ -24,7 +24,7 @@ export function AcceptationConditions() {
     fournisseur: 'Reno Soluces', fournisseurSiret: '', fournisseurAdresse: 'Trausse (Aude)',
     client: licence.client_raison_sociale || licence.organisation?.nom || '', clientForme: licence.client_forme || undefined, clientSiret: licence.client_siret || undefined,
     clientAdresse: [licence.client_adresse, licence.client_code_postal, licence.client_ville].filter(Boolean).join(' '),
-    nbLicences: licence.nb_licences, prixHtMensuel: Number(licence.prix_ht_mensuel), engagementMois: licence.engagement_mois, preavisJours: licence.preavis_jours, essaiJours: licence.essai_jours,
+    nbLicences: licence.nb_licences, prixHtMensuel: Number(licence.prix_ht_mensuel), formule: licence.formule, remiseAnnuellePct: Number(licence.remise_annuelle_pct), engagementMois: licence.engagement_mois, preavisJours: licence.preavis_jours, essaiJours: licence.essai_jours,
     debut: licence.debut ? new Date(licence.debut).toLocaleDateString('fr-FR') : undefined,
   })
 

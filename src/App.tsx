@@ -39,6 +39,7 @@ import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
 import { useAuth } from './lib/auth/AuthContext'
 import { LoginPage } from './pages/LoginPage'
+import { LicenceBloquee } from './components/licence/LicenceBloquee'
 import { AcceptationConditions } from './components/licence/AcceptationConditions'
 import { DefinirMotDePassePage } from './pages/DefinirMotDePassePage'
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
@@ -219,6 +220,7 @@ function AppContent() {
   return (
     <div className="app-layout">
       <AcceptationConditions />
+      <LicenceBloquee />
       <Sidebar current={page} onNavigate={navigate} collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} tasksBadge={tasksBadge} />
       <div className="app-content">
         <Topbar title={pageTitle.title} subtitle={pageTitle.subtitle} onNavigate={navigate} refreshKey={notifRefresh} />
