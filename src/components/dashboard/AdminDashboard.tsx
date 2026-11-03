@@ -478,90 +478,7 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
 
       <PilotageEtats prospects={prospects as any} dossiers={dossiers as any} profiles={profiles} onNavigate={onNavigate} />
 
-      <section className="admin-panel leaderboard-panel">
-
-        <div className="admin-panel-head">
-          <div>
-            <div className="admin-panel-kicker">
-              <Gauge size={14}/> DATAVIZ PARTENAIRES
-            </div>
-            <h2>Leaderboard des installateurs</h2>
-          </div>
-
-          <span className="admin-live">
-            <i/> LIVE
-          </span>
-        </div>
-
-        <div className="leaderboard-list">
-
-          {leaderboard.length===0
-            ?
-            <div className="admin-empty">
-              <Users size={22}/>
-              <div>
-                <strong>Aucun installateur actif</strong>
-                <span>Ajoutez vos partenaires.</span>
-              </div>
-            </div>
-            :
-            leaderboard.slice(0,6).map((x,idx)=>
-              <div className="leader-row" key={x.installer.id}>
-
-                <div className="leader-rank">{idx+1}</div>
-
-                <div className="leader-name">
-                  <strong>{x.installer.nom}</strong>
-                  <span>
-                    {x.leads} leads · {x.signed} signés · {x.vt} VT · {x.lost} perdus
-                  </span>
-                </div>
-
-                <div className="leader-bar">
-                  <div style={{width:`${x.conversion}%`}}/>
-                </div>
-
-                <strong className="leader-pct">{x.conversion}%</strong>
-
-                <span className={`health health-${x.health}`}>
-                  {x.health}
-                </span>
-
-              </div>
-            )
-          }
-
-        </div>
-
-        {leaderboard[0]&&
-          <div className="black-hole">
-            <div>
-              <span className="black-hole-title">
-                <Ban size={14}/> BLACK HOLE
-              </span>
-
-              <strong>
-                {leaderboard.reduce((s,x)=>s+x.lost,0)} leads perdus
-              </strong>
-            </div>
-
-            <span>
-              Surveillez les partenaires qui laissent dormir leur portefeuille.
-            </span>
-          </div>
-        }
-
-        <button
-          className="admin-link-btn"
-          onClick={()=>onNavigate('partenaires')}
-        >
-          Gérer les partenaires
-          <ArrowUpRight size={14}/>
-        </button>
-
-      </section>
-
-    </div>
+      </div>
 
     <section className="admin-panel leaderboard-panel">
 
@@ -715,26 +632,6 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
 
         </div>
 
-      </section>
-
-      <section className="admin-panel leaderboard-panel">
-        <div className="admin-panel-head">
-          <div>
-            <div className="admin-panel-kicker"><Trophy size={14}/> PARTENAIRES</div>
-            <h2>Leaderboard installateurs</h2>
-          </div>
-          <span className="admin-live"><i/> LIVE</span>
-        </div>
-        <div className="leaderboard-list">
-          {leaderboard.length===0 ? <div className="admin-empty"><Users size={22}/><div><strong>Aucun partenaire</strong><span>Les installateurs apparaîtront ici.</span></div></div> :
-            leaderboard.slice(0,8).map((x,idx)=><div className="leader-row" key={x.installer.id}>
-              <div className="leader-rank">{idx+1}</div>
-              <div className="leader-name"><strong>{x.installer.nom}</strong><span>{x.validated} dossiers validés · {x.validatedVT} VT payées · {x.vt} VT au total</span></div>
-              <div className="leader-bar"><div style={{width:`${Math.min(100,x.score)}%`}}/></div>
-              <strong className="leader-pct">{x.validated}</strong>
-            </div>)
-          }
-        </div>
       </section>
 
       <section className="admin-panel leaderboard-panel">
