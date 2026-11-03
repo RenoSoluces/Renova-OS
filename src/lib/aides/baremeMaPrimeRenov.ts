@@ -16,7 +16,7 @@
 // ci-dessous doit être mise à jour à chaque modification pour tracer la fraîcheur des données.
 // ============================================================================
 
-export const DERNIERE_MISE_A_JOUR_BAREME_MPR = "2026-08-17";
+export const DERNIERE_MISE_A_JOUR_BAREME_MPR = "2026-11-03";
 
 export type ProfilMPR = "bleu" | "jaune" | "violet" | "rose";
 
@@ -29,10 +29,7 @@ export const LABEL_PROFIL: Record<ProfilMPR, string> = {
 
 // Plafonds de Revenu Fiscal de Référence (RFR) par taille de foyer.
 // Source hors IDF : tableau ANAH 2026 (concordant hellio.com / velux.fr / primesenergie.fr).
-// Source IDF (1 personne uniquement, confirmée) : primesenergie.fr, 2026.
-// IDF pour 2 à 5+ personnes : ESTIMÉ par extrapolation du même ratio IDF/hors-IDF que pour
-// 1 personne (~+38%) faute de source directe vérifiée pour ces lignes — À VÉRIFIER avant
-// utilisation sur un dossier réel en Île-de-France.
+// Source IDF : voir PLAFONDS_IDF ci-dessous (Anah, janvier 2026).
 export interface PlafondRessources {
   personnes: number;
   bleu: number;
@@ -48,29 +45,35 @@ export const PLAFONDS_HORS_IDF: PlafondRessources[] = [
   { personnes: 5, bleu: 40835, jaune: 52353, violet: 73909 },
 ];
 
-// ⚠️ Estimé par extrapolation — voir avertissement ci-dessus
+// Île-de-France : plafonds Anah de janvier 2026 (relevés sur hellio.com, hellowatt.fr, laprimeenergie.fr
+// et croisés). Ils remplacent l'ancienne extrapolation à partir de la ligne « 1 personne ».
 export const PLAFONDS_IDF: PlafondRessources[] = [
   { personnes: 1, bleu: 24031, jaune: 29253, violet: 40851 },
-  { personnes: 2, bleu: 35244, jaune: 42848, violet: 59981 }, // estimé
-  { personnes: 3, bleu: 42351, jaune: 51503, violet: 72101 }, // estimé
-  { personnes: 4, bleu: 49489, jaune: 60177, violet: 84274 }, // estimé
-  { personnes: 5, bleu: 56643, jaune: 68873, violet: 96475 }, // estimé
+  { personnes: 2, bleu: 35270, jaune: 42933, violet: 60051 },
+  { personnes: 3, bleu: 42357, jaune: 51564, violet: 71846 },
+  { personnes: 4, bleu: 49455, jaune: 60208, violet: 84562 },
+  { personnes: 5, bleu: 56580, jaune: 68877, violet: 96817 },
 ];
+
+// Majoration par personne supplémentaire au-delà de 5 personnes (Anah, janvier 2026).
+export const MAJORATION_PERSONNE_SUPP: Record<"idf" | "horsIdf", { bleu: number; jaune: number; violet: number }> = {
+  idf: { bleu: 7116, jaune: 8663, violet: 12257 },
+  horsIdf: { bleu: 5159, jaune: 6598, violet: 9357 },
+};
 
 function plafondPourFoyer(personnes: number, idf: boolean): PlafondRessources {
   const table = idf ? PLAFONDS_IDF : PLAFONDS_HORS_IDF;
   const n = Math.max(1, Math.min(5, Math.round(personnes)));
   const base = table.find(p => p.personnes === n)!;
   if (personnes <= 5) return base;
-  // Au-delà de 5 personnes : majoration par personne supplémentaire (~5 200€ hors IDF,
-  // ~7 200€ IDF, ordre de grandeur cohérent avec l'écart observé entre les paliers).
-  const majorationParPersonne = idf ? 7200 : 5200;
-  const supplement = (personnes - 5) * majorationParPersonne;
+  // Au-delà de 5 personnes : majoration par personne supplémentaire, propre à chaque profil.
+  const maj = MAJORATION_PERSONNE_SUPP[idf ? "idf" : "horsIdf"];
+  const extra = Math.round(personnes) - 5;
   return {
     personnes,
-    bleu: base.bleu + supplement,
-    jaune: base.jaune + supplement,
-    violet: base.violet + supplement,
+    bleu: base.bleu + extra * maj.bleu,
+    jaune: base.jaune + extra * maj.jaune,
+    violet: base.violet + extra * maj.violet,
   };
 }
 
