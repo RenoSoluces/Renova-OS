@@ -26,10 +26,10 @@ import { Button } from '../components/ui/Button'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { removeDocumentStorageObject, resolveDocumentRows, resolveDocumentUrl } from '../lib/storage/documentUrl'
-import { jsPDF } from 'jspdf'
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { lireTout } from '../lib/lireTout'
+import { genererFacturePartenairePDF } from '../lib/pdf/genererFacturePartenairePDF'
 import { numeroDevis } from '../lib/devis/numeroDevis'
 import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
 
@@ -575,95 +575,60 @@ export function DossiersPage({
       }
       const destinataireFacture = destinataireEntreprise ? {
         nom: destinataireEntreprise.raison_sociale,
-        contact: destinataireEntreprise.forme_juridique,
+        complement: destinataireEntreprise.forme_juridique,
         adresse: destinataireEntreprise.adresse,
         code_postal: destinataireEntreprise.code_postal,
         ville: destinataireEntreprise.ville,
         siret: destinataireEntreprise.siret,
         numero_tva: destinataireEntreprise.numero_tva,
         email: destinataireEntreprise.email,
-      } : partenaire
+      } : (partenaire ? {
+        nom: partenaire.devis_raison_sociale || partenaire.nom,
+        complement: partenaire.devis_forme_juridique || null,
+        adresse: partenaire.adresse,
+        code_postal: partenaire.code_postal,
+        ville: partenaire.ville,
+        siret: partenaire.siret,
+        numero_tva: partenaire.numero_tva || partenaire.devis_numero_tva,
+        email: partenaire.email,
+      } : null)
+      if (!destinataireFacture?.nom) {
+        throw new Error('Aucun partenaire n’est défini pour ce dossier : choisissez l’installateur du dossier (ou l’entreprise destinataire) avant de générer la facture.')
+      }
 
       const ht = Number(ligne.montant_ht) || 0
       const taux = Number(ligne.taux_tva) || 0
       const tva = ht * taux / 100
       const ttc = ht + tva
-      const doc = new jsPDF()
-      const euroPdf = (n:number) => `${n.toLocaleString('fr-FR',{minimumFractionDigits:2,maximumFractionDigits:2})} €`
-
-      try {
-        if (entreprise?.logo_url) {
-          const blob = await fetch(entreprise.logo_url).then(r=>r.blob())
-          const dataUrl = await new Promise<string>((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(String(r.result));r.onerror=reject;r.readAsDataURL(blob)})
-          doc.addImage(dataUrl, 'PNG', 18, 14, 28, 18)
-        }
-      } catch {}
-
-      doc.setFontSize(18); doc.setFont('helvetica','bold'); doc.text(entreprise?.raison_sociale || 'RENOVA OS', 52, 25)
-      doc.setFont('helvetica','normal'); doc.setFontSize(9)
-      let ey=32
-      for (const line of [
-        entreprise?.forme_juridique,
-        entreprise?.adresse,
-        [entreprise?.code_postal,entreprise?.ville].filter(Boolean).join(' '),
-        entreprise?.telephone,
-        entreprise?.email,
-        entreprise?.siret ? `SIRET : ${entreprise.siret}` : '',
-        entreprise?.numero_tva ? `TVA intracommunautaire : ${entreprise.numero_tva}` : '',
-      ].filter(Boolean)) { doc.text(String(line),52,ey); ey+=5 }
-
-      doc.setFont('helvetica','bold'); doc.setFontSize(20); doc.text('FACTURE', 145, 24)
-      doc.setFont('helvetica','normal'); doc.setFontSize(9)
-      doc.text(`N° ${numeroFacture}`,145,32)
-      doc.text(`Date d’émission : ${now.toLocaleDateString('fr-FR')}`,145,38)
-      doc.text(`Date de prestation : ${(detail.date_installation || now.toISOString().slice(0,10))}`,145,44)
-
-      doc.setDrawColor(210); doc.line(18,68,192,68)
-      doc.setFont('helvetica','bold'); doc.setFontSize(11); doc.text('CLIENT / PARTENAIRE',18,78)
-      doc.setFont('helvetica','normal'); doc.setFontSize(9)
-      let py=86
-      for (const line of [
-        destinataireFacture?.nom || 'Destinataire non renseigné',
-        destinataireFacture?.contact,
-        destinataireFacture?.adresse,
-        [destinataireFacture?.code_postal,destinataireFacture?.ville].filter(Boolean).join(' '),
-        destinataireFacture?.siret ? `SIREN : ${String(destinataireFacture.siret).replace(/\s/g,'').slice(0,9)}` : '',
-        destinataireFacture?.numero_tva ? `TVA intracommunautaire : ${destinataireFacture.numero_tva}` : '',
-        destinataireFacture?.email,
-      ].filter(Boolean)) { doc.text(String(line),18,py); py+=5 }
-
-      doc.setFont('helvetica','bold'); doc.text('DÉTAIL DE LA PRESTATION',18,128)
-      doc.setFont('helvetica','normal')
-      doc.text('Désignation',18,137); doc.text('Qté',112,137); doc.text('PU HT',135,137); doc.text('TVA',165,137); doc.text('Total HT',182,137)
-      doc.line(18,140,192,140)
-      doc.text(ligne.libelle || 'Prestation partenaire',18,149)
-      doc.text('1',114,149); doc.text(euroPdf(ht),133,149); doc.text(`${taux}%`,164,149); doc.text(euroPdf(ht),178,149)
-
-      doc.line(18,158,192,158)
-      doc.setFont('helvetica','bold'); doc.text('Total HT',130,168); doc.text(euroPdf(ht),178,168)
-      doc.text('TVA',130,176); doc.text(euroPdf(tva),178,176)
-      doc.setFontSize(12); doc.text('TOTAL TTC',130,186); doc.text(euroPdf(ttc),178,186)
-
-      doc.setFont('helvetica','normal'); doc.setFontSize(8)
-      let fy=200
-      const due = ligne.date_echeance ? new Date(ligne.date_echeance).toLocaleDateString('fr-FR') : 'selon conditions contractuelles'
-      for (const line of [
-        `Échéance de paiement : ${due}`,
-        `Conditions : ${ligne.conditions_paiement || entreprise?.conditions_paiement_defaut || 'Selon conditions contractuelles.'}`,
-        `Escompte pour paiement anticipé : ${entreprise?.escompte_defaut || 'Néant'}`,
-        `Pénalités de retard : ${entreprise?.taux_penalite_retard || '3 fois le taux d’intérêt légal'}`,
-        'Indemnité forfaitaire pour frais de recouvrement : 40 €.',
-        `Nature de l’opération : ${ligne.categorie_operation || 'prestation de services'}.`,
-      ]) { const lines=doc.splitTextToSize(line,174); doc.text(lines,18,fy); fy+=Math.max(5,lines.length*4.5) }
-
-      if (entreprise?.iban || entreprise?.bic) {
-        doc.setFont('helvetica','bold'); doc.text('COORDONNÉES BANCAIRES',18,252)
-        doc.setFont('helvetica','normal')
-        doc.text(`Banque : ${entreprise?.banque || '—'}`,18,260)
-        doc.text(`IBAN : ${entreprise?.iban || '—'}`,18,266)
-        doc.text(`BIC : ${entreprise?.bic || '—'}`,18,272)
-      }
-      doc.setFontSize(7); doc.text('Document généré par RENOVA OS — à conserver comme pièce comptable.',18,286)
+      const doc = await genererFacturePartenairePDF({
+        numero: numeroFacture,
+        dateEmission: now,
+        datePrestation: detail.date_installation || null,
+        dateEcheance: ligne.date_echeance || null,
+        referenceDossier: detail.reference || null,
+        emetteur: {
+          nom: entreprise?.raison_sociale || nomEntreprise,
+          complement: entreprise?.forme_juridique,
+          capital_social: entreprise?.capital_social,
+          adresse: entreprise?.adresse, code_postal: entreprise?.code_postal, ville: entreprise?.ville,
+          telephone: entreprise?.telephone, email: entreprise?.email,
+          siret: entreprise?.siret, numero_tva: entreprise?.numero_tva, logo_url: entreprise?.logo_url,
+          banque: entreprise?.banque, iban: entreprise?.iban, bic: entreprise?.bic,
+          conditions_paiement_defaut: entreprise?.conditions_paiement_defaut,
+          escompte_defaut: entreprise?.escompte_defaut, taux_penalite_retard: entreprise?.taux_penalite_retard,
+        },
+        destinataire: {
+          nom: String(destinataireFacture.nom),
+          complement: (destinataireFacture as any).complement ?? null,
+          adresse: destinataireFacture.adresse, code_postal: destinataireFacture.code_postal, ville: destinataireFacture.ville,
+          siret: destinataireFacture.siret, numero_tva: destinataireFacture.numero_tva, email: destinataireFacture.email,
+        },
+        designation: ligne.libelle || 'Prestation partenaire',
+        montantHt: ht,
+        tauxTva: taux,
+        conditionsPaiement: ligne.conditions_paiement || entreprise?.conditions_paiement_defaut || null,
+        natureOperation: ligne.categorie_operation || null,
+      })
       const pdfBlob = doc.output('blob')
       doc.save(`${numeroFacture}.pdf`)
       const fichierFacture = new File([pdfBlob], `${numeroFacture}.pdf`, { type: 'application/pdf' })
