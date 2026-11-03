@@ -313,6 +313,9 @@ export interface Dossier {
   aides_montant: number | null
   reste_a_charge: number | null
   installateur_id?: string | null
+  parcours_etape?: string | null
+  parcours_statut?: string | null
+  parcours_maj_le?: string | null
   organisation_id?: string | null
   facturation_organisation_id?: string | null
   destinataire_organisation_id?: string | null

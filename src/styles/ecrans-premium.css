@@ -168,3 +168,14 @@
 .dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child) .dashboard-kpi-main strong{font-size:28px}
 @media(max-width:1280px){.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child){grid-template-columns:repeat(3,minmax(0,1fr))}}
 @media(max-width:760px){.dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child){grid-template-columns:1fr}}
+
+/* ---------------------------------------------------------------- Parcours du dossier */
+.parcours-etapes{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:8px}
+.parcours-etapes li button{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;border-radius:999px;border:1px solid var(--ep-line,#d9e2e0);background:#fff;font:inherit;font-size:13px;color:#5B6F72;cursor:pointer}
+.parcours-etapes li button:disabled{cursor:default;opacity:.9}
+.parcours-etapes li button span{display:inline-grid;place-items:center;width:20px;height:20px;border-radius:50%;background:var(--ep-teal-soft,#e3f0ef);color:var(--ep-teal,#0F5C5E);font-size:11px;font-weight:700}
+.parcours-etapes li.fait button{background:var(--ep-teal-soft,#e3f0ef);border-color:transparent;color:var(--ep-teal,#0F5C5E)}
+.parcours-etapes li.courant button{background:var(--ep-teal,#0F5C5E);border-color:var(--ep-teal,#0F5C5E);color:#fff;font-weight:600}
+.parcours-etapes li.courant button span{background:#fff;color:var(--ep-teal,#0F5C5E)}
+.parcours-etapes li.gagne.courant button{background:#1f7a4d;border-color:#1f7a4d}
+.parcours-etapes li.perdu.courant button{background:#8A9A9C;border-color:#8A9A9C}
