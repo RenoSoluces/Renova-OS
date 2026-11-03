@@ -22,6 +22,7 @@ const DevisPage = lazy(() => import('./pages/DevisPage').then(m => ({ default: m
 const ParametresPage = lazy(() => import('./pages/ParametresPage').then(m => ({ default: m.ParametresPage })))
 const ActivitePage = lazy(() => import('./pages/ActivitePage').then(m => ({ default: m.ActivitePage })))
 const CommissionsPage = lazy(() => import('./pages/CommissionsPage').then(m => ({ default: m.CommissionsPage })))
+const LicencesPage = lazy(() => import('./pages/LicencesPage').then(m => ({ default: m.LicencesPage })))
 const VeillePage = lazy(() => import('./pages/VeillePage').then(m => ({ default: m.VeillePage })))
 const CeeDelegatairesPage = lazy(() => import('./pages/CeeDelegatairesPage').then(m => ({ default: m.CeeDelegatairesPage })))
 const SavPage = lazy(() => import('./pages/SavPage').then(m => ({ default: m.SavPage })))
@@ -38,6 +39,7 @@ import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
 import { useAuth } from './lib/auth/AuthContext'
 import { LoginPage } from './pages/LoginPage'
+import { AcceptationConditions } from './components/licence/AcceptationConditions'
 import { DefinirMotDePassePage } from './pages/DefinirMotDePassePage'
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
 import React from 'react'
@@ -79,6 +81,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
   suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
   sav: { title: 'SAV', subtitle: 'Interventions après installation' },
+  licences: { title: 'Licences', subtitle: 'Entreprises clientes de Renova OS' },
   veille: { title: 'Veille réglementaire', subtitle: 'Arrêtés CEE, MaPrimeRénov\' et MonProjetAnah' },
   cee_delegataires: { title: 'Délégataires CEE', subtitle: 'Grilles de prix des certificats d\'économies d\'énergie' },
   partenaires: { title: 'Mon réseau', subtitle: 'Créez les accès de vos apporteurs et partenaires, puis envoyez-les par WhatsApp' },
@@ -215,6 +218,7 @@ function AppContent() {
 
   return (
     <div className="app-layout">
+      <AcceptationConditions />
       <Sidebar current={page} onNavigate={navigate} collapsed={collapsed} onToggleCollapse={() => setCollapsed(c => !c)} tasksBadge={tasksBadge} />
       <div className="app-content">
         <Topbar title={pageTitle.title} subtitle={pageTitle.subtitle} onNavigate={navigate} refreshKey={notifRefresh} />
@@ -252,6 +256,7 @@ function AppContent() {
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
           {page === 'sav' && <SavPage />}
+          {page === 'licences' && (profile.role === 'admin' ? <LicencesPage /> : <div className="card card-pad">Cette rubrique est réservée au Grand Admin.</div>)}
           {page === 'veille' && <VeillePage onNavigate={navigate} />}
           {page === 'cee_delegataires' && (['admin','manager','partner_admin','company_admin'].includes(profile?.role || '') ? <CeeDelegatairesPage /> : <div className="card card-pad">Cette rubrique est réservée aux administrateurs.</div>)}
           {page === 'partenaires' && <ApporteursPage />}
