@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
-  Gauge, ChevronDown, Wrench, Landmark, Scale,
+  Gauge, ChevronDown, Wrench, Landmark, Scale, KeyRound,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -56,6 +56,7 @@ const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
   ] },
   { id: 'gestion', label: 'Gestion', collapsible: true, items: [
     { key: 'installateurs', label: 'Installateurs', icon: Building2 },
+    { key: 'licences', label: 'Licences', icon: KeyRound },
     { key: 'cee_delegataires', label: 'Délégataires CEE', icon: Landmark },
     { key: 'catalogue', label: 'Catalogue produits', icon: Package },
     { key: 'fiches_techniques', label: 'Fiches techniques', icon: BookOpen },
@@ -90,6 +91,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
   const canSee = (item: NavItem) => {
     const role = profile?.role || ''
     if (['performance', 'sante_systeme', 'pilotage'].includes(item.key) && !adminRoles.includes(role)) return false
+    if (item.key === 'licences' && role !== 'admin') return false
     if (item.key === 'pilotage' && !['admin', 'manager'].includes(role)) return false
     if (item.key === 'installateurs' && !adminRoles.includes(role)) return false
     if (item.key === 'cee_delegataires' && !adminRoles.includes(role)) return false
