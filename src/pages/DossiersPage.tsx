@@ -30,6 +30,7 @@ import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { lireTout } from '../lib/lireTout'
 import { PARCOURS_CEE, etapeParcours, indexEtape, libelleParcours } from '../lib/dossiers/parcoursCee'
+import { ligneApplicable, primeCee, prixNet, precariteDepuisCategorieMpr, LIBELLES_PRECARITE, type LignePrix } from '../lib/cee/grillePrix'
 import { genererFacturePartenairePDF } from '../lib/pdf/genererFacturePartenairePDF'
 import { numeroDevis } from '../lib/devis/numeroDevis'
 import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
@@ -153,6 +154,17 @@ export function DossiersPage({
   const [filtreEtape, setFiltreEtape] = useState('')
   const [filtrePersonne, setFiltrePersonne] = useState('')
   const [filtreParcours, setFiltreParcours] = useState('')
+  // CEE par délégataire (admin) : grilles de prix et saisie du dossier ouvert.
+  const [ceeDelegataires, setCeeDelegataires] = useState<{ id: string; nom: string }[]>([])
+  const [ceeGrille, setCeeGrille] = useState<LignePrix[]>([])
+  const [ceeForm, setCeeForm] = useState({ delegataire_id: '', fiche: '', mwh: '' })
+  const [ceeSaving, setCeeSaving] = useState(false)
+  const [ceeMessage, setCeeMessage] = useState('')
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase.from('cee_delegataires').select('id,nom').eq('actif', true).order('nom').then(({ data }) => setCeeDelegataires((data || []) as any))
+    supabase.from('cee_grille_prix').select('*').then(({ data }) => setCeeGrille(((data || []) as any[]).map(l => ({ ...l, prix_eur_par_mwh_cumac: Number(l.prix_eur_par_mwh_cumac), bonification_pct: Number(l.bonification_pct) }))))
+  }, [isAdmin])
   const [parcoursSaving, setParcoursSaving] = useState(false)
   // « En cours » masque les dossiers entièrement soldés ; ils restent toujours accessibles (Terminés / Tous / recherche).
   const [affichage, setAffichage] = useState<'actifs' | 'termines' | 'tous'>('actifs')
@@ -367,6 +379,8 @@ export function DossiersPage({
       d.devis_id ? supabase.from('devis').select('signature_date').eq('id', d.devis_id).maybeSingle() : Promise.resolve({ data: null }),
     ])
     setSignatureDevisDetail((devisSigne as any)?.signature_date || null)
+    setCeeForm({ delegataire_id: (d as any).cee_delegataire_id || '', fiche: (d as any).cee_fiche_reference || '', mwh: (d as any).cee_mwh_cumac != null ? String((d as any).cee_mwh_cumac) : '' })
+    setCeeMessage('')
     {
       const co = commissionsParDevis[d.devis_id || d.id]
       setSaisieFin({
@@ -388,6 +402,36 @@ export function DossiersPage({
       taux_tva: '20',
       declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
     })
+  }
+
+  /** Calcul CEE du dossier ouvert d'après la grille du délégataire choisi. */
+  const ceeCalcul = (() => {
+    if (!detail || !ceeForm.delegataire_id) return null
+    const mwh = parseFloat(ceeForm.mwh.replace(',', '.')) || 0
+    const precarite = precariteDepuisCategorieMpr((detail.prospect as any)?.categorie_mpr)
+    const ligne = ligneApplicable(ceeGrille, { delegataireId: ceeForm.delegataire_id, fiche: ceeForm.fiche, precarite })
+    return { mwh, precarite, ligne, prime: primeCee(mwh, ligne) }
+  })()
+
+  async function enregistrerCee() {
+    if (!detail || !isAdmin) return
+    setCeeSaving(true); setCeeMessage('')
+    const mwh = parseFloat(ceeForm.mwh.replace(',', '.'))
+    const champs = {
+      cee_delegataire_id: ceeForm.delegataire_id || null,
+      cee_fiche_reference: ceeForm.fiche.trim().toUpperCase() || null,
+      cee_mwh_cumac: Number.isFinite(mwh) && mwh > 0 ? mwh : null,
+      cee_prix_applique: ceeCalcul?.ligne ? prixNet(ceeCalcul.ligne) : null,
+      cee_prime_estimee: ceeCalcul?.ligne && ceeCalcul.prime > 0 ? ceeCalcul.prime : null,
+      cee_calcule_le: new Date().toISOString(),
+    }
+    const { error } = await supabase.from('dossiers').update(champs).eq('id', detail.id)
+    setCeeSaving(false)
+    if (error) { setCeeMessage(`Enregistrement impossible : ${error.message}`); return }
+    setDetail(d => d ? { ...d, ...champs } as any : d)
+    setRows(prev => prev.map(r => r.id === detail.id ? { ...r, ...champs } as any : r))
+    void logAuditEvent({ action: 'dossier_cee', entityType: 'dossier', entityId: detail.id, description: `CEE : ${champs.cee_prime_estimee != null ? `${champs.cee_prime_estimee} €` : 'sans prime calculée'}`, meta: champs })
+    setCeeMessage('Calcul CEE enregistré.')
   }
 
   /** Change l'étape (et son statut) du parcours du dossier ouvert. */
@@ -1569,6 +1613,49 @@ export function DossiersPage({
                 </div>
               )
             })()}
+
+            {/* CEE PAR DÉLÉGATAIRE */}
+            {isAdmin && (
+              <div className="card card-pad" style={{ marginBottom: 14 }}>
+                <div className="font-semibold" style={{ marginBottom: 2 }}>Prime CEE</div>
+                <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
+                  Le montant dépend du délégataire qui rachète les certificats. Les MWh cumac viennent du calcul officiel de la fiche d'opération.
+                </div>
+                {ceeDelegataires.length === 0 ? (
+                  <p className="text-sm text-muted">Aucun délégataire n'est configuré : ajoutez-en un dans « Délégataires CEE » (menu Gestion) avec sa grille de prix.</p>
+                ) : (
+                  <>
+                    <div className="grid grid-3 gap-3">
+                      <FloatSelect label="Délégataire" value={ceeForm.delegataire_id} onChange={v => setCeeForm(f => ({ ...f, delegataire_id: v }))}
+                        options={[{ value: '', label: 'Choisir…' }, ...ceeDelegataires.map(x => ({ value: x.id, label: x.nom }))]} />
+                      <FloatInput label="Fiche d'opération (ex. BAR-TH-171)" value={ceeForm.fiche} onChange={v => setCeeForm(f => ({ ...f, fiche: v }))} list="cee-fiches-dossier" />
+                      <FloatInput label="MWh cumac" inputMode="decimal" value={ceeForm.mwh} onChange={v => setCeeForm(f => ({ ...f, mwh: v }))} />
+                    </div>
+                    <datalist id="cee-fiches-dossier">
+                      {(((detail.prospect as any)?.fiches_cee || []) as string[]).map(c => <option key={c} value={c} />)}
+                    </datalist>
+                    {ceeCalcul && (
+                      <div className="cee-resultat" role="status">
+                        {ceeCalcul.ligne ? (
+                          <>
+                            <div><span>Prix net</span><b>{prixNet(ceeCalcul.ligne).toLocaleString('fr-FR', { maximumFractionDigits: 4 })} € / MWh cumac</b></div>
+                            <div><span>Précarité du ménage</span><b>{ceeCalcul.precarite ? LIBELLES_PRECARITE[ceeCalcul.precarite] : 'non renseignée'}</b></div>
+                            <div><span>Prime CEE estimée</span><b className="cee-prime">{ceeCalcul.mwh > 0 ? euro(ceeCalcul.prime) : 'saisir les MWh cumac'}</b></div>
+                          </>
+                        ) : (
+                          <div className="text-sm">Aucun prix dans la grille de ce délégataire pour cette fiche{ceeCalcul.precarite ? `, ce niveau de précarité (${LIBELLES_PRECARITE[ceeCalcul.precarite]})` : ''} et la date du jour.</div>
+                        )}
+                      </div>
+                    )}
+                    <div style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+                      <Button variant="primary" size="sm" onClick={() => void enregistrerCee()} disabled={ceeSaving}>{ceeSaving ? 'Enregistrement…' : 'Enregistrer le calcul'}</Button>
+                      {ceeMessage && <span className="text-sm text-muted" role="status">{ceeMessage}</span>}
+                      {(detail as any).cee_prime_estimee != null && !ceeMessage && <span className="text-sm text-muted">Dernier calcul enregistré : {euro((detail as any).cee_prime_estimee)}</span>}
+                    </div>
+                  </>
+                )}
+              </div>
+            )}
 
             {/* MONTANTS EXISTANTS */}
 

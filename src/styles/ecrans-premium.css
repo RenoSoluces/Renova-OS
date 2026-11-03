@@ -229,3 +229,19 @@
 .foyer-fiscal-verifie{display:inline-flex;align-items:center;gap:7px;margin-left:auto;font-size:13px;color:#41585b;cursor:pointer}
 .foyer-fiscal-verifie span{display:inline-flex;align-items:center;gap:5px}
 .foyer-fiscal-verifie input:checked + span{color:#1f7a4d;font-weight:600}
+
+/* ---------------------------------------------------------------- Délégataires CEE */
+.cee-layout{display:grid;grid-template-columns:260px minmax(0,1fr);gap:18px;align-items:start}
+@media(max-width:900px){.cee-layout{grid-template-columns:1fr}}
+.cee-liste{display:grid;gap:2px;padding:8px}
+.cee-liste-item{display:grid;gap:2px;width:100%;padding:10px 12px;border:0;border-radius:10px;background:none;text-align:left;cursor:pointer;font:inherit}
+.cee-liste-item small{color:#6b7c7e}
+.cee-liste-item:hover{background:var(--ep-teal-soft,#eef6f5)}
+.cee-liste-item.actif{background:var(--ep-teal,#0F5C5E);color:#fff}.cee-liste-item.actif small{color:rgba(255,255,255,.75)}
+.cee-entete{display:flex;justify-content:space-between;align-items:flex-start;gap:14px;margin-bottom:20px}
+.cee-entete-actions{display:flex;gap:6px;flex-wrap:wrap}
+.cee-grille-titre{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.cee-resultat{display:grid;gap:6px;margin-top:12px;padding:12px 14px;border-radius:12px;background:var(--ep-teal-soft,#eef6f5)}
+.cee-resultat > div{display:flex;justify-content:space-between;gap:12px;font-size:13px}
+.cee-resultat span{color:#5B6F72}
+.cee-prime{font-size:16px;color:var(--ep-teal,#0F5C5E)}
