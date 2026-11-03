@@ -8,7 +8,13 @@ export interface AvisImposition {
   rfr: string | number
   date_naissance: string
   nb_personnes: number
+  /** Date (ISO) à laquelle l'avis a été contrôlé sur le service officiel, et par qui. */
+  verifie_le?: string
+  verifie_par?: string
 }
+
+/** Service officiel de vérification des avis d'impôt sur le revenu (SVAIR), sur impots.gouv.fr. */
+export const URL_VERIFICATION_AVIS = 'https://cfsmsp.impots.gouv.fr/secavis/'
 
 export const nouvelAvis = (): AvisImposition => ({ numero_fiscal: '', reference_avis: '', rfr: '', date_naissance: '', nb_personnes: 1 })
 

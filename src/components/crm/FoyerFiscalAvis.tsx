@@ -1,7 +1,8 @@
-import { Plus, Trash2, MapPin, Flame, Home, Landmark } from 'lucide-react'
+import { Plus, Trash2, MapPin, Flame, Home, Landmark, ExternalLink, Copy, BadgeCheck } from 'lucide-react'
+import { useAuth } from '../../lib/auth/AuthContext'
 import { FloatInput, FloatSelect } from '../ui/FloatInput'
 import {
-  agregerAvis, nouvelAvis, numeroFiscalValide, referenceAvisValide, syntheseFoyer,
+  agregerAvis, nouvelAvis, numeroFiscalValide, URL_VERIFICATION_AVIS, referenceAvisValide, syntheseFoyer,
   type AvisImposition,
 } from '../../lib/crm/foyerFiscal'
 
@@ -19,7 +20,11 @@ const COULEURS: Record<string, string> = { bleu: '#2563eb', jaune: '#d9a400', vi
  * additionnés automatiquement et alimentent le département, la zone, la précarité et la couleur MaPrimeRénov'.
  */
 export function FoyerFiscalAvis({ form, set }: { form: FormFoyer; set: (cle: string, valeur: any) => void }) {
+  const { profile } = useAuth()
   const avis = form.avis_imposition || []
+  const copier = (texte: string) => { void navigator.clipboard?.writeText(texte.replace(/\s/g, '')) }
+  const basculerVerification = (i: number, verifie: boolean) =>
+    majAvis(avis.map((a, k) => (k === i ? { ...a, verifie_le: verifie ? new Date().toISOString() : '', verifie_par: verifie ? (profile?.nom_complet || '') : '' } : a)))
   const rfrManuel = parseFloat(String(form.rfr)) || 0
   const agrege = agregerAvis(avis)
   const rfr = avis.length > 0 ? agrege.rfrGlobal : rfrManuel
@@ -71,6 +76,19 @@ export function FoyerFiscalAvis({ form, set }: { form: FormFoyer; set: (cle: str
           </div>
           {(a.numero_fiscal && !numeroFiscalValide(a.numero_fiscal)) && <p className="foyer-fiscal-alerte">Le numéro fiscal compte 13 chiffres.</p>}
           {(a.reference_avis && !referenceAvisValide(a.reference_avis)) && <p className="foyer-fiscal-alerte">La référence de l'avis compte 13 caractères.</p>}
+          <div className="foyer-fiscal-verif">
+            <a className="btn btn-secondary btn-sm" href={URL_VERIFICATION_AVIS} target="_blank" rel="noopener noreferrer" title="Ouvre le service officiel de vérification des avis d'impôt (impots.gouv.fr)">
+              <ExternalLink size={14} /> Vérifier sur impots.gouv.fr
+            </a>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={!a.numero_fiscal} onClick={() => copier(a.numero_fiscal)}><Copy size={14} /> Numéro fiscal</button>
+            <button type="button" className="btn btn-ghost btn-sm" disabled={!a.reference_avis} onClick={() => copier(a.reference_avis)}><Copy size={14} /> Référence</button>
+            <label className="foyer-fiscal-verifie">
+              <input type="checkbox" checked={!!a.verifie_le} onChange={ev => basculerVerification(i, ev.target.checked)} />
+              {a.verifie_le
+                ? <span><BadgeCheck size={14} /> Vérifié le {new Date(a.verifie_le).toLocaleDateString('fr-FR')}{a.verifie_par ? ` par ${a.verifie_par}` : ''}</span>
+                : <span>Avis contrôlé et conforme</span>}
+            </label>
+          </div>
           <div className="grid grid-3 gap-3 mt-3">
             <FloatInput label="Revenu fiscal de référence (€)" type="number" value={String(a.rfr ?? '')} onChange={v => modifier(i, 'rfr', v)} />
             <FloatInput label="Date de naissance" type="date" value={a.date_naissance} onChange={v => modifier(i, 'date_naissance', v)} />
