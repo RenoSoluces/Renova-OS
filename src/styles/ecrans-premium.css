@@ -187,3 +187,17 @@
 .prospect-bulk-actions .pro-filter-select{min-width:130px;max-width:190px}
 .prospect-bulk-message{font-size:13px;color:#5B6F72;margin-left:auto}
 .prospect-row-coche{flex:0 0 auto;width:17px;height:17px;margin-right:4px;accent-color:var(--ep-teal,#0F5C5E);cursor:pointer}
+
+/* ---------------------------------------------------------------- Tableau de bord : états et équipe */
+.etats-grille{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:22px;margin-bottom:22px}
+@media(max-width:1100px){.etats-grille{grid-template-columns:1fr}}
+.etats-bloc h3{margin:0 0 12px;font-size:13px;font-weight:700;letter-spacing:.02em;color:var(--ep-teal,#0F5C5E)}
+.etats-barres{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.etats-barres li{display:grid;grid-template-columns:128px 1fr 34px;align-items:center;gap:10px;font-size:13px}
+.etats-barres-label{color:#41585b;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.etats-barres-piste{height:9px;border-radius:99px;background:var(--ep-teal-soft,#e3f0ef);overflow:hidden}
+.etats-barres-piste i{display:block;height:100%;border-radius:99px;background:linear-gradient(90deg,var(--ep-teal,#0F5C5E),var(--ep-copper,#b87333))}
+.etats-barres li b{text-align:right;font-variant-numeric:tabular-nums}
+.etats-sav{list-style:none;margin:0 0 12px;padding:0;display:grid;gap:6px}
+.etats-sav li{display:flex;align-items:baseline;gap:8px;font-size:13px;color:#41585b}
+.etats-sav li b{min-width:26px;font-size:18px;color:var(--ep-ink,#10302f);font-variant-numeric:tabular-nums}

@@ -8,6 +8,7 @@ import { euro, timeAgo } from '../../lib/crm/constants'
 import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
 import { useAuth } from '../../lib/auth/AuthContext'
+import { PilotageEtats } from './PilotageEtats'
 import type { Devis, Prospect, Commission, Dossier } from '../../types'
 
 interface Installer { id:string; nom:string; telephone?:string; email?:string; ville?:string; zone_intervention?:string; actif:boolean }
@@ -474,6 +475,8 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
         }
 
       </section>
+
+      <PilotageEtats prospects={prospects as any} dossiers={dossiers as any} profiles={profiles} onNavigate={onNavigate} />
 
       <section className="admin-panel leaderboard-panel">
 
