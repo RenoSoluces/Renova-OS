@@ -76,6 +76,8 @@ export function ConnexionGoogleAgenda({ onSynchronise }: { onSynchronise?: () =>
   }
 
   if (!etat) return null
+  // Google a retiré l'accès permanent (invalid_grant) : « Synchroniser » ne peut plus fonctionner, il faut se reconnecter.
+  const expire = etat.connecte && /reconnectez/i.test(etat.derniere_erreur || '')
   return (
     <div className="card google-agenda">
       <div className="google-agenda-ligne">
@@ -83,7 +85,9 @@ export function ConnexionGoogleAgenda({ onSynchronise }: { onSynchronise?: () =>
         <div className="google-agenda-texte">
           <strong>Google Agenda</strong>
           {etat.connecte
-            ? <small>
+            ? expire
+              ? <small><AlertTriangle size={13} /> Connexion expirée{etat.google_email ? ` (${etat.google_email})` : ''} — vos rendez-vous Google ne se mettent plus à jour</small>
+              : <small>
                 <CheckCircle2 size={13} /> Connecté{etat.google_email ? ` à ${etat.google_email}` : ''}
                 {etat.derniere_synchro ? ` · dernière synchronisation ${new Date(etat.derniere_synchro).toLocaleString('fr-FR', { dateStyle: 'short', timeStyle: 'short' })}` : ''}
               </small>
@@ -91,9 +95,13 @@ export function ConnexionGoogleAgenda({ onSynchronise }: { onSynchronise?: () =>
         </div>
         <div className="google-agenda-actions">
           {etat.connecte ? <>
-            <button type="button" className="btn btn-secondary btn-sm" onClick={() => void synchroniser()} disabled={!!action}>
-              {action === 'synchro' ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Synchroniser
-            </button>
+            {expire
+              ? <button type="button" className="btn btn-primary btn-sm" onClick={() => void connecter()} disabled={!!action}>
+                  {action === 'connexion' ? <Loader2 size={14} className="spin" /> : <Link2 size={14} />} Reconnecter Google Agenda
+                </button>
+              : <button type="button" className="btn btn-secondary btn-sm" onClick={() => void synchroniser()} disabled={!!action}>
+                  {action === 'synchro' ? <Loader2 size={14} className="spin" /> : <RefreshCw size={14} />} Synchroniser
+                </button>}
             <button type="button" className="btn btn-ghost btn-sm" onClick={() => void deconnecter()} disabled={!!action}><Unlink size={14} /> Déconnecter</button>
           </> : (
             <button type="button" className="btn btn-primary btn-sm" onClick={() => void connecter()} disabled={!!action}>
