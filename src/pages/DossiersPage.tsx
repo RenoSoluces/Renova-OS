@@ -24,6 +24,7 @@ import type { Dossier, Prospect, Devis, Document as DocumentPiece, DossierFactur
 import { Modal } from '../components/ui/Modal'
 import { SuiviMprDossier } from '../components/dossiers/SuiviMprDossier'
 import { ImportExportAnah } from '../components/dossiers/ImportExportAnah'
+import { PiecesInstallateurDossier } from '../components/dossiers/PiecesInstallateurDossier'
 import { actionRequise } from '../lib/mpr/suiviAnah'
 import { Button } from '../components/ui/Button'
 import { FloatInput, FloatSelect } from '../components/ui/FloatInput'
@@ -1626,6 +1627,8 @@ export function DossiersPage({
                 </div>
               )
             })()}
+
+            <PiecesInstallateurDossier dossier={detail as any} lecture={!isAdmin} />
 
             {/* SUIVI ANAH */}
             <SuiviMprDossier dossier={detail as any} lecture={!isAdmin} onSauve={champs => { setDetail(d => d ? { ...d, ...champs } as any : d); setRows(r => r.map(x => x.id === detail.id ? { ...x, ...champs } as any : x)) }} />
