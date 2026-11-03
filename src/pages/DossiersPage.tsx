@@ -29,6 +29,7 @@ import { removeDocumentStorageObject, resolveDocumentRows, resolveDocumentUrl } 
 import { logAuditEvent } from '../lib/auditLog'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { lireTout } from '../lib/lireTout'
+import { PARCOURS_CEE, etapeParcours, indexEtape, libelleParcours } from '../lib/dossiers/parcoursCee'
 import { genererFacturePartenairePDF } from '../lib/pdf/genererFacturePartenairePDF'
 import { numeroDevis } from '../lib/devis/numeroDevis'
 import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
@@ -151,6 +152,8 @@ export function DossiersPage({
   const [recherche, setRecherche] = useState('')
   const [filtreEtape, setFiltreEtape] = useState('')
   const [filtrePersonne, setFiltrePersonne] = useState('')
+  const [filtreParcours, setFiltreParcours] = useState('')
+  const [parcoursSaving, setParcoursSaving] = useState(false)
   // « En cours » masque les dossiers entièrement soldés ; ils restent toujours accessibles (Terminés / Tous / recherche).
   const [affichage, setAffichage] = useState<'actifs' | 'termines' | 'tous'>('actifs')
   const [lignesFacturation, setLignesFacturation] = useState<Record<string, { statut: string; ht: number }[]>>({})
@@ -385,6 +388,22 @@ export function DossiersPage({
       taux_tva: '20',
       declencheur: totalFactureNonAnnulee > 0 ? 'mpr' : 'installation',
     })
+  }
+
+  /** Change l'étape (et son statut) du parcours du dossier ouvert. */
+  async function majParcours(etapeId: string, statut: string | null) {
+    if (!detail || !isAdmin) return
+    setParcoursSaving(true)
+    setDetailMessage('')
+    const maintenant = new Date().toISOString()
+    const { error } = await supabase.from('dossiers')
+      .update({ parcours_etape: etapeId, parcours_statut: statut, parcours_maj_le: maintenant }).eq('id', detail.id)
+    setParcoursSaving(false)
+    if (error) { setDetailMessage(`Parcours non enregistré : ${error.message}`); return }
+    const champs = { parcours_etape: etapeId, parcours_statut: statut, parcours_maj_le: maintenant } as any
+    setDetail(d => d ? { ...d, ...champs } : d)
+    setRows(prev => prev.map(r => r.id === detail.id ? { ...r, ...champs } : r))
+    void logAuditEvent({ action: 'dossier_parcours', entityType: 'dossier', entityId: detail.id, description: `Parcours : ${libelleParcours(etapeId, statut)}`, meta: { etape: etapeId, statut } })
   }
 
   async function enregistrerSaisieFinanciere() {
@@ -1027,9 +1046,10 @@ export function DossiersPage({
       if (col && !col.statuts.includes((d.statut || '').toLowerCase())) return false
     }
     if (filtrePersonne && pr.commercial_id !== filtrePersonne && pr.apporteur_user_id !== filtrePersonne) return false
+    if (filtreParcours && (d as any).parcours_etape !== filtreParcours) return false
     return true
   })
-  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
+  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, filtreParcours, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
 
   const total = rows.length
 
@@ -1155,12 +1175,16 @@ export function DossiersPage({
           <option value="">Toutes les étapes</option>
           {COLONNES_DOSSIER.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
         </select>
+        <select className="input" value={filtreParcours} onChange={e => setFiltreParcours(e.target.value)} aria-label="Filtrer par étape du parcours">
+          <option value="">Tout le parcours</option>
+          {PARCOURS_CEE.map(e => <option key={e.id} value={e.id}>{e.label}</option>)}
+        </select>
         <select className="input" value={filtrePersonne} onChange={e => setFiltrePersonne(e.target.value)} aria-label="Filtrer par commercial ou apporteur">
           <option value="">Tous les commerciaux / apporteurs</option>
           {personnes.map(x => <option key={x.id} value={x.id}>{x.nom_complet}</option>)}
         </select>
         {filtresActifs > 0 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne(''); setAffichage('actifs') }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne(''); setFiltreParcours(''); setAffichage('actifs') }}>
             Réinitialiser ({filtresActifs})
           </button>
         )}
@@ -1262,6 +1286,7 @@ export function DossiersPage({
                   <th>Référence</th>
                   <th>Prospect</th>
                   <th>Statut</th>
+                  <th>Parcours</th>
                   <th>CA chantier (TTC)</th>
                   <th>Facturé partenaire (HT)</th>
                   {canViewCompanyCommission && <th>Commission société</th>}
@@ -1305,6 +1330,10 @@ export function DossiersPage({
                           const n = alertesDossier(etapesDossier({ aides, suivi: (d as any).suivi_aides || {}, installation: d.date_installation, installationPrevue: (d as any).date_installation_prevue, pieces: piecesParDossier[d.id] || [] })).length
                           return n ? <span className="badge badge-error" style={{ marginLeft: 6 }} title="Alertes sur le suivi des aides">{n} alerte{n > 1 ? 's' : ''} aides</span> : <span className="badge badge-success" style={{ marginLeft: 6 }}>Aides à jour</span>
                         })()}
+                      </td>
+
+                      <td>
+                        {libelleParcours((d as any).parcours_etape, (d as any).parcours_statut)}
                       </td>
 
                       <td>
@@ -1506,6 +1535,40 @@ export function DossiersPage({
                     <div className="fiche-ligne"><span>À encaisser (HT)</span><b>{euro(aEncaisser)}</b></div>
                     <div className="fiche-ligne"><span>À facturer (HT)</span><b>{euro(aFacturer)}</b></div>
                   </div>
+                </div>
+              )
+            })()}
+
+            {/* PARCOURS */}
+            {(() => {
+              const etapeCourante = (detail as any).parcours_etape as string | undefined
+              const idx = indexEtape(etapeCourante)
+              const def = etapeParcours(etapeCourante)
+              return (
+                <div className="card card-pad parcours-card" style={{ marginBottom: 14 }}>
+                  <div className="font-semibold" style={{ marginBottom: 2 }}>Parcours du dossier</div>
+                  <div className="text-sm text-muted" style={{ marginBottom: 12 }}>
+                    {def ? `Étape actuelle : ${def.label}${(detail as any).parcours_statut ? ` — ${(detail as any).parcours_statut}` : ''}` : 'Aucune étape définie : choisissez où en est le dossier.'}
+                  </div>
+                  <ol className="parcours-etapes" aria-label="Étapes du parcours">
+                    {PARCOURS_CEE.map((e, i) => (
+                      <li key={e.id} className={`${i < idx ? 'fait' : i === idx ? 'courant' : ''} ${e.objectif || ''}`}>
+                        <button type="button" disabled={!isAdmin || parcoursSaving} onClick={() => void majParcours(e.id, e.id === etapeCourante ? ((detail as any).parcours_statut ?? null) : null)} title={isAdmin ? `Placer le dossier à l'étape « ${e.label} »` : e.label}>
+                          <span>{i + 1}</span>{e.label}
+                        </button>
+                      </li>
+                    ))}
+                  </ol>
+                  {def && (
+                    <div style={{ marginTop: 12, maxWidth: 360 }}>
+                      <FloatSelect
+                        label={parcoursSaving ? 'Statut de l’étape — enregistrement…' : 'Statut de l’étape'}
+                        value={(detail as any).parcours_statut || ''}
+                        onChange={v => void majParcours(def.id, v || null)}
+                        options={[{ value: '', label: 'Aucun statut' }, ...def.statuts.map(s => ({ value: s, label: s }))]}
+                      />
+                    </div>
+                  )}
                 </div>
               )
             })()}
