@@ -39,6 +39,8 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { TodayTasksWidget } from '../components/crm/TodayTasksWidget'
 import { AdminDashboard } from '../components/dashboard/AdminDashboard'
 import { CommercialDashboard } from '../components/dashboard/CommercialDashboard'
+import { InstallateurDashboard } from '../components/dashboard/InstallateurDashboard'
+import { useTypeOrganisation } from '../lib/organisation/useTypeOrganisation'
 import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
 
 export function DashboardPage({
@@ -50,6 +52,7 @@ export function DashboardPage({
 
   const isAdmin =
     profile?.role === 'admin' || profile?.role === 'manager'
+  const typeOrganisation = useTypeOrganisation()
 
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [visites, setVisites] = useState<Visite[]>([])
@@ -360,5 +363,8 @@ export function DashboardPage({
   // passe du chargement au profil admin.
   if (isAdmin) return <AdminDashboard onNavigate={onNavigate} />
 
-  return <CommercialDashboard onNavigate={onNavigate} />
+  // Entreprise cliente (licence installateur) : sa direction voit son propre pilotage, pas le réseau d'installateurs.
+  if (typeOrganisation === 'partenaire' && ['partner_admin', 'company_admin', 'commercial_manager'].includes(profile?.role || '')) return <InstallateurDashboard onNavigate={onNavigate} />
+
+  return <CommercialDashboard onNavigate={onNavigate} partenaire={typeOrganisation === 'partenaire'} />
 }
