@@ -19,6 +19,8 @@ const ROLE_LABELS: Record<string, string> = {
   commercial: 'Commercial',
   apporteur: "Apporteur d'affaires",
   teleconseiller: 'Téléconseiller',
+  confirmateur: 'Confirmateur',
+  adv: 'Administratif (ADV)',
 }
 
 export function OrganisationPage() {
@@ -100,6 +102,8 @@ export function OrganisationPage() {
         { value: 'commercial', label: 'Commercial' },
         { value: 'apporteur', label: "Apporteur d'affaires" },
         { value: 'teleconseiller', label: 'Téléconseiller' },
+        { value: 'confirmateur', label: 'Confirmateur' },
+        { value: 'adv', label: 'Administratif (ADV)' },
       ].filter(role => selectedInviteOrganisation?.type === 'interne'
         ? !['partner_admin', 'company_admin'].includes(role.value)
         : !['admin', 'manager'].includes(role.value))
@@ -109,11 +113,15 @@ export function OrganisationPage() {
           { value: 'commercial', label: 'Commercial' },
           { value: 'apporteur', label: "Apporteur d'affaires" },
           { value: 'teleconseiller', label: 'Téléconseiller' },
+        { value: 'confirmateur', label: 'Confirmateur' },
+        { value: 'adv', label: 'Administratif (ADV)' },
         ]
       : [
           { value: 'commercial', label: 'Commercial' },
           { value: 'apporteur', label: "Apporteur d'affaires" },
           { value: 'teleconseiller', label: 'Téléconseiller' },
+        { value: 'confirmateur', label: 'Confirmateur' },
+        { value: 'adv', label: 'Administratif (ADV)' },
         ]
 
   async function createOrganisation(event: FormEvent<HTMLFormElement>) {

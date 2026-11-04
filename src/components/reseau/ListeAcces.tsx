@@ -23,7 +23,7 @@ export interface AccesReseau {
 
 const LIBELLE_ROLE: Record<string, string> = {
   apporteur: 'Apporteur', partner_admin: 'Partenaire', company_admin: 'Partenaire', commercial: 'Commercial',
-  commercial_manager: 'Resp. commercial', manager: 'Manager', teleconseiller: 'Téléconseiller',
+  commercial_manager: 'Resp. commercial', manager: 'Manager', teleconseiller: 'Téléconseiller', confirmateur: 'Confirmateur', adv: 'Administratif',
 }
 export const typeAccesDuRole = (role: string): TypeAcces =>
   role === 'apporteur' ? 'apporteur' : role === 'partner_admin' || role === 'company_admin' ? 'partenaire' : 'commercial'

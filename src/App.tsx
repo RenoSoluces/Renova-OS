@@ -22,6 +22,7 @@ const DevisPage = lazy(() => import('./pages/DevisPage').then(m => ({ default: m
 const ParametresPage = lazy(() => import('./pages/ParametresPage').then(m => ({ default: m.ParametresPage })))
 const ActivitePage = lazy(() => import('./pages/ActivitePage').then(m => ({ default: m.ActivitePage })))
 const CommissionsPage = lazy(() => import('./pages/CommissionsPage').then(m => ({ default: m.CommissionsPage })))
+const ConfirmationsPage = lazy(() => import('./pages/ConfirmationsPage').then(m => ({ default: m.ConfirmationsPage })))
 const LicencesPage = lazy(() => import('./pages/LicencesPage').then(m => ({ default: m.LicencesPage })))
 const VeillePage = lazy(() => import('./pages/VeillePage').then(m => ({ default: m.VeillePage })))
 const CeeDelegatairesPage = lazy(() => import('./pages/CeeDelegatairesPage').then(m => ({ default: m.CeeDelegatairesPage })))
@@ -39,6 +40,7 @@ import { useOpenTasksCount } from './lib/crm/useOpenTasksCount'
 import { verifierRelances } from './lib/crm/relances'
 import { useAuth } from './lib/auth/AuthContext'
 import { LoginPage } from './pages/LoginPage'
+import { pageAutorisee, pageAccueil } from './lib/auth/accesParRole'
 import { LicenceBloquee } from './components/licence/LicenceBloquee'
 import { AcceptationConditions } from './components/licence/AcceptationConditions'
 import { DefinirMotDePassePage } from './pages/DefinirMotDePassePage'
@@ -82,6 +84,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   commissions: { title: 'Commissions', subtitle: 'Barème et suivi des commissions commerciales' },
   suivi_chantier: { title: 'Suivi chantier', subtitle: 'Installations, partenaires et SAV' },
   sav: { title: 'SAV', subtitle: 'Interventions après installation' },
+  confirmations: { title: 'Confirmations', subtitle: 'Rendez-vous à confirmer et ventes à valider par téléphone' },
   licences: { title: 'Licences', subtitle: 'Entreprises clientes de Renova OS' },
   veille: { title: 'Veille réglementaire', subtitle: 'Arrêtés CEE, MaPrimeRénov\' et MonProjetAnah' },
   cee_delegataires: { title: 'Délégataires CEE', subtitle: 'Grilles de prix des certificats d\'économies d\'énergie' },
@@ -145,6 +148,10 @@ function AppContent() {
   useEffect(() => {
     if (estApporteur && !['espace_apporteur', 'prospects', 'commissions'].includes(page)) navigate('espace_apporteur')
   }, [estApporteur, page, navigate])
+  // Rôles à périmètre réduit (confirmateur, administratif, centre d'appels) : ramenés vers leurs rubriques.
+  useEffect(() => {
+    if (profile?.role && !pageAutorisee(profile.role, page)) navigate(pageAccueil(profile.role))
+  }, [profile?.role, page, navigate])
   const goToDevis = useCallback((devisId: string) => {
     setPendingDevisId(devisId)
     navigate('devis')
@@ -258,6 +265,7 @@ function AppContent() {
           {page === 'commissions' && <CommissionsPage />}
           {page === 'suivi_chantier' && <SuiviChantierPage />}
           {page === 'sav' && <SavPage />}
+          {page === 'confirmations' && <ConfirmationsPage />}
           {page === 'licences' && (profile.role === 'admin' ? <LicencesPage /> : <div className="card card-pad">Cette rubrique est réservée au Grand Admin.</div>)}
           {page === 'veille' && <VeillePage onNavigate={navigate} />}
           {page === 'cee_delegataires' && (['admin','manager','partner_admin','company_admin'].includes(profile?.role || '') ? <CeeDelegatairesPage /> : <div className="card card-pad">Cette rubrique est réservée aux administrateurs.</div>)}

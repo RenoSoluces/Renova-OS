@@ -54,7 +54,7 @@ type InviteBody = {
 
 const motDePasseValide = (m: string) => m.length >= 12 && /[A-Z]/.test(m) && /[a-z]/.test(m) && /\d/.test(m) && /[^A-Za-z0-9]/.test(m)
 
-const staffRoles = new Set(['commercial', 'apporteur', 'teleconseiller'])
+const staffRoles = new Set(['commercial', 'apporteur', 'teleconseiller', 'confirmateur', 'adv'])
 const leadershipRoles = new Set(['partner_admin', 'company_admin', 'manager', 'commercial_manager'])
 
 const ROLE_LIBELLES: Record<string, string> = {
@@ -66,6 +66,8 @@ const ROLE_LIBELLES: Record<string, string> = {
   commercial: 'Commercial',
   apporteur: "Apporteur d'affaires",
   teleconseiller: 'Téléconseiller',
+  confirmateur: 'Confirmateur',
+  adv: 'Administratif',
 }
 
 const echapper = (v: string) => v.replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]!))

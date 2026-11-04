@@ -2,10 +2,11 @@ import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
-  Gauge, ChevronDown, Wrench, Landmark, Scale, KeyRound,
+  Gauge, ChevronDown, Wrench, Landmark, Scale, KeyRound, BadgeCheck,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
+import { pageAutorisee } from '../lib/auth/accesParRole'
 import { supabase } from '../lib/supabase'
 import { useEffect, useState } from 'react'
 
@@ -28,6 +29,7 @@ const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
     { key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { key: 'a_traiter', label: 'Ma journée', icon: ClipboardCheck },
     { key: 'planning', label: 'Agenda', icon: Calendar },
+    { key: 'confirmations', label: 'Confirmations', icon: BadgeCheck },
   ] },
   { id: 'ventes', label: 'Ventes', items: [
     { key: 'prospects', label: 'Prospects', icon: Users, badge: prospectCount },
@@ -90,6 +92,8 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
   const adminRoles = ['admin', 'manager', 'partner_admin', 'company_admin']
   const canSee = (item: NavItem) => {
     const role = profile?.role || ''
+    if (!pageAutorisee(role, item.key)) return false
+    if (item.key === 'confirmations' && !['confirmateur', 'admin', 'partner_admin', 'company_admin', 'commercial_manager'].includes(role)) return false
     if (['performance', 'sante_systeme', 'pilotage'].includes(item.key) && !adminRoles.includes(role)) return false
     if (item.key === 'licences' && role !== 'admin') return false
     if (item.key === 'pilotage' && !['admin', 'manager'].includes(role)) return false
@@ -114,7 +118,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
 
   const nom = profile?.nom_complet?.trim() || profile?.email || 'Utilisateur'
   const initials = nom.split(/\s+/).filter(Boolean).slice(0, 2).map(part => part[0]).join('').toUpperCase() || 'U'
-  const roleLabel = ({ admin: 'Grand Admin', manager: 'Manager', commercial_manager: 'Responsable commercial', partner_admin: 'Dirigeant', company_admin: 'Direction', commercial: 'Commercial', apporteur: "Apporteur d'affaires", teleconseiller: 'Téléconseiller' } as Record<string, string>)[profile?.role || ''] || (hasDirectReports ? 'Responsable d’équipe' : 'Utilisateur')
+  const roleLabel = ({ admin: 'Grand Admin', manager: 'Manager', commercial_manager: 'Responsable commercial', partner_admin: 'Dirigeant', company_admin: 'Direction', commercial: 'Commercial', apporteur: "Apporteur d'affaires", teleconseiller: 'Téléconseiller', confirmateur: 'Confirmateur', adv: 'Administratif' } as Record<string, string>)[profile?.role || ''] || (hasDirectReports ? 'Responsable d’équipe' : 'Utilisateur')
   return (
     <aside className={`sidebar ${collapsed ? 'sidebar-collapsed' : ''}`}>
       <div className="sidebar-brand">
