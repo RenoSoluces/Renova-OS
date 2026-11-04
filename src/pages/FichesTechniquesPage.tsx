@@ -2,6 +2,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { BookOpen, Download, ExternalLink, FileText, FolderOpen, Loader2, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { lireTout } from '../lib/lireTout'
+import { resolveDocumentRows } from '../lib/storage/documentUrl'
+import { normaliser } from '../lib/documents/rattacherFiches'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import type { Document, Produit } from '../types'
@@ -22,6 +24,8 @@ const CATEGORIE: Record<Famille, Record<Cible, string>> = {
     professionnel: 'Fiche CEE — Professionnels',
   },
 }
+
+const URL_FICHES_OFFICIELLES = 'https://www.ecologie.gouv.fr/politiques-publiques/operations-standardisees-deconomies-denergie'
 
 export function FichesTechniquesPage() {
   const { profile } = useAuth()
@@ -75,7 +79,7 @@ export function FichesTechniquesPage() {
       lireTout(() => supabase.from('catalogue_produits').select('id, nom, marque, reference, fiche_cee, catalogue_groupe, public_cible, actif').eq('actif', true).order('nom')),
     ])
     if (docError) setError(`Lecture des fiches impossible : ${docError.message}`)
-    else setDocs((documents || []) as any)
+    else setDocs((await resolveDocumentRows((documents || []) as any)) as any)
     if (produitError) setError(`Lecture du catalogue impossible : ${produitError.message}`)
     else setProduits((catalogue || []) as Produit[])
     setLoading(false)
@@ -170,14 +174,21 @@ export function FichesTechniquesPage() {
       <strong>{famille === 'cee' ? 'Fiches d\'opérations CEE' : 'Fiches produit'} {typeOrg === 'partenaire' ? '' : 'Reno Soluces'}</strong>
       <p className="text-muted" style={{margin:'6px 0 12px',fontSize:13}}>
         {famille === 'cee'
-          ? 'Générées à partir du catalogue : intitulé, données à renseigner et pièces du dossier. Aucun prix.'
+          ? 'La fiche officielle (ministère de la Transition écologique) fait foi : téléchargez-la sur ecologie.gouv.fr puis importez-la ici, elle sera classée par code. Le « Résumé » Reno Soluces n\'est qu\'un aide-mémoire.'
           : 'Générées à la demande depuis le catalogue, avec le logo, sans prix ni marge. Importez la fiche du fabricant pour les performances détaillées.'}
       </p>
       {famille === 'cee' ? (operations.length === 0 ? <p className="text-muted">Aucune opération CEE pour ce public.</p> :
-        operations.map(([code, liste]) => <div key={code} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'9px 0',borderTop:'1px solid var(--c-border)'}}>
-          <div><strong>{code}</strong> <span className="text-muted">{TITRES_OPERATIONS[code]?.titre || ''}</span><div className="text-muted text-xs">{liste.length} produit{liste.length > 1 ? 's' : ''} au catalogue</div></div>
-          <button className="btn btn-secondary" onClick={() => void ficheOperation(code, liste)}><Download size={15}/> PDF</button>
-        </div>)
+        operations.map(([code, liste]) => {
+          const officielle = docs.find(d => d.categorie === CATEGORIE.cee[cible] && !d.produit_id && normaliser(d.nom).includes(normaliser(code)))
+          return <div key={code} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'9px 0',borderTop:'1px solid var(--c-border)',flexWrap:'wrap'}}>
+            <div><strong>{code}</strong> <span className="text-muted">{TITRES_OPERATIONS[code]?.titre || ''}</span><div className="text-muted text-xs">{liste.length} produit{liste.length > 1 ? 's' : ''} au catalogue · {officielle ? 'fiche officielle importée' : 'fiche officielle à importer'}</div></div>
+            <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+              {officielle?.url && <a className="btn btn-primary" href={officielle.url} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Fiche officielle</a>}
+              {!officielle && <a className="btn btn-secondary" href={URL_FICHES_OFFICIELLES} target="_blank" rel="noreferrer"><ExternalLink size={15}/> Voir sur ecologie.gouv.fr</a>}
+              <button className="btn btn-secondary" title="Résumé Reno Soluces, ne remplace pas la fiche officielle" onClick={() => void ficheOperation(code, liste)}><Download size={15}/> Résumé</button>
+            </div>
+          </div>
+        })
       ) : (generables.length === 0 ? <p className="text-muted">Aucun produit ne correspond.</p> : <>
         {generables.slice(0, nbAffiches).map(p => <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'9px 0',borderTop:'1px solid var(--c-border)'}}>
           <div style={{minWidth:0}}><strong style={{display:'block',overflowWrap:'anywhere'}}>{p.nom}</strong><span className="text-muted text-xs">{p.marque} {p.reference} · {libelleCategorie((p as any).categorie)}{p.fiche_cee ? ` · ${extraireFiche(p.fiche_cee) || ''}` : ''}</span></div>
