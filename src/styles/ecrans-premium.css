@@ -283,3 +283,11 @@
 .pieces-actions { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
 .lien { background: none; border: 0; color: var(--c-primary, #0f5c5e); text-decoration: underline; cursor: pointer; font-size: 12px; margin-left: 4px; }
 @media (max-width: 720px) { .pieces-liste li { grid-template-columns: 22px 1fr; } .pieces-actions { grid-column: 2; justify-content: flex-start; } }
+
+/* Confirmations */
+.confirm-liste { display: grid; gap: 10px; }
+.confirm-tete { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 4px; font-size: 15px; }
+.confirm-tel { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--c-primary, #0f5c5e); }
+.confirm-dernier { display: block; margin-top: 4px; color: #8a4b00; }
+.confirm-actions { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 10px; align-items: center; }
+.confirm-actions .input { flex: 1 1 200px; min-width: 160px; }
