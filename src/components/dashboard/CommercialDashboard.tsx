@@ -32,7 +32,7 @@ function formatDelay(ms: number) {
   return `${Math.floor(hours / 24)} j`
 }
 
-export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) => void }) {
+export function CommercialDashboard({ onNavigate, partenaire = false }: { onNavigate: (p: PageKey) => void; partenaire?: boolean }) {
   const { profile } = useAuth()
   const [prospects, setProspects] = useState<ProspectRef[]>([])
   const [devis, setDevis] = useState<Devis[]>([])
@@ -217,7 +217,7 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
 
         <div className="card commercial-money-card"><div className="commercial-card-head"><div><span className="commercial-eyebrow">MES PRIMES GAGNÉES</span><strong>{euro(primesMois)}</strong></div><Wallet size={22}/></div><div className="commercial-money-meta"><span><CheckCircle2 size={15}/> {signedThisMonth.length} devis signés ce mois</span><button onClick={() => onNavigate('commissions')}>Voir mes commissions <ArrowRight size={14}/></button></div></div>
 
-        <div className="card commercial-pipe-card"><div className="commercial-card-head"><div><span className="commercial-eyebrow">PIPE CHAUD</span><strong>{euro(hotPipe)}</strong></div><Flame size={22}/></div><p>Affaires qualifiées déjà envoyées aux installateurs et pas encore conclues.</p><button className="btn btn-ghost btn-sm" onClick={() => onNavigate('prospects')}>Voir le pipe <ArrowRight size={14}/></button></div>
+        <div className="card commercial-pipe-card"><div className="commercial-card-head"><div><span className="commercial-eyebrow">PIPE CHAUD</span><strong>{euro(hotPipe)}</strong></div><Flame size={22}/></div><p>{partenaire ? 'Affaires qualifiées, devis envoyés et pas encore signés.' : 'Affaires qualifiées déjà envoyées aux installateurs et pas encore conclues.'}</p><button className="btn btn-ghost btn-sm" onClick={() => onNavigate('prospects')}>Voir le pipe <ArrowRight size={14}/></button></div>
       </section>
 
       <section className="commercial-main-grid">
@@ -234,6 +234,7 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
           </div>
         </div>
 
+        {!partenaire && (
         <div className="card commercial-partners-card">
           <div className="card-header"><div><div className="card-title"><Trophy size={17}/> Match des installateurs</div><div className="dashboard-panel-subtitle">Vos 3 partenaires les plus efficaces sur vos leads.</div></div><Building2 size={19}/></div>
           <div className="commercial-partner-list">
@@ -241,6 +242,7 @@ export function CommercialDashboard({ onNavigate }: { onNavigate: (p: PageKey) =
             {!partnerRows.length && <div className="commercial-empty"><Building2 size={24}/><span>Aucun installateur avec vos leads pour le moment.</span></div>}
           </div>
         </div>
+        )}
       </section>
 
       <section className="commercial-stats-grid">
