@@ -5,6 +5,9 @@ import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import type { Document, Produit } from '../types'
+import { chargerLogoRenoSoluces, genererFicheOperation, genererFicheProduit, libelleCategorie, RENO_SOLUCES, TITRES_OPERATIONS, type Emetteur } from '../lib/pdf/ficheTechniquePDF'
+import { extraireFiche } from '../lib/devis/conformite'
+import { useTypeOrganisation } from '../lib/organisation/useTypeOrganisation'
 
 type Cible = 'particulier' | 'professionnel'
 type Famille = 'technique' | 'cee'
@@ -32,6 +35,35 @@ export function FichesTechniquesPage() {
   const [produitId, setProduitId] = useState('')
   const [recherche, setRecherche] = useState('')
   const inputRef = useRef<HTMLInputElement>(null)
+  const typeOrg = useTypeOrganisation()
+  const [nomOrg, setNomOrg] = useState('')
+  const [nbAffiches, setNbAffiches] = useState(40)
+  useEffect(() => {
+    if (!profile?.organisation_id) return
+    void supabase.from('organisations').select('nom').eq('id', profile.organisation_id).maybeSingle().then(({ data }) => setNomOrg(data?.nom || ''))
+  }, [profile?.organisation_id])
+
+  /** Reno Soluces : son logo partout. Un installateur partenaire : son nom, sans le logo de Reno Soluces. */
+  async function emetteur(): Promise<Emetteur> {
+    if (typeOrg === 'partenaire') return { nom: nomOrg || 'Fiche produit' }
+    return { ...RENO_SOLUCES, logo: await chargerLogoRenoSoluces() }
+  }
+  function telecharger(blob: Blob, nom: string) {
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a'); a.href = url; a.download = nom; a.click()
+    setTimeout(() => URL.revokeObjectURL(url), 2000)
+  }
+  const slug = (t: string) => t.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[^a-zA-Z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 70)
+  async function ficheProduit(p: Produit) {
+    setError('')
+    try { telecharger(genererFicheProduit(p as any, await emetteur()), `Fiche-${slug(p.nom)}.pdf`) }
+    catch (e: any) { setError(`Génération impossible : ${e?.message || e}`) }
+  }
+  async function ficheOperation(code: string, liste: Produit[]) {
+    setError('')
+    try { telecharger(genererFicheOperation(code, liste, await emetteur()), `Fiche-CEE-${code}.pdf`) }
+    catch (e: any) { setError(`Génération impossible : ${e?.message || e}`) }
+  }
 
   // Rechargement discret : la liste reste affichée (et la position conservée) pendant la mise à jour.
   async function load() {
@@ -63,6 +95,19 @@ export function FichesTechniquesPage() {
     `${d.nom} ${d.produit?.nom || ''} ${d.produit?.marque || ''} ${d.produit?.reference || ''} ${d.produit?.fiche_cee || ''}`
       .toLowerCase().includes(recherche.toLowerCase())
   )
+
+  const operations = useMemo(() => {
+    const m = new Map<string, Produit[]>()
+    for (const p of produitsFiltres) {
+      const code = extraireFiche(p.fiche_cee)
+      if (code) m.set(code, [...(m.get(code) || []), p])
+    }
+    return [...m.entries()].sort(([a], [b]) => a.localeCompare(b))
+  }, [produitsFiltres])
+  const generables = useMemo(() => produitsFiltres.filter(p =>
+    (!produitId || p.id === produitId) &&
+    `${p.nom} ${p.marque} ${p.reference} ${p.fiche_cee}`.toLowerCase().includes(recherche.toLowerCase())
+  ), [produitsFiltres, produitId, recherche])
 
   async function ajouterFiche(file?: File) {
     if (!file) return
@@ -114,6 +159,27 @@ export function FichesTechniquesPage() {
         <option value="">Tous les produits</option>{produitsFiltres.map(p=><option key={p.id} value={p.id}>{p.nom}{p.fiche_cee ? ` — ${p.fiche_cee}` : ''}</option>)}
       </select></label>
       <label className="field"><span className="field-label">Rechercher</span><div style={{position:'relative'}}><Search size={15} style={{position:'absolute',left:10,top:12}}/><input className="input" style={{paddingLeft:32}} value={recherche} onChange={e=>setRecherche(e.target.value)} placeholder="Nom, marque, référence…"/></div></label>
+    </div>
+
+    <div className="card card-pad" style={{marginBottom:16}}>
+      <strong>{famille === 'cee' ? 'Fiches d\'opérations CEE' : 'Fiches produit'} {typeOrg === 'partenaire' ? '' : 'Reno Soluces'}</strong>
+      <p className="text-muted" style={{margin:'6px 0 12px',fontSize:13}}>
+        {famille === 'cee'
+          ? 'Générées à partir du catalogue : intitulé, données à renseigner et pièces du dossier. Aucun prix.'
+          : 'Générées à la demande depuis le catalogue, avec le logo, sans prix ni marge. Importez la fiche du fabricant pour les performances détaillées.'}
+      </p>
+      {famille === 'cee' ? (operations.length === 0 ? <p className="text-muted">Aucune opération CEE pour ce public.</p> :
+        operations.map(([code, liste]) => <div key={code} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'9px 0',borderTop:'1px solid var(--c-border)'}}>
+          <div><strong>{code}</strong> <span className="text-muted">{TITRES_OPERATIONS[code]?.titre || ''}</span><div className="text-muted text-xs">{liste.length} produit{liste.length > 1 ? 's' : ''} au catalogue</div></div>
+          <button className="btn btn-secondary" onClick={() => void ficheOperation(code, liste)}><Download size={15}/> PDF</button>
+        </div>)
+      ) : (generables.length === 0 ? <p className="text-muted">Aucun produit ne correspond.</p> : <>
+        {generables.slice(0, nbAffiches).map(p => <div key={p.id} style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:12,padding:'9px 0',borderTop:'1px solid var(--c-border)'}}>
+          <div style={{minWidth:0}}><strong style={{display:'block',overflowWrap:'anywhere'}}>{p.nom}</strong><span className="text-muted text-xs">{p.marque} {p.reference} · {libelleCategorie((p as any).categorie)}{p.fiche_cee ? ` · ${extraireFiche(p.fiche_cee) || ''}` : ''}</span></div>
+          <button className="btn btn-secondary" onClick={() => void ficheProduit(p)}><Download size={15}/> PDF</button>
+        </div>)}
+        {generables.length > nbAffiches && <button className="btn btn-secondary" style={{marginTop:10}} onClick={() => setNbAffiches(n => n + 60)}>Afficher plus ({generables.length - nbAffiches} restants)</button>}
+      </>)}
     </div>
 
     {isAdmin && <div className="card card-pad" style={{marginBottom:16,fontSize:13}}>
