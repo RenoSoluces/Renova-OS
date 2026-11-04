@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { BookOpen, Download, ExternalLink, FileText, Loader2, Plus, Search, Trash2 } from 'lucide-react'
+import { BookOpen, Download, ExternalLink, FileText, FolderOpen, Loader2, Plus, Search, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import type { Document, Produit } from '../types'
 import { chargerLogoRenoSoluces, genererFicheOperation, genererFicheProduit, libelleCategorie, RENO_SOLUCES, TITRES_OPERATIONS, type Emetteur } from '../lib/pdf/ficheTechniquePDF'
+import { ImportFichesFabricant } from '../components/documents/ImportFichesFabricant'
 import { extraireFiche } from '../lib/devis/conformite'
 import { useTypeOrganisation } from '../lib/organisation/useTypeOrganisation'
 
@@ -38,6 +39,7 @@ export function FichesTechniquesPage() {
   const typeOrg = useTypeOrganisation()
   const [nomOrg, setNomOrg] = useState('')
   const [nbAffiches, setNbAffiches] = useState(40)
+  const [importMasse, setImportMasse] = useState(false)
   useEffect(() => {
     if (!profile?.organisation_id) return
     void supabase.from('organisations').select('nom').eq('id', profile.organisation_id).maybeSingle().then(({ data }) => setNomOrg(data?.nom || ''))
@@ -142,9 +144,12 @@ export function FichesTechniquesPage() {
   return <div className="page">
     <div className="page-header" style={{display:'flex',justifyContent:'space-between',alignItems:'center',gap:16,flexWrap:'wrap'}}>
       <div><h1 className="page-title">Fiches techniques</h1><p className="text-muted">Documents PDF associés à un produit du catalogue.</p></div>
-      {isAdmin && <button className="btn btn-primary" disabled={uploading} onClick={() => inputRef.current?.click()}>
-        {uploading ? <Loader2 size={16} className="spin" /> : <Plus size={16}/>} Ajouter un PDF
-      </button>}
+      {isAdmin && <div style={{display:'flex',gap:8,flexWrap:'wrap'}}>
+        <button className="btn btn-secondary" onClick={() => setImportMasse(true)}><FolderOpen size={16}/> Importer en masse</button>
+        <button className="btn btn-primary" disabled={uploading} onClick={() => inputRef.current?.click()}>
+          {uploading ? <Loader2 size={16} className="spin" /> : <Plus size={16}/>} Ajouter un PDF
+        </button>
+      </div>}
       <input ref={inputRef} hidden type="file" accept="application/pdf,.pdf" onChange={e => void ajouterFiche(e.target.files?.[0])}/>
     </div>
 
@@ -198,5 +203,6 @@ export function FichesTechniquesPage() {
           <div style={{display:'flex',gap:8}}>{d.url && <a href={d.url} target="_blank" rel="noreferrer" title="Ouvrir le PDF"><ExternalLink size={17}/></a>}{d.url && <a href={d.url} download title="Télécharger"><Download size={17}/></a>}{isAdmin && <button className="btn-icon-sm" onClick={()=>void supprimer(d)} title="Supprimer"><Trash2 size={16}/></button>}</div>
         </div>)}
       </div>}
+    {importMasse && <ImportFichesFabricant produits={produits.filter(p => p.catalogue_groupe !== 'visite_technique') as any} onFermer={() => setImportMasse(false)} onTermine={() => void load()} />}
   </div>
 }

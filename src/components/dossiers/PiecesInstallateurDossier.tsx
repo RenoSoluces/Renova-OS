@@ -4,7 +4,9 @@ import { supabase } from '../../lib/supabase'
 import { Button } from '../ui/Button'
 import { uploadDocument } from '../../lib/storage/uploadDocument'
 import { resolveDocumentUrl } from '../../lib/storage/documentUrl'
-import { genererModelePDF, genererFicheProduitPDF } from '../../lib/pdf/genererModelePDF'
+import { genererModelePDF } from '../../lib/pdf/genererModelePDF'
+import { chargerLogoRenoSoluces, genererFicheProduit, RENO_SOLUCES } from '../../lib/pdf/ficheTechniquePDF'
+import { useTypeOrganisation } from '../../lib/organisation/useTypeOrganisation'
 import { MODELES, piecesAttendues, remplirModele, type CodePiece, type ContexteTravaux, type VariablesModele } from '../../lib/documents/modelesAdministratifs'
 
 interface Props {
@@ -20,6 +22,7 @@ interface LigneDevis { designation: string; produit_id: string | null; produit?:
 
 /** Dossier de pièces attendu pour un chantier : devis, mandats, cadre CEE, TVA, fiches techniques. */
 export function PiecesInstallateurDossier({ dossier, lecture }: Props) {
+  const typeOrg = useTypeOrganisation()
   const [devis, setDevis] = useState<any>(null)
   const [lignes, setLignes] = useState<LigneDevis[]>([])
   const [docs, setDocs] = useState<any[]>([])
@@ -91,7 +94,7 @@ export function PiecesInstallateurDossier({ dossier, lecture }: Props) {
   async function genererFiche(l: LigneDevis) {
     if (!l.produit) return
     setOccupe(l.produit.id); setMessage('')
-    const fichier = new File([genererFicheProduitPDF(l.produit)], `Fiche_${l.produit.nom.replace(/[^\w]+/g, '_')}.pdf`, { type: 'application/pdf' })
+    const fichier = new File([genererFicheProduit(l.produit as any, typeOrg === 'partenaire' ? { nom: 'Fiche produit' } : { ...RENO_SOLUCES, logo: await chargerLogoRenoSoluces() })], `Fiche_${l.produit.nom.replace(/[^\w]+/g, '_')}.pdf`, { type: 'application/pdf' })
     const { error } = await uploadDocument(fichier, { categorie: 'Fiche technique — Particuliers', produitId: l.produit.id, type: 'pdf' })
     setOccupe(''); setMessage(error ? `Génération impossible : ${error}` : 'Fiche générée depuis le catalogue (à remplacer par celle du fabricant dès que possible).')
     void charger()
