@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import { CheckCircle2, FolderOpen, HelpCircle, Loader2, Upload, X } from 'lucide-react'
 import { uploadDocument } from '../../lib/storage/uploadDocument'
+import { extraireFiche } from '../../lib/devis/conformite'
 import { normaliser, rattacherFichiers, type Confiance, type ProduitRattachable } from '../../lib/documents/rattacherFiches'
 
 interface ProduitCatalogue extends ProduitRattachable {
@@ -15,6 +16,8 @@ interface Ligne {
   /** Produits retenus pour cette fiche. */
   retenus: string[]
   recherche: string
+  /** Fiche d'opération officielle (BAR-TH-171…) reconnue dans le nom du fichier : rattachée à l'opération, pas à un produit. */
+  operation?: string
 }
 
 const categorie = (p?: ProduitCatalogue) =>
@@ -43,9 +46,10 @@ export function ImportFichesFabricant({ produits, onFermer, onTermine }: { produ
     setLignes(ancien => {
       const deja = new Set(ancien.map(l => `${l.file.name}|${l.file.size}`))
       const nouvelles = pdfs.map((file, i): Ligne => ({
-        file, confiance: rattaches[i].confiance, candidats: rattaches[i].produits,
+        operation: extraireFiche(file.name) || undefined,
+        file, confiance: extraireFiche(file.name) ? 'sur' : rattaches[i].confiance, candidats: extraireFiche(file.name) ? [] : rattaches[i].produits,
         // Seule une référence exacte est cochée d'office ; le reste attend un choix explicite.
-        retenus: rattaches[i].confiance === 'sur' ? rattaches[i].produits.map(p => p.id) : [], recherche: '',
+        retenus: !extraireFiche(file.name) && rattaches[i].confiance === 'sur' ? rattaches[i].produits.map(p => p.id) : [], recherche: '',
       })).filter(l => !deja.has(`${l.file.name}|${l.file.size}`))
       return [...ancien, ...nouvelles]
     })
@@ -62,24 +66,28 @@ export function ImportFichesFabricant({ produits, onFermer, onTermine }: { produ
     return l.candidats
   }
 
-  const aEnvoyer = lignes.filter(l => l.retenus.length > 0)
+  const aEnvoyer = lignes.filter(l => l.operation || l.retenus.length > 0)
   const compte = { sur: lignes.filter(l => l.confiance === 'sur').length, probable: lignes.filter(l => l.confiance === 'probable').length, aucun: lignes.filter(l => l.confiance === 'aucun').length }
 
   async function valider() {
-    const taches = aEnvoyer.flatMap(l => l.retenus.map(id => ({ l, produit: parId.get(id) })).filter(t => t.produit))
+    const taches = aEnvoyer.flatMap(l => l.operation ? [{ l, produit: undefined as ProduitCatalogue | undefined }] : l.retenus.map(id => ({ l, produit: parId.get(id) })).filter(t => t.produit))
     setEnvoi({ fait: 0, total: taches.length }); setErreurs([]); setBilan('')
     const echecs: string[] = []
     let ok = 0
     for (const [i, t] of taches.entries()) {
-      const { error } = await uploadDocument(t.l.file, { categorie: categorie(t.produit), produitId: t.produit!.id, type: 'pdf' })
-      if (error) echecs.push(`${t.l.file.name} → ${t.produit!.nom} : ${error}`); else ok++
+      const cible = t.l.operation
+        ? { categorie: t.l.operation.startsWith('BAT') ? 'Fiche CEE — Professionnels' : 'Fiche CEE — Particuliers', produitId: null as string | null }
+        : { categorie: categorie(t.produit), produitId: t.produit!.id }
+      const { error } = await uploadDocument(t.l.file, { categorie: cible.categorie, produitId: cible.produitId, type: 'pdf' })
+      const libelle = t.l.operation || t.produit!.nom
+      if (error) echecs.push(`${t.l.file.name} → ${libelle} : ${error}`); else ok++
       setEnvoi({ fait: i + 1, total: taches.length })
     }
     setEnvoi(null)
     setErreurs(echecs)
     setBilan(`${ok} fiche${ok > 1 ? 's' : ''} rattachée${ok > 1 ? 's' : ''}${echecs.length ? `, ${echecs.length} en échec` : ''}.`)
     // Les fiches envoyées disparaissent de la liste ; celles en échec ou non rattachées restent.
-    const reussies = new Set(taches.filter(t => !echecs.some(e => e.startsWith(`${t.l.file.name} → ${t.produit!.nom}`))).map(t => t.l.file))
+    const reussies = new Set(taches.filter(t => !echecs.some(e => e.startsWith(`${t.l.file.name} → ${t.l.operation || t.produit!.nom}`))).map(t => t.l.file))
     setLignes(l => l.filter(x => !reussies.has(x.file)))
     onTermine()
   }
@@ -91,7 +99,7 @@ export function ImportFichesFabricant({ produits, onFermer, onTermine }: { produ
         <button className="btn-icon-sm" onClick={onFermer} disabled={!!envoi} title="Fermer"><X size={18} /></button>
       </div>
       <p className="text-muted" style={{ fontSize: 13, marginTop: 0 }}>
-        Sélectionnez plusieurs PDF (ou un dossier entier). Chaque fichier est rattaché au produit dont la référence correspond au nom du fichier, par exemple <code>520559.pdf</code>.
+        Sélectionnez plusieurs PDF (ou un dossier entier). Chaque fichier est rattaché au produit dont la référence correspond au nom du fichier, par exemple <code>520559.pdf</code>. Un fichier dont le nom contient un code d'opération (<code>BAR-TH-171 vA…pdf</code>) est classé comme fiche officielle de cette opération CEE.
         Vous validez avant l'envoi : seules les références exactes sont cochées d'office.
       </p>
       <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
@@ -110,18 +118,18 @@ export function ImportFichesFabricant({ produits, onFermer, onTermine }: { produ
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
             <div style={{ minWidth: 0 }}>
               <strong style={{ overflowWrap: 'anywhere' }}>{l.file.name}</strong>{' '}
-              <span className={ETIQUETTE[l.confiance].classe}>{ETIQUETTE[l.confiance].texte}</span>
+              {l.operation ? <span className="badge badge-success">Fiche officielle {l.operation}</span> : <span className={ETIQUETTE[l.confiance].classe}>{ETIQUETTE[l.confiance].texte}</span>}
             </div>
             <button className="btn-icon-sm" onClick={() => retirer(i)} title="Retirer de la liste"><X size={15} /></button>
           </div>
-          <div style={{ marginTop: 6 }}>
+          {!l.operation && <div style={{ marginTop: 6 }}>
             {proposes(l).map(p => <label key={p.id} style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 13, padding: '2px 0' }}>
               <input type="checkbox" checked={l.retenus.includes(p.id)} onChange={() => bascule(i, p.id)} style={{ marginTop: 3 }} />
               <span>{p.nom}<span className="text-muted"> · {p.marque} {p.reference}</span></span>
             </label>)}
             {l.retenus.filter(id => !proposes(l).some(p => p.id === id)).map(id => <div key={id} className="text-muted" style={{ fontSize: 12 }}>+ {parId.get(id)?.nom}</div>)}
             <input className="input" style={{ marginTop: 6, maxWidth: 360 }} placeholder={l.confiance === 'sur' ? 'Ajouter un autre produit…' : 'Rechercher le produit (nom, marque, référence)…'} value={l.recherche} onChange={e => maj(i, { recherche: e.target.value })} />
-          </div>
+          </div>}
         </div>)}
         {lignes.length === 0 && <div className="text-muted" style={{ textAlign: 'center', padding: 24 }}><HelpCircle size={22} /><div>Aucun fichier sélectionné.</div></div>}
       </div>
