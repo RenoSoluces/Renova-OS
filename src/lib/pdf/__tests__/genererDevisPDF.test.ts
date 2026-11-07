@@ -8,7 +8,7 @@ const taille = (cgv: string) => (genererDevisPDF(devis(cgv), [], [], null, null,
 describe('CGV du devis PDF', () => {
   it('des retours à la ligne Windows ou Mac donnent le même document qu\'avec \\n', () => {
     const base = taille(CGV)
-    expect(taille(CGV.replace(/\n/g, '\r\n'))).toBe(base.length)
-    expect(taille(CGV.replace(/\n/g, '\r'))).toBe(base.length)
+    expect(taille(CGV.replace(/\n/g, '\r\n'))).toBe(base)
+    expect(taille(CGV.replace(/\n/g, '\r'))).toBe(base)
   })
 })
