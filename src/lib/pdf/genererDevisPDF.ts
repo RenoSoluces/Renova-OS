@@ -195,7 +195,7 @@ export function genererDevisPDF(
   sectionText("Données personnelles",`Les données sont utilisées pour établir et exécuter le devis et gérer la relation client. Le client peut exercer les droits prévus par la réglementation relative aux données personnelles auprès de l’entreprise${email?` (${email})`:""}, et peut saisir la CNIL.`);
 
   // CGV de l'émetteur, en annexe paginée
-  const cgvBrutes=safe(devis.emetteur_cgv||entreprise?.conditions_generales_devis||"").trim();
+  const cgvBrutes=safe(devis.emetteur_cgv||entreprise?.conditions_generales_devis||"").replace(/\r\n?|[\u2028\u2029\u000b\u000c\u0085]/g,"\n").trim();
   // Titre seul sur sa ligne, en majuscules : ne pas confondre avec « le bordereau de rétractation » dans le texte.
   const matchBordereau=cgvBrutes.match(/^\s*BORDEREAU DE RÉTRACTATION\s*$/m);
   const cgv=matchBordereau?.index!==undefined?cgvBrutes.slice(0,matchBordereau.index).trim():cgvBrutes;
@@ -207,12 +207,22 @@ export function genererDevisPDF(
     for(const p of paragraphs){
       // « Article n – Titre » sur la première ligne : titre en gras, corps en texte courant.
       const estArticle=/^Article\s+\d+/i.test(p);const [premiere,...reste]=p.split(/\n/);
-      const titre=estArticle?premiere.trim():"";const corps=estArticle?reste.join(" ").trim():p.replace(/\n/g," ");
-      doc.setFontSize(8);doc.setFont("helvetica","normal");const rows=corps?doc.splitTextToSize(corps,W) as string[]:[];
-      const h=(titre?4.6:0)+rows.length*3.7+4;if(y+Math.min(h,30)>PH-18)suite();
-      if(titre){doc.setFont("helvetica","bold");txt(doc,C.vert);doc.text(titre,M,y);y+=4.6;}
-      doc.setFont("helvetica","normal");txt(doc,[60,68,63]);
-      for(const r of rows){if(y>PH-18)suite(),doc.setFont("helvetica","normal"),doc.setFontSize(8),txt(doc,[60,68,63]);doc.text(r,M,y);y+=3.7;}
+      const titre=estArticle?premiere.trim():"";
+      // Chaque ligne du texte reste une ligne (listes à puces, adresses) ; une ligne longue est coupée à la largeur.
+      const lignes=(estArticle?reste:p.split(/\n/)).map(l=>l.replace(/[\r\u2028\u2029]/g,"").trim()).filter(Boolean);
+      doc.setFontSize(8);doc.setFont("helvetica","normal");
+      const blocs=lignes.map(l=>{const puce=/^[-•]\s*/.test(l);const t=puce?l.replace(/^[-•]\s*/,""):l;return{puce,rows:doc.splitTextToSize(t,puce?W-5:W) as string[]};});
+      const nbRows=blocs.reduce((n,b)=>n+b.rows.length,0);
+      const h=(titre?4.6:0)+nbRows*3.7+4;if(y+Math.min(h,30)>PH-18)suite();
+      if(titre){doc.setFont("helvetica","bold");doc.setFontSize(8);txt(doc,C.vert);doc.text(titre,M,y);y+=4.6;}
+      for(const b of blocs){
+        b.rows.forEach((r,i)=>{
+          if(y>PH-18)suite();
+          doc.setFont("helvetica","normal");doc.setFontSize(8);txt(doc,[60,68,63]);
+          if(b.puce){if(i===0)doc.text("-",M+1,y);doc.text(r,M+5,y);}else doc.text(r,M,y);
+          y+=3.7;
+        });
+      }
       y+=4;
     }
   }
