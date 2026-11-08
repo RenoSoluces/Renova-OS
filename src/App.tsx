@@ -15,6 +15,7 @@ const FacturationPage = lazy(() => import('./pages/FacturationPage').then(m => (
 const CourrierPage = lazy(() => import('./pages/CourrierPage').then(m => ({ default: m.CourrierPage })))
 const TasksPage = lazy(() => import('./pages/TasksPage').then(m => ({ default: m.TasksPage })))
 const ProspectionTelephonePage = lazy(() => import('./pages/ProspectionTelephonePage').then(m => ({ default: m.ProspectionTelephonePage })))
+const ScriptCallPage = lazy(() => import('./pages/ScriptCallPage').then(m => ({ default: m.ScriptCallPage })))
 const ProspectionTerrainPage = lazy(() => import('./pages/ProspectionTerrainPage').then(m => ({ default: m.ProspectionTerrainPage })))
 const FichesTechniquesPage = lazy(() => import('./pages/FichesTechniquesPage').then(m => ({ default: m.FichesTechniquesPage })))
 const CataloguePage = lazy(() => import('./pages/CataloguePage').then(m => ({ default: m.CataloguePage })))
@@ -65,6 +66,7 @@ const PAGE_TITLES: Record<PageKey, { title: string; subtitle: string }> = {
   dashboard: { title: 'Tableau de bord', subtitle: 'Vue d\'ensemble de votre activité' },
   prospects: { title: 'Prospects', subtitle: 'Gérez vos contacts et prospects' },
   prospection_terrain: { title: 'Prospection Terrain', subtitle: 'Tournées de porte-à-porte sur la carte' },
+  script_call: { title: 'Script Call', subtitle: 'Scripts d’appel pour chaque produit pro' },
   prospection: { title: 'Prospection Téléphone', subtitle: 'Import des leads, appels et suivi des résultats' },
   pipeline: { title: 'Pipeline commercial', subtitle: 'Visualisez les étapes de votre portefeuille de prospects' },
   a_traiter: { title: 'Ma journée', subtitle: 'Rendez-vous, appels, relances en retard et itinéraires' },
@@ -237,6 +239,7 @@ function AppContent() {
           {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} initialProspectId={pendingProspectId} onInitialProspectHandled={() => setPendingProspectId(null)} />}
           {page === 'prospection' && <ProspectionTelephonePage />}
           {page === 'prospection_terrain' && <ProspectionTerrainPage />}
+          {page === 'script_call' && <ScriptCallPage />}
           {page === 'simulations' && <AidesSimulationPage initialProspectId={pendingSimulationProspectId} onInitialProspectHandled={() => setPendingSimulationProspectId(null)} />}
           {page === 'resultats_3cl' && <SimulationsPage onNavigateToDevis={goToDevis} />}
           {page === 'dossiers' && (
