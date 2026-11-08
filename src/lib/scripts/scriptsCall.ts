@@ -20,7 +20,7 @@ export const REGLES_APPEL_PRO = [
 ]
 
 export const INTRO_APPEL =
-  'Bonjour, Melissa de Reno Soluces, à Trausse. Je cherche la personne qui s’occupe des bâtiments ou des dépenses d’énergie, pour lui présenter une solution qui baisse la facture avec des aides à la clé.'
+  'Bonjour, Melissa de Reno Soluces, à Trausse. Je cherche la personne qui s’occupe des bâtiments ou des dépenses d’énergie, pour lui présenter une solution qui baisse la facture d’énergie. Selon le produit, elle peut être financée à 100 % par les certificats d’économies d’énergie (CEE).'
 
 export const SCRIPTS_PRODUITS: ScriptProduit[] = [
   {
@@ -37,7 +37,7 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     arguments: [
       'Baisse de la consommation de chauffage sur les grands volumes.',
       'Pose rapide, sans arrêt de l’activité.',
-      'Opération éligible à des aides (certificats d’économies d’énergie) qui couvrent une partie du coût.',
+      'Financée à 100 % par les CEE (certificats d’économies d’énergie) : pas d’investissement pour l’entreprise, sous réserve de l’étude d’éligibilité.',
       'Étude de dimensionnement incluse dans notre offre.',
     ],
     objections: [
@@ -60,7 +60,7 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     ],
     arguments: [
       'Baisse de la consommation du groupe froid, surtout en saison fraîche.',
-      'Solution éligible à des aides qui couvrent une partie de l’investissement.',
+      'Financée à 100 % par les CEE : pas d’investissement pour l’entreprise, sous réserve de l’étude d’éligibilité.',
       'Installation planifiée pour ne pas interrompre la chaîne du froid.',
     ],
     objections: [
@@ -82,12 +82,12 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     ],
     arguments: [
       'Baisse de la facture énergétique par rapport à une chaudière fioul ou gaz.',
-      'Aides mobilisables selon l’opération.',
+      'Financée à 100 % par les CEE : pas d’investissement pour l’entreprise, sous réserve de l’étude d’éligibilité.',
       'Une seule entreprise suit le dossier, de la visite à la mise en service.',
     ],
     objections: [
       { objection: 'La chaudière fonctionne encore', reponse: 'C’est justement le bon moment pour préparer le remplacement : on chiffre à l’avance, sans engagement, pour ne pas subir une panne en pleine saison.' },
-      { objection: 'Trop d’investissement', reponse: 'Je ne donne aucun prix au téléphone : la visite sert à chiffrer votre cas précis, avec les aides, et vous jugez ensuite.' },
+      { objection: 'Trop d’investissement', reponse: 'Je ne donne aucun prix au téléphone : la visite sert à vérifier l’éligibilité de votre cas : sous réserve de l’étude, la plupart de ces opérations sont financées à 100 % par les CEE.' },
     ],
     cloture: 'Je vous propose une visite de 30 minutes pour voir la chaufferie. Quel jour vous arrange ?',
   },
@@ -105,11 +105,11 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     arguments: [
       'Étanchéité et isolation traitées ensemble, avec une garantie.',
       'Possibilité de coupler avec une centrale photovoltaïque jusqu’à 18 kWc.',
-      'Aides possibles selon l’isolation réalisée.',
+      'Financée à 100 % par les CEE : pas d’investissement pour l’entreprise, sous réserve de l’étude d’éligibilité.',
     ],
     objections: [
       { objection: 'Notre toit est en bac acier', reponse: 'Dans ce cas nous ne sommes pas la bonne entreprise pour la couverture, mais je peux regarder la partie solaire. Est-ce que cela vous intéresse ?' },
-      { objection: 'Nous avons un artisan habituel', reponse: 'Très bien. Je ne vous demande pas de le changer, seulement de regarder une offre complète avec les aides.' },
+      { objection: 'Nous avons un artisan habituel', reponse: 'Très bien. Je ne vous demande pas de le changer, seulement de regarder une offre complète, financée par les CEE.' },
     ],
     cloture: 'Je vous propose de passer 30 minutes sur place pour voir l’état de la toiture. Quel créneau vous convient ?',
     attention: 'Ne pas proposer ce produit si le toit est en bac acier ou en panneau sandwich.',
@@ -128,6 +128,7 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     arguments: [
       'Production d’électricité sur place, utilisée en journée par l’activité.',
       'Installation jusqu’à 18 kWc, adaptée aux bâtiments de taille moyenne.',
+      'Photovoltaïque : ce n’est PAS financé à 100 % par les CEE. C’est un transfert de charge : la dépense d’électricité devient la charge de la centrale, sans la présenter comme gratuite.',
       'Étude gratuite et sans engagement.',
     ],
     objections: [
