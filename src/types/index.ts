@@ -42,6 +42,7 @@ export interface Prospect {
   liste_appels_pour?: string | null
   tags: string[]
   temperature: 'chaud' | 'tiede' | 'froid' | null
+  qualification_pro?: Record<string, string> | null
   derniere_interaction_at: string | null
   // Prospects professionnels (personne morale) — nom/prenom/email/telephone restent
   // les coordonnées du contact au sein de l'entreprise.

@@ -28,6 +28,7 @@ import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
 import { resolveDocumentRows } from '../lib/storage/documentUrl'
 import { ProspectShareControl } from '../components/crm/ProspectShareControl'
+import { QuestionnairePro } from '../components/prospection/QuestionnairePro'
 import { EnvoiProspectionModal, peutEnvoyerEnProspection } from '../components/prospection/EnvoiProspectionModal'
 
 interface Props {
@@ -1151,6 +1152,16 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                   </div>
                 </div>}
               </div>
+
+              {selected.type_prospect === 'professionnel' && (
+                <QuestionnairePro
+                  reponses={selected.qualification_pro}
+                  lectureSeule={lectureSeule}
+                  temperatureActuelle={selected.temperature}
+                  onChange={r => void updateProspectField('qualification_pro', r)}
+                  onAppliquerTemperature={t => void updateProspectField('temperature', t)}
+                />
+              )}
 
               <div className="right-mini-card">
                 <div className="right-mini-label">Aides & éligibilité</div>
