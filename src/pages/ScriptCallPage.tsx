@@ -19,7 +19,7 @@ export function ScriptCallPage(): JSX.Element {
   const produit = SCRIPTS_PRODUITS.find(s => s.id === actif)
 
   const copier = async () => {
-    const texte = produit ? [produit.titre, ...produit.presentation].join('\n\n') : texteGeneral()
+    const texte = produit ? [produit.titre, ...produit.presentation, `Question clé : ${produit.question}`, `Clôture : ${produit.cloture}`].join('\n\n') : texteGeneral()
     try {
       await navigator.clipboard.writeText(texte)
       setCopie(true)
@@ -62,12 +62,14 @@ export function ScriptCallPage(): JSX.Element {
               </div>
             )}
             <Bloc titre="Présentation de la solution">{produit.presentation.map(p => <p key={p}>{p}</p>)}</Bloc>
+            <Bloc titre="Question clé à poser"><p>{produit.question}</p></Bloc>
+            <Bloc titre="Clôture : prendre le rendez-vous"><p>{produit.cloture}</p></Bloc>
           </>
         ) : (
           <>
-            {SECTIONS_GENERALES.slice(0, 4).map(s => <Section key={s.id} titre={s.titre} note={s.note} paragraphes={s.paragraphes} />)}
+            {SECTIONS_GENERALES.filter(s => ['standard', 'messagerie', 'ouverture', 'accroche', 'qualification', 'relance'].includes(s.id)).map(s => <Section key={s.id} titre={s.titre} note={s.note} paragraphes={s.paragraphes} />)}
             <Bloc titre="5. Présentation des solutions"><p>Après avoir identifié un besoin, ouvrir l’onglet du produit concerné.</p></Bloc>
-            {SECTIONS_GENERALES.slice(4, 5).map(s => <Section key={s.id} titre={s.titre} note={s.note} paragraphes={s.paragraphes} />)}
+            {SECTIONS_GENERALES.filter(s => s.id === 'financier').map(s => <Section key={s.id} titre={s.titre} note={s.note} paragraphes={s.paragraphes} />)}
             <Bloc titre="7. Objections courantes">
               {OBJECTIONS.map(o => (
                 <div key={o.objection} style={{ marginBottom: 10 }}>
@@ -76,7 +78,7 @@ export function ScriptCallPage(): JSX.Element {
                 </div>
               ))}
             </Bloc>
-            {SECTIONS_GENERALES.slice(5).map(s => <Section key={s.id} titre={s.titre} note={s.note} paragraphes={s.paragraphes} />)}
+            {SECTIONS_GENERALES.filter(s => ['rdv', 'refus', 'compte_rendu'].includes(s.id)).map(s => <Section key={s.id} titre={s.titre} note={s.note} paragraphes={s.paragraphes} />)}
           </>
         )}
       </div>

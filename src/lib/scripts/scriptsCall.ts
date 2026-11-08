@@ -9,6 +9,8 @@ export interface ScriptProduit {
   id: string
   titre: string
   cible: string
+  question: string
+  cloture: string
   presentation: string[]
   attention?: string
 }
@@ -25,6 +27,25 @@ export const REGLES_APPEL_PRO = [
 ]
 
 export const SECTIONS_GENERALES: SectionScript[] = [
+  {
+    id: 'standard',
+    titre: '0. Passer le standard',
+    note: 'Objectif : joindre la personne qui décide des bâtiments, de l’énergie ou de la maintenance. Ne pas pitcher au standard.',
+    paragraphes: [
+      'Bonjour, Melissa de Reno Soluces. Je cherche à joindre la personne qui s’occupe des bâtiments ou des dépenses d’énergie chez vous. Qui est-ce, s’il vous plaît ?',
+      'Si on demande l’objet : « C’est pour un point sur vos charges énergétiques et les aides pour les entreprises. Je ne vends rien au téléphone, je souhaite juste fixer un court échange avec la bonne personne. »',
+      'Si on propose de transmettre un message : « Volontiers. Quel est son nom, et quel est le meilleur moment pour la joindre ? Je rappelle à ce moment-là. » Noter nom, fonction et créneau dans la fiche.',
+      'Si la personne est absente : demander son prénom, sa fonction et son e-mail professionnel, puis rappeler au créneau indiqué.',
+    ],
+  },
+  {
+    id: 'messagerie',
+    titre: 'Message sur répondeur (30 secondes maximum)',
+    paragraphes: [
+      'Bonjour [Prénom], Melissa de Reno Soluces, à Trausse. Je vous appelle pour voir avec vous si votre site peut réduire sa facture d’énergie, avec des aides possibles pour les entreprises. L’étude est gratuite. Je vous rappelle [jour] ; vous pouvez aussi me joindre au [numéro]. Bonne journée.',
+      'Ne pas laisser de message plus de deux fois au même prospect.',
+    ],
+  },
   {
     id: 'ouverture',
     titre: '1. Ouverture',
@@ -102,6 +123,16 @@ export const SECTIONS_GENERALES: SectionScript[] = [
       'Merci pour votre temps, [Prénom]. Excellente journée.',
     ],
   },
+  {
+    id: 'compte_rendu',
+    titre: '10. Après chaque appel : compte rendu dans Renova',
+    paragraphes: [
+      'Dans la fiche prospect, noter tout de suite : résultat (rdv pris, à rappeler, pas intéressé, ne plus appeler, numéro erroné), nom et fonction du décideur, type de site, surface, chauffage actuel, facture d’énergie, produit visé.',
+      'Rdv pris : inscrire date, heure, conseiller, adresse du site et produit en jeu. Envoyer l’invitation avec le récapitulatif dans l’heure.',
+      'À rappeler : toujours une date et une heure précises, jamais « plus tard ».',
+      'Pas intéressé : noter la raison réelle (déjà équipé, pas propriétaire, pas de budget, mauvais moment) pour ajuster le ciblage.',
+    ],
+  },
 ]
 
 export const OBJECTIONS: { objection: string; reponse: string[] }[] = [
@@ -146,6 +177,27 @@ export const OBJECTIONS: { objection: string; reponse: string[] }[] = [
     ],
   },
   {
+    objection: 'Nous sommes locataires',
+    reponse: [
+      'Très bien, c’est fréquent. Dans ce cas la décision revient souvent au propriétaire ou au gestionnaire du bâtiment.',
+      'Qui est-ce, et souhaitez-vous que je le contacte avec vous ? Ces travaux améliorent aussi vos charges de fonctionnement.',
+    ],
+  },
+  {
+    objection: 'Combien ça coûte ?',
+    reponse: [
+      'Je ne peux pas vous donner de chiffre sérieux sans connaître votre site : cela dépend de la surface, du système actuel et de l’éligibilité aux aides.',
+      'C’est justement le but de l’échange de 10 à 15 minutes : vous donner une estimation claire, avec le reste à charge et le temps de retour. Mardi matin ou jeudi après-midi ?',
+    ],
+  },
+  {
+    objection: 'Rappelez-moi plus tard',
+    reponse: [
+      'Bien sûr. Pour ne pas vous déranger au mauvais moment : plutôt le matin ou l’après-midi, et quel jour ?',
+      'Je note [jour] à [heure] et je vous rappelle à ce moment précis.',
+    ],
+  },
+  {
     objection: 'Ce n’est pas intéressant',
     reponse: [
       'Je comprends. Peut-être que ce n’est pas la bonne solution pour votre site, ou peut-être que nous n’avons pas encore identifié le bon poste d’économie.',
@@ -161,6 +213,8 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     id: 'pac_air_eau',
     titre: 'Pompe à chaleur air/eau',
     cible: 'Sites chauffés par chaudière gaz ou fioul, chauffage électrique énergivore ou installation vieillissante.',
+    question: 'Quelle est la puissance et l’âge de votre chaudière ? Chauffez-vous aussi de l’eau chaude ?',
+    cloture: 'Je vous propose de regarder votre chaufferie avec notre conseiller et de vérifier l’éligibilité. Mardi ou jeudi ?',
     presentation: [
       'Pour remplacer ou compléter une chaudière, un système électrique énergivore ou une installation vieillissante, la pompe à chaleur air/eau peut produire du chauffage et de l’eau chaude avec une consommation électrique nettement réduite.',
       'Selon les caractéristiques du bâtiment, de l’équipement et de l’opération, elle peut être éligible aux CEE. Nous vérifions cela gratuitement avant toute proposition chiffrée.',
@@ -172,6 +226,8 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     id: 'destratificateur',
     titre: 'Déstratificateur',
     cible: 'Ateliers, entrepôts, halles, hangars et salles de production chauffés, grande hauteur sous plafond.',
+    question: 'Quelle est la hauteur sous plafond, et par quoi chauffez-vous (aérothermes, gaz, fioul) ?',
+    cloture: 'Notre conseiller passe regarder votre volume et dimensionne la solution. Mardi matin ou jeudi après-midi ?',
     presentation: [
       'Si vous avez des volumes importants — atelier, entrepôt, halle, hangar, salle de production — la chaleur monte naturellement vers le plafond. Résultat : il fait froid au sol alors que vous chauffez inutilement les 8, 10 ou 15 mètres supérieurs.',
       'Le déstratificateur redistribue l’air chaud vers la zone d’activité. Cela permet généralement de réduire la consommation de chauffage, d’améliorer le confort des équipes et de rentabiliser rapidement l’investissement.',
@@ -182,6 +238,8 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     id: 'toiture_plate',
     titre: 'Isolation de toiture plate',
     cible: 'Bâtiments à toiture-terrasse ancienne ou mal isolée.',
+    question: 'Quel est l’âge de la toiture, et en quoi est-elle faite : béton avec étanchéité ou bac acier ? (le bac acier est exclu)',
+    cloture: 'Notre conseiller visite la toiture et vérifie les critères avant tout chiffrage. Quel jour vous arrange ?',
     presentation: [
       'Sur une toiture plate, une part importante des déperditions peut passer par le toit, surtout si l’isolation est ancienne, insuffisante ou dégradée.',
       'Nous pouvons étudier une isolation par l’extérieur, qui améliore le confort d’été comme d’hiver, réduit les consommations et valorise le bâtiment.',
@@ -194,6 +252,8 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     id: 'hp_flottante',
     titre: 'Pompe à chaleur flottante',
     cible: 'Sites avec bassin, plan d’eau, process industriel ou besoin de production de chaud et/ou de froid.',
+    question: 'Quelle est la taille du bassin ou du plan d’eau, et quel besoin de chaud ou de froid avez-vous ?',
+    cloture: 'Je vous propose un échange avec notre conseiller pour valider la faisabilité technique. Quel créneau ?',
     presentation: [
       'Si vous avez un bassin, un plan d’eau, une application industrielle ou un besoin de production de chaud et/ou de froid, la pompe à chaleur flottante peut être une solution intéressante.',
       'Elle utilise la masse d’eau comme source d’énergie et peut remplacer ou compléter une installation énergivore.',
@@ -204,6 +264,8 @@ export const SCRIPTS_PRODUITS: ScriptProduit[] = [
     id: 'photovoltaique',
     titre: 'Photovoltaïque',
     cible: 'Pros avec toiture exploitable et consommation d’électricité en journée (jusqu’à 18 kWc).',
+    question: 'Quelle est votre consommation annuelle, et est-elle surtout en journée ? La toiture est-elle dégagée ?',
+    cloture: 'Notre conseiller fait une étude de toiture et de rentabilité, sans engagement. Mardi ou jeudi ?',
     presentation: [
       'Concernant le photovoltaïque, ce n’est pas financé par les CEE. En revanche, il peut s’autofinancer grâce à l’autoconsommation : vous produisez une partie de votre électricité, vous réduisez vos achats au réseau et vous maîtrisez mieux votre facture.',
       'Nous étudions votre profil de consommation, vos heures de fonctionnement, la surface de toiture disponible et l’orientation du projet. L’objectif est de déterminer si l’installation est rentable et en combien de temps elle peut être amortie.',
