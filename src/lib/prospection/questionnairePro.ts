@@ -51,10 +51,8 @@ export const QUESTIONS_PRO: QuestionPro[] = [
     { valeur: 'bac_acier', label: 'Bac acier / panneau sandwich', bloquant: 'Bac acier ou panneau sandwich : pas d’isolation de toiture' },
     { valeur: 'nsp', label: 'Ne sait pas' },
   ] },
-  { id: 'chaud_froid', label: 'Bassin, process ou besoin chaud / froid ?', options: [
-    { valeur: 'bassin', label: 'Bassin / plan d’eau', poids: 2 },
-    { valeur: 'froid', label: 'Groupe froid (alimentaire)', poids: 2 },
-    { valeur: 'process', label: 'Process industriel', poids: 2 },
+  { id: 'chaud_froid', label: 'Groupe de production de froid ?', aide: 'Chambres froides, meubles frigorifiques, groupe centralisé : HP flottante.', options: [
+    { valeur: 'froid', label: 'Oui, groupe froid centralisé', poids: 2 },
     { valeur: 'non', label: 'Non' },
   ] },
   { id: 'facture', label: 'Facture d’énergie annuelle', options: [
@@ -108,7 +106,6 @@ export function produitsAProposer(r: ReponsesPro): string[] {
   if (r.hauteur === 'oui') p.push('Déstratificateur')
   if (r.toiture === 'plate') p.push('Isolation de toiture plate')
   if (['gaz', 'fioul', 'electrique'].includes(r.chauffage)) p.push('Pompe à chaleur air/eau')
-  if (r.chaud_froid === 'bassin' || r.chaud_froid === 'process') p.push('Pompe à chaleur flottante')
   if (r.chaud_froid === 'froid') p.push('HP flottante (groupe froid)')
   if (r.pv !== 'equipe' && (r.facture === 'plus_20k' || r.facture === '5k_20k')) p.push('Photovoltaïque')
   return p

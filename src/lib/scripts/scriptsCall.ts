@@ -1,277 +1,477 @@
-export interface SectionScript {
-  id: string
-  titre: string
+/**
+ * Scripts d'appel pour les prospects professionnels.
+ * [Prénom] = prénom de la personne qui appelle. Les textes entre « » se disent à voix haute.
+ */
+export interface Bloc {
+  titre?: string
   note?: string
-  paragraphes: string[]
+  /** Texte à dire, un paragraphe par ligne. */
+  dire?: string[]
+  /** Questions à poser (liste à puces). */
+  questions?: string[]
 }
 
 export interface ScriptProduit {
   id: string
   titre: string
   cible: string
-  question: string
-  cloture: string
-  presentation: string[]
+  note?: string
   attention?: string
+  etapes: Bloc[]
+  infos: string
 }
 
-/** Règles à respecter pendant tout l'appel. */
+export const REGLES_A_FAIRE = [
+  'Parler lentement et avec assurance.',
+  'Poser des questions ouvertes.',
+  'Laisser le prospect parler davantage que le téléprospecteur.',
+  'Parler d’économies et de rentabilité avant de parler d’équipements.',
+  'Adapter son vocabulaire à l’activité de l’entreprise.',
+  'Proposer deux créneaux de rendez-vous.',
+  'Ne jamais inventer un montant de prime ou une économie.',
+]
+
+export const REGLES_A_NE_PAS_FAIRE = [
+  'Prétendre appeler au nom de l’État ou d’EDF.',
+  'Garantir une prise en charge à 100 % avant validation.',
+  'Dire qu’une installation est gratuite sans expliquer les conditions.',
+  'Promettre des économies sans étude.',
+  'Faire croire que l’entreprise a une obligation de réaliser les travaux.',
+  'Insister lourdement après un refus.',
+]
+
+/** Rappel court affiché en haut de la page. */
 export const REGLES_APPEL_PRO = [
   'Démarchage B2B uniquement : jamais de particulier à froid. Un refus ou « ne plus rappeler » se note aussitôt dans la fiche.',
-  'Ne jamais affirmer « c’est 100 % financé par les CEE » avant l’étude : cela dépend de la fiche d’opération, des performances techniques, de l’installateur RGE et du bénéficiaire.',
-  'Ne pas confondre CEE résidentiel et CEE professionnels : les fiches et conditions ne sont pas les mêmes.',
-  'Ne pas promettre un montant de prime sans dossier complet.',
-  'Photovoltaïque : parler de rentabilité, d’autoconsommation et de transfert de charge, jamais de financement CEE.',
-  'Toujours obtenir : type de site, surface, chauffage actuel, consommation, décisionnaire, disponibilité pour un rendez-vous.',
-  'Toujours proposer une action concrète : étude gratuite, visite technique ou rendez-vous de 10 à 15 minutes.',
+  'Jamais « 100 % financé » avant validation du dossier : on vérifie l’éligibilité CEE, puis on chiffre.',
+  'Photovoltaïque : pas de CEE. On parle de rentabilité, d’autoconsommation et de transfert de charge.',
+  'Un seul produit par appel : celui qui répond au problème énergétique principal du prospect.',
+  'Toujours proposer deux créneaux de rendez-vous.',
 ]
 
-export const SECTIONS_GENERALES: SectionScript[] = [
+/* ------------------------------------------------------------------ Ouverture commune */
+
+export const OUVERTURE: Bloc[] = [
   {
-    id: 'standard',
-    titre: '0. Passer le standard',
-    note: 'Objectif : joindre la personne qui décide des bâtiments, de l’énergie ou de la maintenance. Ne pas pitcher au standard.',
-    paragraphes: [
-      'Bonjour, Melissa de Reno Soluces. Je cherche à joindre la personne qui s’occupe des bâtiments ou des dépenses d’énergie chez vous. Qui est-ce, s’il vous plaît ?',
-      'Si on demande l’objet : « C’est pour un point sur vos charges énergétiques et les aides pour les entreprises. Je ne vends rien au téléphone, je souhaite juste fixer un court échange avec la bonne personne. »',
-      'Si on propose de transmettre un message : « Volontiers. Quel est son nom, et quel est le meilleur moment pour la joindre ? Je rappelle à ce moment-là. » Noter nom, fonction et créneau dans la fiche.',
-      'Si la personne est absente : demander son prénom, sa fonction et son e-mail professionnel, puis rappeler au créneau indiqué.',
+    titre: 'Passage du standard ou du secrétariat',
+    dire: [
+      '« Bonjour Madame/Monsieur, [Prénom] de Reno Soluces.',
+      'Je souhaiterais échanger avec la personne qui s’occupe des bâtiments et des dépenses énergétiques de votre établissement, s’il vous plaît.',
+      'C’est concernant des solutions d’optimisation énergétique destinées aux professionnels. »',
     ],
   },
   {
-    id: 'messagerie',
+    titre: 'Si on demande la raison de l’appel',
+    dire: [
+      '« Nous accompagnons les entreprises sur plusieurs dispositifs permettant de réduire leurs consommations énergétiques, notamment sur le chauffage, l’isolation et les installations électriques, avec des mécanismes de financement spécifiques aux professionnels.',
+      'Je souhaite simplement vérifier si certains de ces dispositifs pourraient être intéressants pour votre établissement. »',
+    ],
+  },
+  {
+    titre: 'Si le standard demande d’envoyer un mail',
+    dire: [
+      '« Bien sûr, aucun problème. Simplement, pour éviter de vous envoyer une documentation qui ne correspond pas à votre activité, pouvez-vous me préciser qui serait la bonne personne à contacter et son adresse mail directe ? »',
+      'Puis : « Et savez-vous à quel moment je pourrais le joindre plus facilement ? »',
+    ],
+    note: 'Noter dans la fiche : nom, fonction, mail direct et créneau pour le rappel.',
+  },
+  {
+    titre: 'Lorsque le décideur décroche',
+    dire: [
+      '« Bonjour Monsieur/Madame [Nom], [Prénom] de Reno Soluces.',
+      'Je vous rassure, je vais être rapide.',
+      'Nous accompagnons actuellement les professionnels dans l’optimisation énergétique de leurs bâtiments, avec plusieurs solutions qui peuvent bénéficier d’une prise en charge par les Certificats d’Économies d’Énergie, les CEE.',
+      'L’idée est de voir si votre établissement présente des opportunités d’amélioration énergétique sans mobiliser inutilement votre trésorerie.',
+      'Je peux vous poser deux ou trois petites questions pour voir si cela pourrait vous concerner ? »',
+    ],
+    note: 'Objectif : obtenir l’autorisation de poursuivre. Ensuite, passer à l’onglet du produit adapté.',
+  },
+  {
     titre: 'Message sur répondeur (30 secondes maximum)',
-    paragraphes: [
-      'Bonjour [Prénom], Melissa de Reno Soluces, à Trausse. Je vous appelle pour voir avec vous si votre site peut réduire sa facture d’énergie, avec des aides possibles pour les entreprises. L’étude est gratuite. Je vous rappelle [jour] ; vous pouvez aussi me joindre au [numéro]. Bonne journée.',
-      'Ne pas laisser de message plus de deux fois au même prospect.',
+    dire: [
+      '« Bonjour [Nom], [Prénom] de Reno Soluces. Je vous appelle au sujet de vos dépenses d’énergie : nous vérifions gratuitement si votre établissement peut bénéficier de dispositifs de financement pour les professionnels. Je vous rappelle [jour] ; vous pouvez aussi me joindre au [numéro]. Bonne journée. »',
     ],
-  },
-  {
-    id: 'ouverture',
-    titre: '1. Ouverture',
-    paragraphes: [
-      'Bonjour, [Prénom du décideur] ?',
-      'Moi, c’est [Prénom] de [Nom de l’entreprise]. Je vous appelle rapidement car nous accompagnons les entreprises de votre secteur sur la réduction de leurs charges énergétiques, notamment à travers des solutions de rénovation financées, en tout ou partie, par les certificats d’économies d’énergie.',
-      'Je sais que je vous appelle sans rendez-vous : je vous dérange ou vous avez 30 secondes pour que je vous explique pourquoi je vous contacte ?',
-    ],
-  },
-  {
-    id: 'accroche',
-    titre: '2. Accroche selon la cible',
-    note: 'Si le prospect est un industriel, un logisticien, un agriculteur ou un gestionnaire de bâtiment.',
-    paragraphes: [
-      'Nous intervenons sur les bâtiments professionnels pour identifier les postes où l’énergie est gaspillée : chauffage, production d’eau chaude, air comprimé, froid, éclairage, isolation et consommation électrique.',
-      'Selon votre situation, nous pouvons étudier des solutions comme une pompe à chaleur air/eau, un déstratificateur pour réduire la facture de chauffage des grands volumes, une isolation de toiture plate, une pompe à chaleur flottante ou encore une installation photovoltaïque en autoconsommation.',
-      'L’objectif n’est pas de vous vendre un équipement, mais de voir s’il existe une opération rentable pour votre site, avec un financement possible via les CEE lorsque le projet est éligible.',
-      'Transition : Concrètement, je ne vous demande pas de prendre une décision aujourd’hui. Je souhaite simplement comprendre votre configuration et voir si une étude gratuite peut vous faire économiser de l’argent.',
-      'Qui gère aujourd’hui les dépenses énergétiques ou la maintenance des équipements chez vous : vous-même, le responsable technique, ou une autre personne ?',
-    ],
-  },
-  {
-    id: 'qualification',
-    titre: '3. Qualification du prospect',
-    note: 'Poser ces questions dans cet ordre, sans les transformer en interrogatoire.',
-    paragraphes: [
-      '« Vous êtes bien [fonction / entreprise] à [ville] ? »',
-      '« Quel type de site gérez-vous : atelier, entrepôt, magasin, bureau, exploitation agricole, hôtel, restaurant, ou autre ? »',
-      '« Quelle est approximativement la surface à chauffer ou à équiper ? »',
-      '« Quel est votre système de chauffage actuel : gaz, fioul, électrique, pompe à chaleur, ou autre ? »',
-      '« Avez-vous des plafonds hauts, une halle, un entrepôt ou des zones de production où la chaleur monte rapidement ? »',
-      '« Avez-vous une toiture plate, une toiture ancienne, ou des problèmes de déperditions thermiques ? »',
-      '« Avez-vous un bassin, un process industriel, ou un besoin de production de chaud ou de froid qui pourrait justifier une pompe à chaleur flottante ? »',
-      '« Quelle est approximativement votre facture d’énergie annuelle, ou votre consommation en kWh ? »',
-      '« Avez-vous déjà étudié une installation photovoltaïque ou un projet d’autoconsommation ? »',
-      '« Qui prend la décision sur ce type d’investissement : vous, le dirigeant, le responsable technique, ou le propriétaire du bâtiment ? »',
-    ],
-  },
-  {
-    id: 'relance',
-    titre: '4. Si le prospect hésite',
-    paragraphes: [
-      'Je comprends. Ce n’est pas pour vous vendre quelque chose aujourd’hui. Mon rôle est juste de vérifier si votre site présente un potentiel d’économies et si les CEE peuvent réduire fortement le reste à charge.',
-      'Sur la base de deux ou trois informations, je peux déjà vous dire si cela vaut la peine d’aller plus loin. Vous avez une idée de votre système de chauffage actuel ?',
-    ],
-  },
-  {
-    id: 'financier',
-    titre: '6. Argumentaire financier',
-    paragraphes: [
-      'Notre approche est simple : nous réalisons d’abord une étude gratuite de faisabilité.',
-      'Nous regardons votre consommation, vos équipements, vos contraintes techniques et les financements mobilisables. Ensuite, nous vous présentons une proposition claire : économies estimées, investissement, reste à charge et temps de retour.',
-      'Pour les opérations éligibles, les CEE peuvent financer une part importante, parfois la totalité selon le montage du projet. Mais je préfère être précis : nous ne promettons pas 100 % avant d’avoir vérifié l’éligibilité réelle de votre site et de l’opération.',
-      'Vous n’avez rien à décider aujourd’hui. L’étude est gratuite et sans engagement.',
-    ],
-  },
-  {
-    id: 'rdv',
-    titre: '8. Prise de rendez-vous et confirmation',
-    paragraphes: [
-      'Très bien. Je vous propose donc un échange de 10 à 15 minutes avec [Nom du conseiller / technicien].',
-      'Il pourra regarder votre consommation, vos équipements, vos contraintes techniques et les financements possibles. À l’issue de cet échange, vous saurez si une étude complète est pertinente.',
-      'Je vous propose [jour] à [heure], ou [jour alternatif] à [heure]. Lequel vous convient le mieux ?',
-      'Confirmation : Parfait. Je confirme donc [jour] à [heure] avec [Nom du conseiller]. Je vous envoie une invitation par e-mail avec un récapitulatif. Pouvez-vous me confirmer votre adresse e-mail professionnelle, s’il vous plaît ?',
-      'Merci [Prénom], je vous souhaite une excellente journée. Au revoir.',
-    ],
-  },
-  {
-    id: 'refus',
-    titre: '9. Si refus',
-    paragraphes: [
-      'Je comprends, merci de votre franchise.',
-      'Est-ce que je peux simplement vous poser une dernière question : est-ce que c’est le bon moment, ou est-ce que le sujet énergétique n’est pas prioritaire pour vous actuellement ?',
-      'Très bien. Je note que je peux vous recontacter dans [3 mois / 6 mois] pour voir si votre situation a évolué. Est-ce que cela vous convient ?',
-      'Merci pour votre temps, [Prénom]. Excellente journée.',
-    ],
-  },
-  {
-    id: 'compte_rendu',
-    titre: '10. Après chaque appel : compte rendu dans Renova',
-    paragraphes: [
-      'Dans la fiche prospect, noter tout de suite : résultat (rdv pris, à rappeler, pas intéressé, ne plus appeler, numéro erroné), nom et fonction du décideur, type de site, surface, chauffage actuel, facture d’énergie, produit visé.',
-      'Rdv pris : inscrire date, heure, conseiller, adresse du site et produit en jeu. Envoyer l’invitation avec le récapitulatif dans l’heure.',
-      'À rappeler : toujours une date et une heure précises, jamais « plus tard ».',
-      'Pas intéressé : noter la raison réelle (déjà équipé, pas propriétaire, pas de budget, mauvais moment) pour ajuster le ciblage.',
-    ],
+    note: 'Pas plus de deux messages au même prospect.',
   },
 ]
 
-export const OBJECTIONS: { objection: string; reponse: string[] }[] = [
-  {
-    objection: 'Nous n’avons pas le temps',
-    reponse: [
-      'Je comprends parfaitement. C’est justement pour cela que je ne vous demande pas de meeting technique aujourd’hui.',
-      'Je vous propose simplement un échange de 10 minutes avec notre conseiller technique, à une date qui vous convient. Il regardera si votre site présente un potentiel. Si ce n’est pas le cas, nous vous le dirons franchement.',
-      'Vous préférez plutôt un créneau en début ou en fin de semaine ?',
-    ],
-  },
-  {
-    objection: 'Nous avons déjà un prestataire',
-    reponse: [
-      'C’est très bien, cela veut dire que vous prenez le sujet au sérieux.',
-      'Nous ne venons pas remplacer votre prestataire. Nous pouvons simplement réaliser une étude indépendante et vérifier si des financements CEE ou une solution technique complémentaire peuvent améliorer votre rentabilité.',
-      'Cela ne vous engage à rien. Qui gère ce sujet en interne : vous ou votre responsable technique ?',
-    ],
-  },
-  {
-    objection: 'Nous n’avons pas de budget',
-    reponse: [
-      'C’est justement l’intérêt de notre approche.',
-      'Lorsqu’une opération est éligible, les CEE peuvent réduire fortement le reste à charge. Selon le projet, le financement peut couvrir une part très importante, voire la totalité de l’investissement.',
-      'Mais cela se vérifie cas par cas. Puis-je vous poser deux questions rapides pour voir si votre site est éligible ?',
-    ],
-  },
-  {
-    objection: 'Nous avons déjà fait des travaux',
-    reponse: [
-      'Parfait, cela veut dire que vous avez déjà engagé une démarche.',
-      'Nous pouvons vérifier s’il reste des postes non traités : chauffage, isolation, air comprimé, éclairage, production d’eau chaude, froid ou autoconsommation photovoltaïque.',
-      'Quel type de travaux avez-vous déjà réalisés ?',
-    ],
-  },
-  {
-    objection: 'Envoyez-moi une documentation',
-    reponse: [
-      'Je peux bien sûr vous l’envoyer. Mais une documentation générale ne vous dira pas si votre site est éligible ni quelles économies vous pouvez réaliser.',
-      'Je vous propose mieux : un échange de 10 à 15 minutes avec notre conseiller. Il regardera votre configuration et vous dira si une étude complète a du sens.',
-      'Vous êtes plutôt disponible mardi matin ou jeudi après-midi ?',
-    ],
-  },
-  {
-    objection: 'Nous sommes locataires',
-    reponse: [
-      'Très bien, c’est fréquent. Dans ce cas la décision revient souvent au propriétaire ou au gestionnaire du bâtiment.',
-      'Qui est-ce, et souhaitez-vous que je le contacte avec vous ? Ces travaux améliorent aussi vos charges de fonctionnement.',
-    ],
-  },
-  {
-    objection: 'Combien ça coûte ?',
-    reponse: [
-      'Je ne peux pas vous donner de chiffre sérieux sans connaître votre site : cela dépend de la surface, du système actuel et de l’éligibilité aux aides.',
-      'C’est justement le but de l’échange de 10 à 15 minutes : vous donner une estimation claire, avec le reste à charge et le temps de retour. Mardi matin ou jeudi après-midi ?',
-    ],
-  },
-  {
-    objection: 'Rappelez-moi plus tard',
-    reponse: [
-      'Bien sûr. Pour ne pas vous déranger au mauvais moment : plutôt le matin ou l’après-midi, et quel jour ?',
-      'Je note [jour] à [heure] et je vous rappelle à ce moment précis.',
-    ],
-  },
-  {
-    objection: 'Ce n’est pas intéressant',
-    reponse: [
-      'Je comprends. Peut-être que ce n’est pas la bonne solution pour votre site, ou peut-être que nous n’avons pas encore identifié le bon poste d’économie.',
-      'Juste pour être précis : est-ce le principe qui ne vous intéresse pas, ou est-ce que vous avez déjà étudié le sujet et trouvé une offre plus intéressante ?',
-      'Si vous avez déjà une proposition, je peux la comparer gratuitement avec notre étude. Cela ne vous engage à rien.',
-    ],
-  },
-]
+/* ------------------------------------------------------------------ Scripts produits */
 
-/** 5. Présentation des solutions : à utiliser après avoir identifié un besoin. */
 export const SCRIPTS_PRODUITS: ScriptProduit[] = [
   {
     id: 'pac_air_eau',
-    titre: 'Pompe à chaleur air/eau',
-    cible: 'Sites chauffés par chaudière gaz ou fioul, chauffage électrique énergivore ou installation vieillissante.',
-    question: 'Quelle est la puissance et l’âge de votre chaudière ? Chauffez-vous aussi de l’eau chaude ?',
-    cloture: 'Je vous propose de regarder votre chaufferie avec notre conseiller et de vérifier l’éligibilité. Mardi ou jeudi ?',
-    presentation: [
-      'Pour remplacer ou compléter une chaudière, un système électrique énergivore ou une installation vieillissante, la pompe à chaleur air/eau peut produire du chauffage et de l’eau chaude avec une consommation électrique nettement réduite.',
-      'Selon les caractéristiques du bâtiment, de l’équipement et de l’opération, elle peut être éligible aux CEE. Nous vérifions cela gratuitement avant toute proposition chiffrée.',
-      'L’intérêt pour vous, c’est de réduire la facture énergétique, d’améliorer le confort de vos équipes et de sécuriser une installation plus performante.',
-      'Les CEE concernent notamment les pompes à chaleur air/eau, mais l’éligibilité dépend des critères de la fiche d’opération applicable, de l’installation réalisée par un professionnel RGE et de la conformité technique du projet.',
+    titre: 'PAC air/eau',
+    cible: 'Bâtiments tertiaires chauffés par chaudière gaz, fioul ou système de chauffage vieillissant.',
+    infos: 'Surface chauffée, énergie actuelle, puissance, émetteurs.',
+    etapes: [
+      {
+        titre: 'Étape 1 – Accroche',
+        dire: [
+          '« Nous intervenons notamment sur le remplacement ou l’amélioration des systèmes de chauffage des bâtiments professionnels.',
+          'Nous proposons des solutions de pompes à chaleur air/eau qui permettent de produire le chauffage du bâtiment avec une consommation énergétique optimisée.',
+          'L’intérêt, c’est que certaines installations peuvent être financées par les CEE, ce qui peut permettre de réaliser l’opération sans investissement initial de la part de l’entreprise, sous réserve de validation du dossier. »',
+        ],
+      },
+      {
+        titre: 'Étape 2 – Découverte des besoins',
+        dire: ['« Aujourd’hui, comment est chauffé votre établissement ? » Laisser répondre.'],
+        questions: [
+          '« Vous êtes plutôt sur une chaudière gaz, fioul, électrique ou un autre système ? »',
+          '« Vous avez une idée de l’ancienneté de votre installation ? »',
+          '« Vous chauffez quelle surface approximativement ? »',
+          '« Vous avez des radiateurs, un plancher chauffant ou des aérothermes ? »',
+          '« Vous avez constaté une augmentation de vos dépenses de chauffage ces dernières années ? »',
+        ],
+      },
+      {
+        titre: 'Étape 3 – Argumentaire',
+        dire: [
+          '« D’accord, justement, c’est le type d’installation sur lequel nous pouvons intervenir.',
+          'L’objectif est de remplacer ou compléter votre système actuel par une pompe à chaleur air/eau dimensionnée pour les besoins du bâtiment.',
+          'Cela permet de valoriser les performances énergétiques de votre installation et potentiellement de réduire vos dépenses de chauffage.',
+          'Ce qui est intéressant dans votre cas, c’est que nous étudions d’abord le potentiel de financement CEE. Si le dossier est éligible et que la prime couvre l’intégralité du coût, vous n’avez pas à financer l’installation sur vos fonds propres. »',
+        ],
+      },
+      {
+        titre: 'Étape 4 – Conclusion',
+        dire: [
+          '« Ce que je vous propose, c’est de programmer un rendez-vous avec notre conseiller technique.',
+          'Il pourra étudier votre installation actuelle, la surface à chauffer et les caractéristiques du bâtiment pour déterminer la faisabilité et le montant du financement mobilisable.',
+          'Vous seriez plutôt disponible [jour 1] ou [jour 2] ? »',
+        ],
+      },
     ],
   },
   {
     id: 'destratificateur',
-    titre: 'Déstratificateur',
-    cible: 'Ateliers, entrepôts, halles, hangars et salles de production chauffés, grande hauteur sous plafond.',
-    question: 'Quelle est la hauteur sous plafond, et par quoi chauffez-vous (aérothermes, gaz, fioul) ?',
-    cloture: 'Notre conseiller passe regarder votre volume et dimensionne la solution. Mardi matin ou jeudi après-midi ?',
-    presentation: [
-      'Si vous avez des volumes importants — atelier, entrepôt, halle, hangar, salle de production — la chaleur monte naturellement vers le plafond. Résultat : il fait froid au sol alors que vous chauffez inutilement les 8, 10 ou 15 mètres supérieurs.',
-      'Le déstratificateur redistribue l’air chaud vers la zone d’activité. Cela permet généralement de réduire la consommation de chauffage, d’améliorer le confort des équipes et de rentabiliser rapidement l’investissement.',
-      'C’est une solution simple, sans gros travaux, particulièrement intéressante si vous chauffez un grand volume.',
+    titre: 'Déstratificateur d’air',
+    cible: 'Bâtiments à grande hauteur sous plafond : ateliers, entrepôts, garages, concessions, locaux industriels.',
+    infos: 'Hauteur, surface, chauffage, volume.',
+    etapes: [
+      {
+        titre: 'Étape 1 – Accroche',
+        dire: [
+          '« Nous proposons également une solution particulièrement intéressante pour les bâtiments professionnels qui disposent de grandes hauteurs sous plafond.',
+          'Il s’agit de systèmes de déstratification d’air qui permettent de récupérer la chaleur accumulée en hauteur et de la redistribuer vers les zones occupées.',
+          'L’objectif est d’améliorer le confort thermique et de limiter les pertes énergétiques liées à la stratification de l’air.',
+          'Cette opération peut bénéficier d’un financement CEE selon les caractéristiques du bâtiment et de l’installation. »',
+        ],
+      },
+      {
+        titre: 'Étape 2 – Qualification',
+        dire: ['« J’aurais simplement quelques questions : »'],
+        questions: [
+          '« Votre bâtiment dispose de quelle hauteur sous plafond environ ? »',
+          '« Vous avez une surface de combien de mètres carrés ? »',
+          '« Vous chauffez actuellement cet espace ? »',
+          '« Vous avez des aérothermes, des radiateurs ou un autre système ? »',
+          '« En hiver, est-ce que vous constatez que la chaleur reste principalement en hauteur alors qu’il fait plus frais au niveau du sol ? »',
+        ],
+      },
+      {
+        titre: 'Étape 3 – Argumentaire',
+        dire: [
+          '« C’est justement la problématique que le déstratificateur permet de traiter.',
+          'Dans un bâtiment avec une grande hauteur, l’air chaud a naturellement tendance à monter. On se retrouve parfois à chauffer une partie du volume qui n’est pas réellement occupée.',
+          'Le déstratificateur permet de mieux répartir cette chaleur dans le bâtiment.',
+          'L’intérêt est double : améliorer le confort des salariés et optimiser le fonctionnement du chauffage.',
+          'Et surtout, lorsque les conditions réglementaires sont réunies, l’installation peut être prise en charge par les CEE. »',
+        ],
+      },
+      {
+        titre: 'Étape 4 – Conclusion',
+        dire: [
+          '« Nous pouvons organiser une étude pour déterminer le nombre d’appareils nécessaires, leur positionnement et le financement mobilisable.',
+          'Cela ne vous engage pas à réaliser les travaux.',
+          'Est-ce que vous auriez un créneau cette semaine pour qu’un conseiller technique puisse étudier votre bâtiment ? »',
+        ],
+      },
     ],
   },
   {
     id: 'toiture_plate',
     titre: 'Isolation de toiture plate',
-    cible: 'Bâtiments à toiture-terrasse ancienne ou mal isolée.',
-    question: 'Quel est l’âge de la toiture, et en quoi est-elle faite : béton avec étanchéité ou bac acier ? (le bac acier est exclu)',
-    cloture: 'Notre conseiller visite la toiture et vérifie les critères avant tout chiffrage. Quel jour vous arrange ?',
-    presentation: [
-      'Sur une toiture plate, une part importante des déperditions peut passer par le toit, surtout si l’isolation est ancienne, insuffisante ou dégradée.',
-      'Nous pouvons étudier une isolation par l’extérieur, qui améliore le confort d’été comme d’hiver, réduit les consommations et valorise le bâtiment.',
-      'Selon la nature des travaux et les caractéristiques du projet, l’opération peut entrer dans le cadre des CEE. Nous vérifions les critères avant de vous proposer un chiffrage.',
-      'L’isolation des toitures-terrasses figure parmi les opérations pouvant relever des CEE, sous réserve de respecter la fiche standardisée et les exigences techniques applicables.',
-    ],
+    cible: 'Bâtiments industriels, entrepôts, commerces, grandes surfaces, bureaux, hôtels.',
+    infos: 'Surface, propriété, isolation existante, état de la toiture.',
     attention: 'Toitures plates uniquement : pas de bac acier ni de panneau sandwich.',
+    etapes: [
+      {
+        titre: 'Étape 1 – Accroche',
+        dire: [
+          '« Nous accompagnons également les entreprises sur l’amélioration de l’isolation thermique des toitures plates.',
+          'C’est un poste souvent négligé dans les bâtiments professionnels, alors qu’une toiture mal isolée peut entraîner des pertes thermiques importantes en hiver et contribuer à la surchauffe des locaux en été.',
+          'Nous étudions la possibilité de réaliser des travaux d’isolation avec un financement par les CEE. »',
+        ],
+      },
+      {
+        titre: 'Étape 2 – Qualification',
+        dire: ['« J’aurais quelques questions concernant votre bâtiment : »'],
+        questions: [
+          '« Vous êtes propriétaire de vos locaux ou locataire ? »',
+          '« Votre bâtiment possède une toiture plate ou une toiture-terrasse ? »',
+          '« Vous connaissez approximativement la surface de la toiture ? »',
+          '« La toiture est-elle isolée actuellement ? »',
+          '« Est-ce que vous rencontrez des problèmes de chaleur en été ou de déperditions en hiver ? »',
+          '« La toiture a-t-elle déjà fait l’objet de travaux de rénovation ? »',
+        ],
+      },
+      {
+        titre: 'Étape 3 – Argumentaire',
+        dire: [
+          '« D’accord. L’idée serait de réaliser une étude de votre toiture pour vérifier son état, son isolation actuelle et les possibilités d’amélioration.',
+          'Une isolation performante permet de limiter les échanges thermiques entre l’intérieur et l’extérieur, de réduire les besoins en chauffage et en climatisation et d’améliorer le confort des occupants.',
+          'Le financement CEE peut permettre de réduire fortement, voire de couvrir la totalité du coût des travaux lorsque le dossier le permet.',
+          'Nous vérifions également que les travaux envisagés sont compatibles avec les contraintes techniques de votre toiture, notamment l’étanchéité et la structure existante. »',
+        ],
+      },
+      {
+        titre: 'Étape 4 – Conclusion',
+        dire: [
+          '« Je vous propose de faire intervenir un conseiller pour une première étude de faisabilité.',
+          'Il pourra notamment évaluer la surface, les caractéristiques de la toiture et le financement envisageable.',
+          'Vous êtes disponible plutôt en début ou en fin de semaine ? »',
+        ],
+      },
+    ],
   },
   {
     id: 'hp_flottante',
-    titre: 'Pompe à chaleur flottante',
-    cible: 'Sites avec bassin, plan d’eau, process industriel ou besoin de production de chaud et/ou de froid.',
-    question: 'Quelle est la taille du bassin ou du plan d’eau, et quel besoin de chaud ou de froid avez-vous ?',
-    cloture: 'Je vous propose un échange avec notre conseiller pour valider la faisabilité technique. Quel créneau ?',
-    presentation: [
-      'Si vous avez un bassin, un plan d’eau, une application industrielle ou un besoin de production de chaud et/ou de froid, la pompe à chaleur flottante peut être une solution intéressante.',
-      'Elle utilise la masse d’eau comme source d’énergie et peut remplacer ou compléter une installation énergivore.',
-      'Nous regardons d’abord votre besoin réel, la température requise, les contraintes techniques et le potentiel d’économies. Ensuite seulement, nous étudions le financement CEE possible.',
+    titre: 'HP flottante',
+    cible: 'Supermarchés, hypermarchés, plateformes frigorifiques, industries agroalimentaires, entrepôts réfrigérés.',
+    note: 'Approche plus technique : ne pas présenter la HP flottante comme un simple équipement de rénovation. On intervient sur la régulation du groupe froid, on ne le remplace pas.',
+    infos: 'Groupe froid, fluide, régulation existante, responsable technique.',
+    etapes: [
+      {
+        titre: 'Étape 1 – Accroche',
+        dire: [
+          '« Nous accompagnons les professionnels équipés d’installations frigorifiques sur l’optimisation énergétique de leurs groupes de production de froid.',
+          'Nous intervenons notamment sur la mise en place de systèmes de régulation en haute pression flottante.',
+          'C’est une solution qui permet d’adapter automatiquement la pression de condensation aux conditions extérieures, afin d’optimiser le fonctionnement du groupe frigorifique et de réduire sa consommation électrique.',
+          'Cette opération peut bénéficier du dispositif des CEE. »',
+        ],
+      },
+      {
+        titre: 'Étape 2 – Qualification technique',
+        dire: ['« Pour savoir si votre installation peut être concernée, j’aurais quelques questions : »'],
+        questions: [
+          '« Vous disposez de chambres froides ou de meubles frigorifiques ? »',
+          '« Vous avez un groupe de production de froid centralisé ? »',
+          '« Votre installation fonctionne au CO2, au R404A, au R134a ou avec un autre fluide frigorigène ? »',
+          '« Vous connaissez approximativement la puissance frigorifique de votre installation ? »',
+          '« Votre système dispose déjà d’une régulation de pression de condensation flottante ? »',
+        ],
+      },
+      {
+        titre: 'Étape 3 – Argumentaire',
+        dire: [
+          '« Ce qui est intéressant avec cette opération, c’est que l’on ne cherche pas nécessairement à remplacer votre groupe frigorifique.',
+          'On intervient sur sa régulation pour permettre au système d’adapter sa pression de condensation en fonction de la température extérieure.',
+          'Cela peut réduire le travail demandé aux compresseurs et aux équipements de refroidissement du condenseur, et donc diminuer la consommation électrique.',
+          'L’intérêt est particulièrement important pour les établissements qui fonctionnent avec des installations frigorifiques sur une grande partie de l’année.',
+          'Nous pouvons étudier l’éligibilité de votre installation au financement CEE et vérifier les économies potentielles. »',
+        ],
+      },
+      {
+        titre: 'Étape 4 – Conclusion',
+        dire: [
+          '« Dans votre cas, le plus pertinent serait de faire intervenir un technicien qui connaît les installations frigorifiques.',
+          'Il pourra vérifier votre régulation actuelle, les caractéristiques du groupe froid et déterminer si une opération de haute pression flottante est envisageable.',
+          'Est-ce que vous seriez disponible pour un premier échange technique ? »',
+        ],
+      },
     ],
   },
   {
     id: 'photovoltaique',
-    titre: 'Photovoltaïque',
-    cible: 'Pros avec toiture exploitable et consommation d’électricité en journée (jusqu’à 18 kWc).',
-    question: 'Quelle est votre consommation annuelle, et est-elle surtout en journée ? La toiture est-elle dégagée ?',
-    cloture: 'Notre conseiller fait une étude de toiture et de rentabilité, sans engagement. Mardi ou jeudi ?',
-    presentation: [
-      'Concernant le photovoltaïque, ce n’est pas financé par les CEE. En revanche, il peut s’autofinancer grâce à l’autoconsommation : vous produisez une partie de votre électricité, vous réduisez vos achats au réseau et vous maîtrisez mieux votre facture.',
-      'Nous étudions votre profil de consommation, vos heures de fonctionnement, la surface de toiture disponible et l’orientation du projet. L’objectif est de déterminer si l’installation est rentable et en combien de temps elle peut être amortie.',
-      'Ce n’est pas une dépense : c’est un investissement qui doit être rentable. Si les chiffres ne sont pas bons, nous vous le dirons clairement.',
-      'Le photovoltaïque en autoconsommation permet de réduire l’électricité achetée au réseau ; la rentabilité dépend notamment du profil de consommation, de la puissance installée, du tarif d’électricité et des éventuels revenus de revente.',
+    titre: 'Photovoltaïque (transfert de charge)',
+    cible: 'Entreprises industrielles, bâtiments logistiques, grandes surfaces, exploitations agricoles, forte consommation électrique.',
+    note: 'Argumentaire orienté rentabilité. On ne parle pas de financement CEE : on vend une optimisation des dépenses électriques par autoconsommation.',
+    infos: 'Surface disponible, consommation annuelle, profil de consommation, propriétaire.',
+    attention: 'Jamais de CEE sur le photovoltaïque. Préciser le montage proposé : investissement propre, tiers-investissement, location ou contrat d’achat d’électricité.',
+    etapes: [
+      {
+        titre: 'Étape 1 – Accroche',
+        dire: [
+          '« Nous accompagnons actuellement les entreprises qui souhaitent réduire leurs dépenses d’électricité grâce à l’installation de panneaux photovoltaïques.',
+          'Nous avons une approche particulière pour les professionnels : plutôt que de présenter le photovoltaïque comme un investissement classique, nous étudions une solution basée sur le transfert de charge énergétique.',
+          'L’objectif est de produire une partie de votre électricité directement sur votre bâtiment et de consommer cette énergie au moment où votre entreprise en a besoin.',
+          'Cela permet de substituer une partie de l’électricité achetée au réseau par une production solaire locale. »',
+        ],
+      },
+      {
+        titre: 'Étape 2 – Qualification',
+        dire: ['« Pour savoir si votre établissement présente un potentiel intéressant, j’aurais quelques questions : »'],
+        questions: [
+          '« Vous êtes propriétaire ou locataire du bâtiment ? »',
+          '« Vous disposez d’une toiture suffisamment importante ? »',
+          '« Vous connaissez votre consommation électrique annuelle ? »',
+          '« Votre activité fonctionne principalement en journée ? »',
+          '« Vous avez des équipements qui consomment beaucoup d’électricité : machines, chambres froides, climatisation, compresseurs, lignes de production ? »',
+          '« Vous avez déjà une installation photovoltaïque ? »',
+        ],
+      },
+      {
+        titre: 'Étape 3 – Explication du transfert de charge',
+        dire: [
+          '« Le principe est assez simple. Aujourd’hui, votre entreprise achète de l’électricité auprès de son fournisseur.',
+          'Avec une installation photovoltaïque, une partie de cette énergie est produite directement sur votre toiture. Lorsque vos équipements consomment cette électricité pendant les heures de production solaire, vous réduisez les volumes achetés au réseau.',
+          'On parle de transfert de charge parce qu’une partie de votre consommation électrique est couverte par une production locale plutôt que par votre fournisseur habituel.',
+          'L’objectif est donc de diminuer votre facture sans dépendre uniquement des évolutions du prix de l’électricité.',
+          'Selon le montage retenu, le projet peut être financé par un tiers investisseur ou par un autre mécanisme contractuel, ce qui permet de limiter ou d’éviter un investissement initial de votre entreprise.',
+          'Nous devons évidemment vérifier le coût du montage, le prix de l’énergie produite et les économies réellement attendues. »',
+        ],
+      },
+      {
+        titre: 'Étape 4 – Argumentaire financier',
+        dire: [
+          '« Ce qui nous intéresse particulièrement, c’est votre profil de consommation. Une entreprise qui consomme beaucoup d’électricité en journée peut avoir un potentiel d’autoconsommation intéressant.',
+          'Nous allons comparer votre facture électrique actuelle, votre consommation pendant les heures d’ensoleillement, la production photovoltaïque envisageable, la part d’énergie que vous pourrez autoconsommer, et le coût du montage avec les économies nettes attendues.',
+          'L’objectif est de vérifier si le projet permet réellement de réduire vos dépenses énergétiques. »',
+        ],
+      },
+      {
+        titre: 'Étape 5 – Conclusion',
+        dire: [
+          '« Je vous propose de réaliser une première étude de potentiel photovoltaïque.',
+          'Pour cela, notre conseiller aura simplement besoin de quelques informations sur votre bâtiment et votre consommation électrique.',
+          'Vous pourrez ainsi savoir si votre toiture présente un potentiel intéressant et si l’opération peut être autofinancée par les économies générées.',
+          'Est-ce que vous préférez que nous organisions un premier échange cette semaine ou la semaine prochaine ? »',
+        ],
+      },
     ],
-    attention: 'Jamais de CEE sur le PV : parler de rentabilité, d’autoconsommation et de transfert de charge.',
   },
 ]
+
+/* ------------------------------------------------------------------ Objections */
+
+export const OBJECTIONS: { objection: string; reponse: string[] }[] = [
+  { objection: 'Ça ne m’intéresse pas', reponse: [
+    '« Je comprends parfaitement. Simplement, je ne vous appelle pas pour vous vendre un équipement aujourd’hui.',
+    'Mon objectif est surtout de vérifier si votre entreprise peut bénéficier d’une optimisation énergétique financée en partie ou en totalité par un dispositif existant.',
+    'Si après étude il n’y a aucun intérêt économique pour vous, nous en resterons là.',
+    'Vous êtes d’accord pour que je vérifie simplement si votre bâtiment peut être concerné ? »',
+  ] },
+  { objection: 'Nous avons déjà fait des travaux', reponse: [
+    '« Très bien, c’est plutôt une bonne chose. Vous avez déjà réalisé quels types de travaux ? Le chauffage, l’isolation, le photovoltaïque ?',
+    'Je vous pose la question parce que certains équipements peuvent être complémentaires et qu’il peut rester des opportunités d’optimisation sur d’autres postes énergétiques. »',
+  ] },
+  { objection: 'Nous n’avons pas de budget', reponse: [
+    '« Justement, c’est une des raisons pour lesquelles je vous contacte.',
+    'Nous étudions des opérations qui peuvent bénéficier des CEE et, lorsque les conditions sont réunies, permettre une prise en charge intégrale des travaux.',
+    'L’objectif est justement de ne pas vous proposer un investissement qui pèserait sur votre trésorerie.',
+    'Le premier rendez-vous sert à vérifier si l’opération est économiquement intéressante. »',
+  ] },
+  { objection: 'Envoyez-moi une documentation', reponse: [
+    '« Bien entendu. Simplement, je préfère éviter de vous envoyer une documentation générale qui ne correspondrait pas à votre installation.',
+    'Vous êtes plutôt intéressé par une solution concernant votre chauffage, votre bâtiment ou votre consommation électrique ? Je pourrai ainsi vous adresser les informations pertinentes.',
+    'Et je vous propose de reprendre contact avec vous après réception pour voir si cela mérite une étude. »',
+  ] },
+  { objection: 'Je ne crois pas aux travaux financés à 100 %', reponse: [
+    '« Je comprends votre réaction, il y a effectivement beaucoup de démarchage sur les dispositifs d’aides.',
+    'Je préfère être transparent : nous ne promettons pas un financement avant d’avoir vérifié le dossier. Les CEE sont un dispositif réglementé, avec des conditions techniques et administratives.',
+    'Notre travail consiste à vérifier votre éligibilité, à chiffrer le financement réellement mobilisable et à vous présenter le coût restant éventuel avant tout engagement.',
+    'Vous gardez ainsi une vision claire de l’opération. »',
+  ] },
+  { objection: 'Nous sommes locataires', reponse: [
+    '« Aucun problème, cela dépend des travaux envisagés. En revanche, il faudra vérifier les conditions d’intervention et obtenir les autorisations nécessaires du propriétaire.',
+    'Est-ce que vous avez un contact direct avec le propriétaire ou le gestionnaire du bâtiment ? »',
+  ] },
+  { objection: 'Nous avons déjà un fournisseur / installateur', reponse: [
+    '« C’est très bien, nous ne cherchons pas nécessairement à remplacer vos partenaires habituels.',
+    'Nous pouvons simplement intervenir dans une logique d’étude complémentaire sur les dispositifs énergétiques et les financements disponibles.',
+    'Votre installateur actuel intervient-il également sur les dispositifs CEE ? »',
+  ] },
+  { objection: 'Je n’ai pas le temps', reponse: [
+    '« Je comprends, je vais donc être très rapide. Je cherche simplement à savoir si votre établissement pourrait être concerné par une opération d’optimisation énergétique.',
+    'Si c’est le cas, nous pouvons prévoir un échange de 15 à 20 minutes à un moment qui vous convient.',
+    'Vous préférez que je vous rappelle demain ou en fin de semaine ? »',
+  ] },
+  { objection: 'Ça ne coûte vraiment rien ?', reponse: [
+    '« Je préfère ne pas vous annoncer un coût nul sans avoir étudié votre situation. Le principe est de rechercher le financement CEE le plus adapté à votre opération.',
+    'Si la prime couvre effectivement l’intégralité du coût éligible, il peut ne pas y avoir de reste à charge sur les travaux concernés.',
+    'Dans le cas contraire, nous vous présentons clairement le montant restant avant toute décision. »',
+  ] },
+  { objection: 'Nous avons déjà des panneaux photovoltaïques', reponse: [
+    '« Très bien. Vous avez donc déjà engagé une démarche d’autonomie énergétique.',
+    'Votre installation couvre-t-elle une bonne partie de votre consommation ou avez-vous encore des achats importants d’électricité auprès de votre fournisseur ?',
+    'Nous pouvons éventuellement étudier l’optimisation de votre autoconsommation, sous réserve de la configuration existante. »',
+  ] },
+]
+
+/* ------------------------------------------------------------------ Rendez-vous */
+
+/** Informations à obtenir systématiquement avant de prendre un rendez-vous. */
+export const INFOS_AVANT_RDV: [string, string][] = [
+  ['Nom de l’entreprise', 'Identification'],
+  ['Activité', 'Vérifier le secteur'],
+  ['Adresse du site', 'Identifier le bâtiment'],
+  ['Nom du décideur', 'Identifier le bon interlocuteur'],
+  ['Téléphone direct', 'Faciliter le suivi'],
+  ['Adresse mail', 'Envoyer les informations'],
+  ['Propriétaire ou locataire', 'Vérifier les droits sur le bâtiment'],
+  ['Surface approximative', 'Première qualification'],
+  ['Énergie utilisée', 'Identifier les besoins'],
+  ['Installation existante', 'Vérifier la faisabilité'],
+  ['Intérêt exprimé', 'Évaluer la maturité'],
+  ['Disponibilités', 'Fixer le rendez-vous'],
+]
+
+export const CONFIRMATION_RDV: string[] = [
+  '« Parfait Monsieur/Madame [Nom].',
+  'Je vous confirme donc notre rendez-vous le [date] à [heure].',
+  'Nous allons prévoir un échange avec notre conseiller spécialisé concernant [produit].',
+  'L’objectif sera d’étudier votre installation actuelle, de vérifier les possibilités techniques et de déterminer le financement ou la rentabilité envisageable.',
+  'Pour préparer cet échange, si vous disposez de vos dernières factures énergétiques ou de quelques informations sur votre bâtiment, cela pourra être utile.',
+  'Je vous confirme également vos coordonnées : [coordonnées].',
+  'Merci pour votre disponibilité et excellente journée à vous. »',
+]
+
+export const SMS_CONFIRMATION = `Bonjour Monsieur/Madame [Nom],
+
+Suite à notre échange téléphonique, nous vous confirmons votre rendez-vous avec notre conseiller Reno Soluces :
+
+Date : [date]
+Heure : [heure]
+Adresse : [adresse]
+
+Objet : Étude de votre projet d’optimisation énergétique – [produit].
+
+Cet échange permettra d’étudier la faisabilité technique et les possibilités de financement de votre projet.
+
+Bien cordialement,
+L’équipe Reno Soluces`
+
+export const APRES_APPEL: string[] = [
+  'Dans la fiche prospect : résultat (rdv pris, à rappeler, pas intéressé, ne plus appeler, numéro erroné), nom et fonction du décideur, remplir le questionnaire pro.',
+  'Rdv pris : date, heure, conseiller, adresse du site et produit en jeu. Envoyer le SMS ou le mail de confirmation dans l’heure.',
+  'À rappeler : toujours une date et une heure précises, jamais « plus tard ».',
+  'Pas intéressé : noter la raison réelle (déjà équipé, pas propriétaire, pas de budget, mauvais moment).',
+]
+
+/* ------------------------------------------------------------------ Repères */
+
+export const REPERES_CEE: [string, string][] = [
+  ['PAC air/eau collective tertiaire', 'BAT-TH-163'],
+  ['Déstratificateur tertiaire', 'BAT-TH-142'],
+  ['Déstratificateur industriel', 'IND-BA-110'],
+  ['Haute pression flottante', 'BAT-TH-134'],
+  ['Isolation toiture plate', 'Vérifier la fiche applicable selon le bâtiment et les travaux'],
+]
+
+export const NOTES_REPERES: string[] = [
+  'Références issues du script source : à faire valider avec Idehome avant de les citer à un prospect.',
+  'La HP flottante (BAT-TH-134) concerne la régulation d’un groupe de production de froid.',
+  'Toiture plate : faire valider la référence exacte de la fiche et ses critères avant de lancer une campagne.',
+  'Photovoltaïque : le transfert de charge est un argument économique, pas une prime CEE.',
+]
+
+export const CAMPAGNES: [string, string, string][] = [
+  ['PAC air/eau', 'Réduction des dépenses de chauffage', 'Haute'],
+  ['Déstratificateur', 'Optimisation du chauffage des grands volumes', 'Très haute'],
+  ['Toiture plate', 'Réduction des déperditions thermiques', 'Haute'],
+  ['HP flottante', 'Réduction de la consommation des groupes froids', 'Très haute'],
+  ['Photovoltaïque', 'Réduction durable de la facture électrique', 'Très haute'],
+]
+
+export const CONSEIL_CAMPAGNES =
+  'Une campagne par produit, pas cinq produits dans le même appel. On identifie le potentiel du prospect et on propose la solution la plus pertinente. Exemple : un supermarché peut être concerné par la HP flottante, le photovoltaïque et la déstratification, mais on commence par son problème énergétique principal.'
