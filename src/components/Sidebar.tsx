@@ -2,7 +2,7 @@ import {
   LayoutDashboard, Users, Trophy, ClipboardCheck, Calculator,
   FolderOpen, Calendar, FileText, Settings, ChevronLeft,
   Package, FileSignature, History, Wallet, HardHat, Building2, BarChart3, ShieldCheck, BookOpen, Mail, PhoneCall, Receipt, Network, Sun, MapPinned,
-  Gauge, ChevronDown, Wrench, Landmark, Scale, KeyRound, BadgeCheck,
+  Gauge, ChevronDown, Wrench, Landmark, Scale, KeyRound, BadgeCheck, ScrollText,
 } from 'lucide-react'
 import type { PageKey } from '../types'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -39,6 +39,7 @@ const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
     { key: 'facturation', label: 'Facturation', icon: Receipt },
     { key: 'prospection', label: 'Prospection téléphone', icon: PhoneCall },
     { key: 'prospection_terrain', label: 'Prospection terrain', icon: MapPinned },
+    { key: 'script_call', label: 'Script Call', icon: ScrollText },
   ] },
   { id: 'chantiers', label: 'Chantiers', items: [
     { key: 'visites', label: 'Visites techniques', icon: ClipboardCheck },

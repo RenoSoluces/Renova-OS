@@ -8,7 +8,7 @@ export const PAGES_PAR_ROLE: Record<string, PageKey[]> = {
   // Confirme les rendez-vous et les ventes : ne voit ni prix, ni commissions, ni dossiers.
   confirmateur: ['confirmations', 'planning'],
   // Centre d'appels : listes d'appels, prospects qu'il traite, agenda.
-  teleconseiller: ['dashboard', 'prospection', 'prospects', 'planning', 'a_traiter'],
+  teleconseiller: ['dashboard', 'prospection', 'script_call', 'prospects', 'planning', 'a_traiter'],
   // Administratif : monte et suit les dossiers de l'entreprise ; pas de commissions ni de performance.
   adv: ['dashboard', 'prospects', 'dossiers', 'devis', 'documents', 'fiches_techniques', 'suivi_chantier', 'sav', 'planning', 'simulations', 'veille', 'facturation', 'a_traiter'],
 }
