@@ -110,8 +110,9 @@ export function ProspectionTelephonePage(): JSX.Element {
     if (error) { setError(error.message); setLeads([]); setLoading(false); return }
     // Les portes saisies sur le terrain sans numéro de téléphone n'ont pas leur place dans une liste d'appels.
     // Prospects envoyés depuis le CRM : dans la liste de la personne qui les appelle ; les responsables voient toutes les listes.
+    // Un professionnel sans numéro n'a pas sa place non plus : on ne peut pas l'appeler.
     const rows = data.filter(p => (p.liste_appels_le && (p.liste_appels_pour === profile?.id || peutConstituer))
-      || (SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || !/porte/i.test(p.source || ''))))
+      || (SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || (p.type_prospect !== 'professionnel' && !/porte/i.test(p.source || '')))))
 
     // Historique des appels de prospection, par paquets (une liste d'identifiants trop longue casse l'URL de la requête).
     const parProspect = new Map<string, { resultat: string; date: string; n: number }>()
