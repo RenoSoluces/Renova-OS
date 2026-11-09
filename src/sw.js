@@ -37,13 +37,17 @@ self.addEventListener('notificationclick', (event) => {
   const target = new URL(event.notification.data?.url || '/app/activite', self.location.origin)
   if (target.origin !== self.location.origin) return
   event.waitUntil((async () => {
-    const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
-    for (const client of windows) {
-      if ('focus' in client) {
-        await client.navigate(target.href)
-        return client.focus()
+    // Une fenêtre déjà ouverte est réutilisée : on lui donne le focus, puis on lui indique la page à afficher.
+    // Chaque étape est protégée : un navigate() refusé ne doit jamais empêcher l'ouverture de l'application.
+    try {
+      const windows = await self.clients.matchAll({ type: 'window', includeUncontrolled: true })
+      const fenetre = windows.find(c => 'focus' in c)
+      if (fenetre) {
+        await fenetre.focus()
+        fenetre.postMessage({ type: 'renova-ouvrir', url: target.pathname + target.search })
+        return
       }
-    }
-    return self.clients.openWindow(target.href)
+    } catch { /* on tente l'ouverture d'une nouvelle fenêtre */ }
+    await self.clients.openWindow(target.href)
   })())
 })

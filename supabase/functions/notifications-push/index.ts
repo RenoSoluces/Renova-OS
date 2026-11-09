@@ -55,7 +55,7 @@ Deno.serve(async (req: Request) => {
   try { corps = await req.json() } catch { /* vide */ }
 
   if (corps.mode === 'notification' && corps.notification_id) {
-    const { data: n } = await admin.from('notifications').select('id,type,titre,message,recipient_id').eq('id', corps.notification_id).maybeSingle()
+    const { data: n } = await admin.from('notifications').select('id,type,titre,message,recipient_id,prospect_id').eq('id', corps.notification_id).maybeSingle()
     if (!n?.recipient_id) return json({ envoyes: 0 })
     // Anti-rafale (imports de prospects), sauf pour les messages : chaque message d'une conversation doit arriver.
     const conversation = n.type === 'message_prospect'
@@ -64,7 +64,7 @@ Deno.serve(async (req: Request) => {
         .gte('envoye_le', new Date(Date.now() - 2 * 60 * 1000).toISOString()).limit(1)
       if (recent?.length) return json({ envoyes: 0, ignore: 'rafale' })
     }
-    const envoyes = await pousser(n.recipient_id, { title: n.titre || 'Renova OS', body: n.message || '', url: URL_PAR_TYPE[n.type] || '/app/a_traiter', tag: conversation ? `renova-message-${n.id}` : `renova-${n.type}` })
+    const envoyes = await pousser(n.recipient_id, { title: n.titre || 'Renova OS', body: n.message || '', url: conversation && n.prospect_id ? `/app/prospects?prospect=${n.prospect_id}` : (URL_PAR_TYPE[n.type] || '/app/a_traiter'), tag: conversation ? `renova-message-${n.id}` : `renova-${n.type}` })
     if (envoyes) await admin.from('push_journal').insert({ user_id: n.recipient_id, type: n.type })
     return json({ envoyes })
   }
