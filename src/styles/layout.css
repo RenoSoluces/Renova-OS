@@ -194,7 +194,9 @@
   .sidebar-nav{padding:8px 6px;gap:4px}
   .sidebar-item{width:52px;height:46px;padding:8px;border-radius:12px}
   .sidebar-item svg{width:19px;height:19px}
-  .sidebar-footer{display:none}
+  /* Sur téléphone, on garde le bouton Paramètres (réglages, notifications) mais pas le bloc utilisateur. */
+  .sidebar-footer{padding:8px 6px;display:flex;justify-content:center}
+  .sidebar-footer .sidebar-user{display:none}
   .topbar{height:auto;min-height:58px;padding:9px 10px;gap:7px;flex-wrap:nowrap}
   .topbar-title{font-size:15px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .topbar-sub{display:none}
