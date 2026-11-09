@@ -43,6 +43,7 @@ import { useAuth } from './lib/auth/AuthContext'
 import { LoginPage } from './pages/LoginPage'
 import { pageAutorisee, pageAccueil } from './lib/auth/accesParRole'
 import { LicenceBloquee } from './components/licence/LicenceBloquee'
+import { InvitationNotifications } from './components/InvitationNotifications'
 import { AcceptationConditions } from './components/licence/AcceptationConditions'
 import { DefinirMotDePassePage } from './pages/DefinirMotDePassePage'
 import { Loader2, AlertTriangle, RefreshCw } from 'lucide-react'
@@ -234,6 +235,7 @@ function AppContent() {
       <div className="app-content">
         <Topbar title={pageTitle.title} subtitle={pageTitle.subtitle} onNavigate={navigate} refreshKey={notifRefresh} />
         <div className="page-scroll">
+          <div style={{ padding: '12px 24px 0' }}><InvitationNotifications /></div>
           <Suspense fallback={<div className="page" style={{display:'flex',justifyContent:'center',padding:48}}><Loader2 className="spin" size={26} /></div>}>
           {page === 'dashboard' && <DashboardPage onNavigate={navigate} />}
           {(page === 'prospects' || page === 'pipeline') && <ProspectsPage key={page} initialView={page === 'pipeline' ? 'pipeline' : 'liste'} onContinueLifecycle={continuerCycleProspect} initialProspectId={pendingProspectId} onInitialProspectHandled={() => setPendingProspectId(null)} />}

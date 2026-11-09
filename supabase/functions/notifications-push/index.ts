@@ -5,7 +5,7 @@ import webpush from 'npm:web-push@3.6.7'
  * Notifications push Renova OS (appelée uniquement par la base, avec l'en-tête x-renova-cron).
  *
  * { mode: 'notification', notification_id } : envoie la notification aux appareils du destinataire
- *   (au plus une alerte du même type toutes les 2 minutes, pour éviter les rafales lors des imports).
+ *   (au plus une alerte du même type toutes les 2 minutes, pour éviter les rafales lors des imports ; pas de limite pour les messages).
  * { mode: 'horaire' } : chaque heure — relances des devis envoyés sans réponse à J+3 et J+7 ;
  *   à 7 h (heure de Paris), récapitulatif de la journée pour chaque commercial abonné.
  */
@@ -57,10 +57,14 @@ Deno.serve(async (req: Request) => {
   if (corps.mode === 'notification' && corps.notification_id) {
     const { data: n } = await admin.from('notifications').select('id,type,titre,message,recipient_id').eq('id', corps.notification_id).maybeSingle()
     if (!n?.recipient_id) return json({ envoyes: 0 })
-    const { data: recent } = await admin.from('push_journal').select('id').eq('user_id', n.recipient_id).eq('type', n.type)
-      .gte('envoye_le', new Date(Date.now() - 2 * 60 * 1000).toISOString()).limit(1)
-    if (recent?.length) return json({ envoyes: 0, ignore: 'rafale' })
-    const envoyes = await pousser(n.recipient_id, { title: n.titre || 'Renova OS', body: n.message || '', url: URL_PAR_TYPE[n.type] || '/app/a_traiter', tag: `renova-${n.type}` })
+    // Anti-rafale (imports de prospects), sauf pour les messages : chaque message d'une conversation doit arriver.
+    const conversation = n.type === 'message_prospect'
+    if (!conversation) {
+      const { data: recent } = await admin.from('push_journal').select('id').eq('user_id', n.recipient_id).eq('type', n.type)
+        .gte('envoye_le', new Date(Date.now() - 2 * 60 * 1000).toISOString()).limit(1)
+      if (recent?.length) return json({ envoyes: 0, ignore: 'rafale' })
+    }
+    const envoyes = await pousser(n.recipient_id, { title: n.titre || 'Renova OS', body: n.message || '', url: URL_PAR_TYPE[n.type] || '/app/a_traiter', tag: conversation ? `renova-message-${n.id}` : `renova-${n.type}` })
     if (envoyes) await admin.from('push_journal').insert({ user_id: n.recipient_id, type: n.type })
     return json({ envoyes })
   }
