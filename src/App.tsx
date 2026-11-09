@@ -132,6 +132,24 @@ function AppContent() {
     if (window.location.pathname !== nextPath) window.history.pushState({ page: p }, '', nextPath)
   }, [])
 
+  // Ouverture depuis une notification : /app/prospects?prospect=<id> (application fermée), ou message du service worker (application ouverte).
+  useEffect(() => {
+    const ouvrir = (href: string) => {
+      const url = new URL(href, window.location.origin)
+      const m = url.pathname.match(/^\/app\/([^/]+)\/?$/)
+      const cible = m?.[1] as PageKey | undefined
+      if (!cible || !Object.prototype.hasOwnProperty.call(PAGE_TITLES, cible)) return
+      const prospectId = url.searchParams.get('prospect')
+      if (prospectId && cible === 'prospects') setPendingProspectId(prospectId)
+      setPage(cible)
+      window.history.replaceState({ page: cible }, '', `/app/${cible}`)
+    }
+    if (new URLSearchParams(window.location.search).get('prospect')) ouvrir(window.location.href)
+    const surMessage = (e: MessageEvent) => { if (e.data?.type === 'renova-ouvrir' && typeof e.data.url === 'string') ouvrir(e.data.url) }
+    navigator.serviceWorker?.addEventListener('message', surMessage)
+    return () => navigator.serviceWorker?.removeEventListener('message', surMessage)
+  }, [])
+
   // Keep browser back/forward and direct URLs synchronized with the visible page.
   useEffect(() => {
     const syncPageFromUrl = () => {
