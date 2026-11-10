@@ -73,7 +73,7 @@ const SOURCES = [
 
 const LIFECYCLE_STEPS = [
   { num: 1, title: 'Prospect', sub: 'Créé' },
-  { num: 2, title: 'Visite technique', sub: 'Audit énergétique' },
+  { num: 2, title: 'Visite technique', sub: 'Facultative · audit énergétique' },
   { num: 3, title: 'Simulation', sub: 'Calcul 3CL + aides' },
   { num: 4, title: 'Proposition', sub: 'Devis & contrat' },
   { num: 5, title: 'Dossier', sub: 'Suivi travaux' },
@@ -662,15 +662,21 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   // ===== DETAIL VIEW =====
   if (selected) {
     const e = extended(selected)
-    const currentStep = statutToStep(e.statut || 'Nouveau')
+    // La visite technique est facultative : un devis (ou un dossier) déjà créé fait avancer le cycle même sans visite.
+    const currentStep = Math.max(
+      statutToStep(e.statut || 'Nouveau'),
+      linkedCounts?.dossiers ? 5 : 0,
+      linkedCounts?.devis ? 4 : 0,
+    )
     const ceeCount = (e.fiches_cee || []).length
     const catLabel = e.categorie_mpr ? (
       { TresModeste: 'Très modeste', Modeste: 'Modeste', Intermediaire: 'Intermédiaire', Aisee: 'Aisée' } as Record<string, string>
     )[e.categorie_mpr] || e.categorie_mpr : null
 
     // Cible de la prochaine étape du cycle de vie (Visite technique -> Simulation -> Devis -> Dossier).
+    // Visite technique facultative : sans visite déjà planifiée, la suite logique est le devis.
     const nextActionTarget: 'visite' | 'simulation' | 'devis' | 'dossier' | null =
-      currentStep <= 2 ? 'visite' : currentStep === 3 ? 'devis' : currentStep === 4 ? 'dossier' : null
+      currentStep === 2 ? 'visite' : currentStep <= 1 ? 'devis' : currentStep === 3 ? 'devis' : currentStep === 4 ? 'dossier' : null
 
     function goToNextAction() {
       if (!nextActionTarget) return
@@ -745,14 +751,19 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             <div className="action-rec-banner">
               <span className="action-rec-badge">ACTION RECOMMANDÉE</span>
               <span className="action-rec-text">
-                {currentStep === 1 && 'Planifier une visite technique pour démarrer l\'audit énergétique.'}
-                {currentStep === 2 && 'Saisir les résultats de la visite et lancer la simulation 3CL.'}
+                {currentStep === 1 && 'Préparer le devis. La visite technique est facultative : planifiez-la seulement si le dossier l\'exige.'}
+                {currentStep === 2 && 'Saisir les résultats de la visite, ou passer directement au devis.'}
                 {currentStep === 3 && 'Générer une proposition commerciale avec le détail des aides.'}
                 {currentStep === 4 && 'Finaliser le dossier et planiser le démarrage des travaux.'}
               </span>
               <span className="action-rec-cta" onClick={goToNextAction} role="button" tabIndex={0} style={{ cursor: 'pointer' }}>
-                Continuer <ArrowRight size={14} />
+                {currentStep === 2 ? 'Saisir la visite' : currentStep <= 1 ? 'Créer le devis' : 'Continuer'} <ArrowRight size={14} />
               </span>
+              {currentStep <= 2 && (
+                <span className="action-rec-cta" onClick={() => onContinueLifecycle?.(currentStep === 2 ? 'devis' : 'visite', selected)} role="button" tabIndex={0} style={{ cursor: 'pointer', opacity: .85, marginLeft: 14 }}>
+                  {currentStep === 2 ? 'Passer directement au devis' : 'Planifier une visite (facultatif)'} <ArrowRight size={14} />
+                </span>
+              )}
             </div>
           )}
 
