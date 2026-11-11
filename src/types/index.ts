@@ -515,6 +515,8 @@ export interface Installateur {
 export interface Produit {
   id: string
   entreprise_id: string
+  /** Libellé réservé à l'équipe interne (ex. « Idehome »), jamais montré aux clients. */
+  libelle_interne?: string | null
   categorie: string
   nom: string
   marque: string

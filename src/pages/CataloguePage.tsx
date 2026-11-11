@@ -89,6 +89,7 @@ interface FormState {
   nom: string
   marque: string
   reference: string
+  libelle_interne: string
   description: string
   caracteristiques: CaracLigne[]
   prix_unitaire_ht: string
@@ -198,7 +199,7 @@ function auditerCommercialement(p: Produit): string[] {
 
 function emptyForm(): FormState {
   return {
-    categorie: 'rampants', catalogue_groupe: 'particulier', public_cible: 'particulier', nom: '', marque: '', reference: '', description: '',
+    categorie: 'rampants', catalogue_groupe: 'particulier', public_cible: 'particulier', nom: '', marque: '', reference: '', libelle_interne: '', description: '',
     caracteristiques: [{ cle: '', valeur: '' }],
     prix_unitaire_ht: '', unite: 'unite', tva_taux: 5.5,
     eligible_mpr: false, eligible_cee: false, fiche_cee: '', actif: true,
@@ -222,6 +223,7 @@ export function CataloguePage() {
   const [filtreMarque, setFiltreMarque] = useState<string>('toutes')
   const [filtreVtPublic, setFiltreVtPublic] = useState<'tous' | 'particulier' | 'professionnel'>('particulier')
   const [recherche, setRecherche] = useState('')
+  const [filtreLibelle, setFiltreLibelle] = useState<string>('')
   const [groupement, setGroupement] = useState<'categorie' | 'fournisseur'>('categorie')
   const [modalOpen, setModalOpen] = useState(false)
   const [editing, setEditing] = useState<Produit | null>(null)
@@ -242,7 +244,7 @@ export function CataloguePage() {
     for (let from = 0; ; from += pageSize) {
       const { data, error } = await supabase
         .from('catalogue_produits')
-        .select('id,entreprise_id,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht,prix_conseille_ht,prix_plancher_ht,consommables_detail')
+        .select('id,entreprise_id,libelle_interne,categorie,nom,marque,reference,description,caracteristiques,prix_unitaire_ht,unite,tva_taux,eligible_mpr,eligible_cee,fiche_cee,actif,created_at,zones_prix,forfait_pose_ht,forfait_evacuation_ht,public_cible,catalogue_groupe,forfait_consommables_ht,prix_conseille_ht,prix_plancher_ht,consommables_detail')
         // Le produit générique « Isolation » est remplacé par les produits détaillés.
         .neq('nom', 'Isolation')
         .order('categorie', { ascending: true })
@@ -339,7 +341,7 @@ export function CataloguePage() {
     setEditing(p)
     const carac = Object.entries(p.caracteristiques || {}).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
     setForm({
-      categorie: p.categorie, catalogue_groupe: (p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) as GroupeCatalogue, public_cible: p.public_cible || 'particulier', nom: p.nom, marque: p.marque, reference: p.reference,
+      categorie: p.categorie, catalogue_groupe: (p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) as GroupeCatalogue, public_cible: p.public_cible || 'particulier', nom: p.nom, marque: p.marque, reference: p.reference, libelle_interne: p.libelle_interne || '',
       description: nettoyerDescriptionProduit(p.description),
       caracteristiques: carac.length ? carac : [{ cle: '', valeur: '' }],
       prix_unitaire_ht: prixARenseigner(p) ? '' : String(p.prix_unitaire_ht),
@@ -360,7 +362,7 @@ export function CataloguePage() {
     setEditing(null)
     const carac = Object.entries(p.caracteristiques || {}).map(([cle, valeur]) => ({ cle, valeur: String(valeur) }))
     setForm({
-      categorie: p.categorie, catalogue_groupe: (p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) as GroupeCatalogue, public_cible: p.public_cible || 'particulier', nom: `${p.nom} (copie)`, marque: p.marque, reference: '',
+      categorie: p.categorie, catalogue_groupe: (p.catalogue_groupe || (p.public_cible === 'professionnel' ? 'professionnel' : 'particulier')) as GroupeCatalogue, public_cible: p.public_cible || 'particulier', nom: `${p.nom} (copie)`, marque: p.marque, reference: '', libelle_interne: p.libelle_interne || '',
       description: nettoyerDescriptionProduit(p.description),
       caracteristiques: carac.length ? carac : [{ cle: '', valeur: '' }],
       prix_unitaire_ht: prixARenseigner(p) ? '' : String(p.prix_unitaire_ht),
@@ -427,6 +429,7 @@ export function CataloguePage() {
       nom: form.nom,
       marque: form.marque,
       reference: form.reference,
+      libelle_interne: form.libelle_interne.trim() || null,
       description: nettoyerDescriptionProduit(form.description),
       caracteristiques,
       prix_unitaire_ht: parseFloat(form.prix_unitaire_ht) || 0,
@@ -473,16 +476,19 @@ export function CataloguePage() {
   const euro = (n: number) =>
     new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 2 }).format(n)
 
+  const libellesInternes = [...new Set(rows.map(r => (r.libelle_interne || '').trim()).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'))
+
   const filtered = rows
     .filter(r => { const g = r.catalogue_groupe || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier'); return g === filtrePublic })
     .filter(r => filtrePublic !== 'visite_technique' || filtreVtPublic === 'tous' || (r.public_cible === 'professionnel' ? 'professionnel' : 'particulier') === filtreVtPublic)
     .filter(r => filtreCategorie === 'toutes' ? true : r.categorie === filtreCategorie)
     .filter(r => !CATEGORIES_FILTRE_MARQUE.includes(filtreCategorie) || filtreMarque === 'toutes' || (r.marque || '').trim() === filtreMarque)
+    .filter(r => !filtreLibelle || (r.libelle_interne || '').trim() === filtreLibelle)
     .filter(r => filtreAudit === 'aucun' || (filtreAudit === 'conformite' ? auditerProduit(r).length > 0 : auditerCommercialement(r).length > 0))
     .filter(r => {
       if (!recherche.trim()) return true
       const q = recherche.trim().toLowerCase()
-      return [r.nom, r.marque, r.reference].some(v => (v || '').toLowerCase().includes(q))
+      return [r.nom, r.marque, r.reference, isAdmin ? r.libelle_interne : ''].some(v => (v || '').toLowerCase().includes(q))
     })
 
   // Regroupement par fournisseur/marque : permet de visualiser les gammes proposées
@@ -648,6 +654,11 @@ export function CataloguePage() {
           <Search size={15} style={{ position: 'absolute', left: 11, top: 12, color: 'var(--rv-mute)' }} />
           <input className="search" style={{ paddingLeft: 32, width: '100%' }} placeholder="Rechercher un produit, une marque, une référence…" value={recherche} onChange={e => setRecherche(e.target.value)} />
         </span>
+        {isAdmin && libellesInternes.map(l => (
+          <button key={l} className="chip" aria-pressed={filtreLibelle === l} onClick={() => setFiltreLibelle(v => v === l ? '' : l)} title="Libellé interne Reno Soluces : retrouvez rapidement ces produits">
+            {l}<small>{rows.filter(r => (r.libelle_interne || '').trim() === l).length}</small>
+          </button>
+        ))}
         <button className="chip" aria-pressed={filtreAudit === 'conformite'} onClick={() => setFiltreAudit(v => v === 'conformite' ? 'aucun' : 'conformite')} title="Filtrer les anomalies techniques et réglementaires, sans tenir compte des prix ni des forfaits de pose">
           <ShieldCheck size={13} style={{ verticalAlign: -2, marginRight: 5 }} />À auditer — conformité<small>{rows.filter(r => auditerProduit(r).length > 0).length}</small>
         </button>
@@ -707,7 +718,7 @@ export function CataloguePage() {
                       return (
                         <tr key={p.id} className={`row ${p.actif ? '' : 'off'}`}>
                           <td>
-                            <div className="pn">{p.nom}
+                            <div className="pn">{p.nom}{isAdmin && p.libelle_interne ? <span className="pill" style={{ marginLeft: 8, fontSize: 10 }} title="Libellé interne Reno Soluces">{p.libelle_interne}</span> : null}
                               <small>{[p.marque, p.reference].filter(Boolean).join(' · ') || '—'}{p.zones_prix && p.zones_prix.length > 0 ? ` · ${p.zones_prix.length} zone${p.zones_prix.length > 1 ? 's' : ''} tarifaire${p.zones_prix.length > 1 ? 's' : ''}` : ''}</small>
                             </div>
                           </td>
@@ -822,6 +833,14 @@ export function CataloguePage() {
               <input style={mauvaisChamp('reference') ? { borderColor: '#dc2626', background: '#fef2f2' } : undefined} value={form.reference} onChange={e => setForm(f => ({ ...f, reference: e.target.value }))} placeholder="ex: ETSX16P50D" />
             </label>
           </div>
+
+          {isAdmin && (
+            <label className="field">
+              <span>Libellé interne Reno Soluces (facultatif)</span>
+              <input list="libelles-internes" value={form.libelle_interne} onChange={e => setForm(f => ({ ...f, libelle_interne: e.target.value }))} placeholder="ex: Idehome — pour retrouver vite ces produits ; jamais visible des clients" />
+              <datalist id="libelles-internes">{libellesInternes.map(l => <option key={l} value={l} />)}</datalist>
+            </label>
+          )}
 
           <label className="field">
             <span>Description</span>
