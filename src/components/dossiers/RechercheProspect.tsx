@@ -17,10 +17,12 @@ export function RechercheProspect({
   prospects,
   value,
   onChange,
+  label = 'Prospect / client',
 }: {
   prospects: Prospect[]
   value: string
   onChange: (id: string) => void
+  label?: string
 }) {
   const [recherche, setRecherche] = useState('')
 
@@ -57,7 +59,7 @@ export function RechercheProspect({
     return (
       <div className="flex items-center justify-between gap-3 rounded-xl border border-[var(--c-border)] px-4 py-3">
         <div className="min-w-0">
-          <div className="text-xs uppercase tracking-wide text-muted">Prospect / client</div>
+          <div className="text-xs uppercase tracking-wide text-muted">{label}</div>
           <div className="truncate font-medium">{libelle(choisi)}</div>
           <div className="truncate text-sm text-muted">
             {[choisi.code_postal, choisi.ville].filter(Boolean).join(' ')}
