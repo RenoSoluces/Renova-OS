@@ -234,6 +234,7 @@ export function CataloguePage() {
   const [tarifOpen, setTarifOpen] = useState(false)
   const [importOpen, setImportOpen] = useState(false)
   const [prixAchat, setPrixAchat] = useState<Map<string, number>>(new Map())
+  const [erreurChargement, setErreurChargement] = useState<string | null>(null)
   const [regles, setRegles] = useState<Record<string, RegleTarifaire>>({})
   const estAdministrateur = profile?.role === 'admin'
 
@@ -251,10 +252,12 @@ export function CataloguePage() {
         .order('nom', { ascending: true })
         .range(from, from + pageSize - 1)
       if (error) {
-        setRows([])
+        // Ne jamais présenter une erreur de lecture comme un catalogue vide.
+        setErreurChargement(error.message)
         setLoading(false)
         return
       }
+      setErreurChargement(null)
       const batch = (data || []) as Produit[]
       all.push(...batch)
       if (batch.length < pageSize) break
@@ -674,6 +677,13 @@ export function CataloguePage() {
 
       {loading ? (
         <div className="card"><div className="card-pad text-muted">Chargement…</div></div>
+      ) : erreurChargement ? (
+        <div className="card">
+          <div className="card-pad" style={{ color: '#b91c1c', background: '#fef2f2' }}>
+            <b>Le catalogue n’a pas pu être chargé.</b> Vos produits ne sont pas supprimés : la lecture a échoué ({erreurChargement}).
+            <div style={{ marginTop: 10 }}><Button variant="ghost" onClick={() => { setLoading(true); void fetchProduits() }}>Réessayer</Button></div>
+          </div>
+        </div>
       ) : filtered.length === 0 ? (
         <div className="card">
           <div className="empty-state">
