@@ -24,7 +24,7 @@ type NavGroup = { id: string; label: string; items: NavItem[]; collapsible?: boo
 
 // Organisation par usage : les rubriques du quotidien sont toujours visibles,
 // la gestion (catalogue, réglages, historique…) est repliée par défaut.
-const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
+const NAV_GROUPS: (prospectCount?: number, veilleCount?: number) => NavGroup[] = (prospectCount, veilleCount) => [
   { id: 'aujourdhui', label: 'Aujourd’hui', items: [
     { key: 'dashboard', label: 'Tableau de bord', icon: LayoutDashboard },
     { key: 'a_traiter', label: 'Ma journée', icon: ClipboardCheck },
@@ -48,7 +48,7 @@ const NAV_GROUPS: (prospectCount?: number) => NavGroup[] = (prospectCount) => [
     { key: 'simulations', label: 'Simulation des aides', icon: Calculator },
     { key: 'solaire', label: 'Simulateur solaire', icon: Sun },
     { key: 'resultats_3cl', label: 'Résultats 3CL', icon: Calculator },
-    { key: 'veille', label: 'Veille réglementaire', icon: Scale },
+    { key: 'veille', label: 'Veille réglementaire', icon: Scale, badge: veilleCount },
   ] },
   { id: 'equipe', label: 'Équipe et performance', items: [
     { key: 'commissions', label: 'Commissions', icon: Wallet },
@@ -81,6 +81,7 @@ const NAV_APPORTEUR: NavGroup[] = [
 export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, tasksBadge, prospectsBadge }: SidebarProps) {
   const { profile } = useAuth()
   const [prospectCount, setProspectCount] = useState(prospectsBadge ?? 0)
+  const [veilleCount, setVeilleCount] = useState(0)
   const [hasDirectReports, setHasDirectReports] = useState(false)
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>(() => {
     try { return JSON.parse(localStorage.getItem('renova.sidebar.groups') || '{}') } catch { return {} }
@@ -109,6 +110,12 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
     supabase.from('prospects').select('id', { count: 'exact', head: true }).then(({ count }) => {
       if (!cancelled) setProspectCount(count || 0)
     })
+    // Textes de veille réglementaire en attente de relecture (visibles seulement par les responsables).
+    if (['admin', 'manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')) {
+      supabase.from('veille_reglementaire').select('id', { count: 'exact', head: true }).eq('statut', 'a_relire').then(({ count }) => {
+        if (!cancelled) setVeilleCount(count || 0)
+      })
+    }
     if (profile?.id) {
       supabase.from('profiles').select('id').eq('manager_id', profile.id).limit(1).then(({ data }) => {
         if (!cancelled) setHasDirectReports(Boolean(data?.length))
@@ -144,7 +151,7 @@ export function Sidebar({ current, onNavigate, collapsed, onToggleCollapse, task
       </button>
 
       <nav className="sidebar-nav">
-        {(profile?.role === 'apporteur' ? NAV_APPORTEUR : NAV_GROUPS(prospectCount)).map(group => {
+        {(profile?.role === 'apporteur' ? NAV_APPORTEUR : NAV_GROUPS(prospectCount, veilleCount)).map(group => {
           const items = group.items.filter(canSee)
           if (!items.length) return null
           const containsCurrent = items.some(item => item.key === current)
