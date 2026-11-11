@@ -2,7 +2,7 @@ import { zoneClimatiqueDepuisCodePostal } from '../3cl/database/departementsZone
 
 /**
  * Prime CEE isolation des combles perdus (BAR-EN-101), en € par m² isolé.
- * Grille communiquée par Reno Soluces le 11/11/2026 : elle dépend de la zone
+ * Grille communiquée par Reno Soluces le 11/11/2026 (montants à majorer de 5,5 %) : elle dépend de la zone
  * climatique (H1, H2, H3) et du profil de revenus (Bleu ou autres profils).
  */
 export type ZoneCee = 'H1' | 'H2' | 'H3'
@@ -22,7 +22,15 @@ export function zoneCee(zoneSaisie: string | null | undefined, codePostal: strin
   return deduite === 'H1' || deduite === 'H2' || deduite === 'H3' ? deduite : null
 }
 
+/** Les montants de la grille s'entendent hors majoration : la prime versée en ajoute 5,5 %. */
+export const MAJORATION_PRIME_COMBLES_PERDUS = 1.055
+
+/** Taux en €/m², majoration de 5,5 % comprise (non arrondi : arrondir le montant final). */
 export function tauxPrimeComblesPerdus(zone: ZoneCee, profilBleu: boolean): number {
   const grille = PRIME_COMBLES_PERDUS_EUR_M2[zone]
-  return profilBleu ? grille.bleu : grille.autres
+  return (profilBleu ? grille.bleu : grille.autres) * MAJORATION_PRIME_COMBLES_PERDUS
+}
+
+export function montantPrimeComblesPerdus(zone: ZoneCee, profilBleu: boolean, surfaceM2: number): number {
+  return Math.round(Math.max(0, surfaceM2) * tauxPrimeComblesPerdus(zone, profilBleu) * 100) / 100
 }
