@@ -24,6 +24,7 @@ import type { Dossier, Prospect, Devis, Document as DocumentPiece, DossierFactur
 import { Modal } from '../components/ui/Modal'
 import { SuiviMprDossier } from '../components/dossiers/SuiviMprDossier'
 import { ImportExportAnah } from '../components/dossiers/ImportExportAnah'
+import { RechercheProspect } from '../components/dossiers/RechercheProspect'
 import { PiecesInstallateurDossier } from '../components/dossiers/PiecesInstallateurDossier'
 import { actionRequise } from '../lib/mpr/suiviAnah'
 import { Button } from '../components/ui/Button'
@@ -1455,16 +1456,10 @@ export function DossiersPage({
         }
       >
         <div className="flex flex-col gap-4">
-          <FloatSelect
-            label="Prospect / client"
+          <RechercheProspect
+            prospects={prospects}
             value={newProspectId}
             onChange={setNewProspectId}
-            options={prospects.map(p => ({
-              value: p.id,
-              label: `${p.prenom} ${p.nom} — ${
-                p.ville || ''
-              }`,
-            }))}
           />
 
           {newProspectId && (

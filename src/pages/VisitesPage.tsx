@@ -22,6 +22,7 @@ import {
   Droplets,
   Fan,
 } from 'lucide-react'
+import { RechercheProspect } from '../components/dossiers/RechercheProspect'
 import { supabase } from '../lib/supabase'
 import { lireTout } from '../lib/lireTout'
 import { useAuth } from '../lib/auth/AuthContext'
@@ -1573,17 +1574,7 @@ export function VisitesPage({
           }
         >
           <div className="flex flex-col gap-4">
-            <FloatSelect
-              label="Prospect"
-              value={newProspectId}
-              onChange={setNewProspectId}
-              options={prospects.map(p => ({
-                value: p.id,
-                label: `${p.prenom} ${p.nom} — ${
-                  p.ville || ''
-                }`,
-              }))}
-            />
+            <RechercheProspect label="Prospect" prospects={prospects} value={newProspectId} onChange={setNewProspectId} />
 
             <FloatInput
               label="Date de la visite"

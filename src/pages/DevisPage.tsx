@@ -2,6 +2,7 @@ import { Fragment, useEffect, useMemo, useState } from 'react'
 import {
   Plus, FileSignature, ArrowLeft, Trash2, Send, Save, Download, PenTool, CheckCircle2, Lock, FilePlus, Sparkles, ImagePlus,
 } from 'lucide-react'
+import { RechercheProspect } from '../components/dossiers/RechercheProspect'
 import { supabase } from '../lib/supabase'
 import { lireTout } from '../lib/lireTout'
 import { setProspectStatus } from '../lib/crm/workflow'
@@ -1187,12 +1188,7 @@ export function DevisPage({
           }
         >
           {creationError && <div className="card card-pad text-sm" style={{ color: '#b91c1c', background: '#fef2f2', marginBottom: 12 }}>{creationError}</div>}
-          <FloatSelect
-            label="Client"
-            value={newProspectId}
-            onChange={setNewProspectId}
-            options={prospects.map(p => ({ value: p.id, label: `${p.prenom} ${p.nom} — ${p.ville || ''}` }))}
-          />
+          <RechercheProspect label="Client" prospects={prospects} value={newProspectId} onChange={setNewProspectId} />
           <div className="mt-4">
             <FloatSelect
               label="Émetteur du devis"
