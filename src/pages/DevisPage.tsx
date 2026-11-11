@@ -25,6 +25,7 @@ const PREFIXES_ASSOCIES = ['Pose', 'Dépose et évacuation', 'Évacuation des d�
 const estLigneAssociee = (designation: string, produit: string) =>
   PREFIXES_ASSOCIES.some(prefixe => designation === `${prefixe} — ${produit}`)
 import { estimerPrimeCEE } from '../lib/aides/calculAidesCEE'
+import { tauxPrimeComblesPerdus, zoneCee } from '../lib/cee/primeComblesPerdus'
 import { telechargerDevisPDF, devisPDFFichier } from '../lib/pdf/genererDevisPDF'
 import { BoutonEspaceClient } from '../components/partage/BoutonEspaceClient'
 import { BoutonRelance } from '../components/partage/BoutonRelance'
@@ -593,13 +594,14 @@ export function DevisPage({
       if (nom.includes('pose') || nom.includes('déchet') || nom.includes('évacuation')) return total
       return total + Math.max(0, Number(ligne.quantite) || 0)
     }, 0)
-    const tauxCEE = profilMPR === 'bleu' ? 13 : 10
+    const zoneChantier = zoneCee(conf.logement.zone, current.prospect?.code_postal)
+    const tauxCEE = zoneChantier ? tauxPrimeComblesPerdus(zoneChantier, profilMPR === 'bleu') : 0
     const montantCEE = surface > 0 ? Math.round(surface * tauxCEE * 100) / 100 : 0
     setAides(previous => {
       const existing = previous.find(a => a.devis_id === current.id && (a.details as any)?.calculType === 'cee_combles_perdus_surface')
       const autres = previous.filter(a => !(a.devis_id === current.id && (a.details as any)?.calculType === 'cee_combles_perdus_surface'))
       if (!surface || !profilMPR || montantCEE <= 0) return autres
-      const next: DevisAide = { id: existing?.id || `tmp_${current.id}_cee_combles_perdus`, devis_id: current.id, type: 'cee', libelle: `Prime CEE combles perdus — ${surface} m² × ${tauxCEE} €/m²`, montant: montantCEE, details: { calculType: 'cee_combles_perdus_surface', gesteId: 'isolation_combles_perdus', surface_m2: surface, taux_eur_m2: tauxCEE, fiche: 'BAR-EN-101', estimation: false }, created_at: existing?.created_at || new Date().toISOString() }
+      const next: DevisAide = { id: existing?.id || `tmp_${current.id}_cee_combles_perdus`, devis_id: current.id, type: 'cee', libelle: `Prime CEE combles perdus — ${surface} m² × ${tauxCEE.toFixed(2).replace('.', ',')} €/m² (zone ${zoneChantier}, profil ${profilMPR === 'bleu' ? 'Bleu' : 'autres'})`, montant: montantCEE, details: { calculType: 'cee_combles_perdus_surface', gesteId: 'isolation_combles_perdus', surface_m2: surface, taux_eur_m2: tauxCEE, zone: zoneChantier, fiche: 'BAR-EN-101', estimation: false }, created_at: existing?.created_at || new Date().toISOString() }
       return [...autres, next]
     })
     // Le nettoyage de l'aide MPR existante doit toujours s'exécuter (même si la surface retombe à 0).
@@ -611,7 +613,7 @@ export function DevisPage({
       const next: DevisAide = { id: existing?.id || `tmp_${current.id}_mpr_combles_perdus`, devis_id: current.id, type: 'maprimerenov', libelle: `MaPrimeRénov’ combles perdus — ${surface} m² × ${tauxMPR} €/m²`, montant: Math.round(surface * tauxMPR * 100) / 100, details: { calculType: 'mpr_combles_perdus_surface', gesteId: 'isolation_combles_perdus', profil: profilMPR, surface_m2: surface, taux_eur_m2: tauxMPR }, created_at: existing?.created_at || new Date().toISOString() }
       return [...autres, next]
     })
-  }, [current?.id, lignes, produits, profilMPR])
+  }, [current?.id, current?.prospect?.code_postal, conf.logement.zone, lignes, produits, profilMPR])
 
   function ajouterProduit(produit: Produit, quantite = 1) {
     const prixApplicable = prixProduitPourZone(produit, current?.prospect?.code_postal)
@@ -1502,7 +1504,7 @@ export function DevisPage({
               </div>
             )}
             <p className="note" style={{ margin: '12px 0 0' }}>
-              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — prime CEE BAR-EN-101 : Bleu 13 €/m², autres profils 10 €/m², calculée sur la quantité (m²) des lignes d’isolant R ≥ 7. MaPrimeRénov’ par geste ne finance plus l’isolation depuis le 01/09/2026 : elle ne reste possible qu’en rénovation d’ampleur (bouton « + Anah »).' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
+              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — prime CEE BAR-EN-101 par zone : H1 Bleu 19,34 €/m², autres 13,26 ; H2 Bleu 16,80, autres 10,92 ; H3 Bleu 10,80, autres 7,02. Calculée sur la quantité (m²) des lignes d’isolant R ≥ 7, selon la zone du devis ou, à défaut, le code postal. MaPrimeRénov’ par geste ne finance plus l’isolation depuis le 01/09/2026 : elle ne reste possible qu’en rénovation d’ampleur (bouton « + Anah »).' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
             </p>
           </section>
 
