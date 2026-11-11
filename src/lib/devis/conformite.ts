@@ -694,7 +694,9 @@ export function controlerDevis(ctx: ContexteConformite): PointConformite[] {
 
   // Mentions légales
   if (!rempli(ctx.devis.dateValidite)) add('Mentions', 'bloc', 'Date de validité du devis à renseigner (conditions de vente)')
-  if (!rempli(meta.dates.debut) || !rempli(meta.dates.duree)) add('Mentions', 'bloc', 'Date de début et durée des travaux à renseigner', { champ: 'dates.debut' })
+  // Deux points distincts : chacun désigne le champ réellement vide.
+  if (!rempli(meta.dates.debut)) add('Mentions', 'bloc', 'Date de début des travaux à renseigner', { champ: 'dates.debut' })
+  if (!rempli(meta.dates.duree)) add('Mentions', 'bloc', 'Durée estimée des travaux à renseigner (ex. 1 journée)', { champ: 'dates.duree' })
   if (lignes.length === 0) add('Mentions', 'bloc', 'Aucune ligne sur le devis')
 
   return out

@@ -55,7 +55,12 @@ function metaInitiale(prospect: any): ConformiteMeta {
   let pro = META_PAR_DEFAUT.pro
   try {
     const brut = localStorage.getItem(CLE_PRO_LOCAL)
-    if (brut) pro = { ...pro, ...JSON.parse(brut), couvre: {} }
+    if (brut) {
+      // Les fiches déjà confirmées pour cette qualification sont reprises : la confirmation
+      // se fait une fois par numéro de qualification, pas à chaque devis.
+      const memo = JSON.parse(brut)
+      pro = { ...pro, ...memo, couvre: memo.couvre && typeof memo.couvre === 'object' ? memo.couvre : {} }
+    }
   } catch { /* stockage indisponible */ }
   const type = pick(prospect, ['type_logement', 'type_habitation'])
   return {
@@ -854,7 +859,7 @@ export function DevisPage({
       conformite_devis: conf,
     }).eq('id', current.id)
     if (devisError) throw devisError
-    try { localStorage.setItem(CLE_PRO_LOCAL, JSON.stringify({ rge: conf.pro.rge, organisme: conf.pro.organisme, validite: conf.pro.validite, assurance: conf.pro.assurance })) } catch { /* ignoré */ }
+    try { localStorage.setItem(CLE_PRO_LOCAL, JSON.stringify({ rge: conf.pro.rge, organisme: conf.pro.organisme, validite: conf.pro.validite, assurance: conf.pro.assurance, couvre: conf.pro.couvre })) } catch { /* ignoré */ }
 
     const { error: deleteLignesError } = await supabase.from('devis_lignes').delete().eq('devis_id', current.id)
     if (deleteLignesError) throw deleteLignesError

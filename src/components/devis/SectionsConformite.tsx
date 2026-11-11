@@ -68,7 +68,7 @@ export function SectionsConformite({ meta, onChange, points, disabled, fichesDuD
         <h2 className="rv-h">Professionnel qualifié</h2>
         <div className="grid g3">
           {input('pro.assurance', 'Assurance décennale (assureur, n°)', meta.pro.assurance, v => setPro({ assurance: v }))}
-          {input('pro.rge', 'N° de qualification', meta.pro.rge, v => setPro({ rge: v }))}
+          {input('pro.rge', 'N° de qualification', meta.pro.rge, v => onChange(m => ({ ...m, pro: { ...m.pro, rge: v, couvre: v.trim() === m.pro.rge.trim() ? m.pro.couvre : {} } })))}
           {input('pro.organisme', 'Organisme (Qualibat, Qualit’EnR…)', meta.pro.organisme, v => setPro({ organisme: v }))}
           {input('pro.validite', 'Valable jusqu’au', meta.pro.validite, v => setPro({ validite: v }), 'date')}
         </div>
