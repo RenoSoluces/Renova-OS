@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react'
+import { useEffect, useRef, useState, useMemo } from 'react'
 import {
   Plus, Search, ChevronLeft, ChevronRight, Check, Phone, Mail, MapPin,
   Pencil, Trash2, Zap, Home, Wrench, User, Users, Wallet, ArrowRight,
@@ -150,6 +150,8 @@ const LIBELLES_STATUT_DOSSIER: Record<string, string> = {
   creation: 'En création', signe: 'Signé', installation: 'Installation en cours', installe: 'Installé',
 }
 
+const PAS_AFFICHAGE = 100
+
 export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialView = 'liste', initialProspectId, onInitialProspectHandled }: Props) {
   const { profile } = useAuth()
   // Apporteur / call : consulte ses prospects (fiche, chat, historique, rappels) sans modifier la fiche.
@@ -157,6 +159,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  // Seuls les premiers prospects sont dessinés : afficher des milliers de lignes d'un coup ralentit la page.
+  const [nombreAffiche, setNombreAffiche] = useState(PAS_AFFICHAGE)
+  const finListeRef = useRef<HTMLDivElement | null>(null)
   const [statutFilter, setStatutFilter] = useState('')
   const [temperatureFilter, setTemperatureFilter] = useState('')
   const [sourceFilter, setSourceFilter] = useState('')
@@ -453,6 +458,15 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPool
     })
   }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly])
+
+  useEffect(() => { setNombreAffiche(PAS_AFFICHAGE) }, [search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly])
+  useEffect(() => {
+    const cible = finListeRef.current
+    if (!cible || typeof IntersectionObserver === 'undefined') return
+    const obs = new IntersectionObserver(es => { if (es.some(x => x.isIntersecting)) setNombreAffiche(n => n + PAS_AFFICHAGE) }, { rootMargin: '400px' })
+    obs.observe(cible)
+    return () => obs.disconnect()
+  }, [nombreAffiche, filtered.length])
 
   const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly ? 'pot' : ''].filter(Boolean).length
 
@@ -1443,7 +1457,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 {groupeMessage && <span className="prospect-bulk-message" role="status">{groupeMessage}</span>}
               </div>
             )}
-            {filtered.map(p => {
+            {filtered.slice(0, nombreAffiche).map(p => {
               const e = extended(p)
               const ceeCount = (e.fiches_cee || []).length
               return (
@@ -1494,6 +1508,13 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 </div>
               )
             })}
+            {filtered.length > nombreAffiche && (
+              <div ref={finListeRef} style={{ display: 'flex', justifyContent: 'center', padding: '14px 0' }}>
+                <button className="btn btn-secondary btn-sm" onClick={() => setNombreAffiche(n => n + PAS_AFFICHAGE)}>
+                  Afficher plus ({Math.min(PAS_AFFICHAGE, filtered.length - nombreAffiche)} sur {filtered.length - nombreAffiche} restants)
+                </button>
+              </div>
+            )}
           </div>
         ))}
       </div>
