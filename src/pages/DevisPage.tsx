@@ -140,6 +140,23 @@ interface DevisPageProps {
   onInitialProspectHandled?: () => void
 }
 
+// Le catalogue stocke la résistance thermique sous plusieurs clés selon l'origine de la
+// fiche (import, saisie, fiches CEE officielles). Sans cette lecture tolérante, un isolant
+// conforme était lu à R = 0 et sa prime CEE n'était pas proposée.
+function lireResistanceThermique(...sources: (Record<string, any> | null | undefined)[]): number {
+  const cles = ['resistance_thermique_R_m2K_W', 'resistance_thermique', 'Résistance thermique R', 'r', 'R']
+  for (const c of sources) {
+    if (!c) continue
+    for (const k of cles) {
+      const brut = c[k]
+      if (brut === undefined || brut === null || brut === '') continue
+      const n = Number(String(brut).replace(',', '.').replace(/[^0-9.]/g, ''))
+      if (Number.isFinite(n) && n > 0) return n
+    }
+  }
+  return 0
+}
+
 export function DevisPage({
   openDevisId, onOpenedDevis, initialProspectId, onInitialProspectHandled }: DevisPageProps = {}) {
   const { profile } = useAuth()
@@ -523,7 +540,7 @@ export function DevisPage({
       const ref = String(produit.reference || '').toUpperCase()
       const nom = String(produit.nom || ligne.designation || '').toLowerCase()
       const c = produit.caracteristiques || {}
-      const r = Number(c.resistance_thermique_R_m2K_W ?? c.resistance_thermique ?? c.r ?? ligne.caracteristiques?.resistance_thermique ?? 0)
+      const r = lireResistanceThermique(c, ligne.caracteristiques)
       return r >= 6 && Number(ligne.quantite) > 0
     })
     const surface = lignesRampants.reduce((total, ligne) => total + Math.max(0, Number(ligne.quantite) || 0), 0)
@@ -570,7 +587,7 @@ export function DevisPage({
       const produit = produits.find(item => item.id === ligne.produit_id)
       if (!produit || produit.categorie !== 'combles_perdus') return total
       const c = produit.caracteristiques || {}
-      const r = Number(c.resistance_thermique_R_m2K_W ?? c.resistance_thermique ?? c.r ?? 0)
+      const r = lireResistanceThermique(c, ligne.caracteristiques)
       if (r < 7) return total
       const nom = String(produit.nom || ligne.designation || '').toLowerCase()
       if (nom.includes('pose') || nom.includes('déchet') || nom.includes('évacuation')) return total
@@ -607,8 +624,8 @@ export function DevisPage({
     }
     if (['combles_perdus', 'rampants', 'combles', 'ite'].includes(produit.categorie)) {
       caracteristiquesProduit.marque_isolant = caracteristiquesProduit.marque_isolant || [produit.marque, produit.reference].filter(Boolean).join(' ') || produit.description || produit.nom
-      const rCatalogue = caracteristiquesProduit.resistance_thermique_R_m2K_W ?? caracteristiquesProduit.resistance_thermique ?? caracteristiquesProduit.r
-      if (rCatalogue !== undefined && rCatalogue !== null && rCatalogue !== '') caracteristiquesProduit.resistance_thermique = Number(rCatalogue) || String(rCatalogue)
+      const rCatalogue = lireResistanceThermique(caracteristiquesProduit)
+      if (rCatalogue > 0) caracteristiquesProduit.resistance_thermique = rCatalogue
       caracteristiquesProduit.surface_isolee = qte
     }
     const ligne: DevisLigne = {
@@ -1485,7 +1502,7 @@ export function DevisPage({
               </div>
             )}
             <p className="note" style={{ margin: '12px 0 0' }}>
-              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — barème 2026 : MaPrimeRénov’ Bleu 25 €/m², Jaune 20 €/m², Violet 15 €/m², Rose non éligible en geste seul ; CEE BAR-EN-101 : Bleu 13 €/m², autres profils 10 €/m². Les montants sont calculés sur la quantité des lignes de produits combles perdus.' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
+              {filtreCategorie === 'combles_perdus' ? 'Combles perdus — prime CEE BAR-EN-101 : Bleu 13 €/m², autres profils 10 €/m², calculée sur la quantité (m²) des lignes d’isolant R ≥ 7. MaPrimeRénov’ par geste ne finance plus l’isolation depuis le 01/09/2026 : elle ne reste possible qu’en rénovation d’ampleur (bouton « + Anah »).' : filtreCategorie === 'rampants' || filtreCategorie === 'combles' ? 'Rampants / sarking — prime CEE calculée séparément sur la surface des isolants rampants éligibles (R ≥ 6 m²·K/W), hors injection/écobilles et prestations annexes. Barème CEE : Bleu 13 €/m² ; Jaune, Violet et Rose 10 €/m². Vérifier la résistance thermique et la conformité de la solution réellement posée.' : filtreCategorie === 'ite' ? 'ITE — barème CEE : Bleu 12 €/m² ; Jaune, Violet et Rose 8 €/m². Le calcul suit la quantité des lignes d’isolant ITE et exclut l’échafaudage et l’enduit.' : `Pour les autres gestes, les montants CEE sont estimatifs selon le taux configuré (${tauxCEE} €/MWh cumac) et doivent être confirmés avec le délégataire.`}
             </p>
           </section>
 
