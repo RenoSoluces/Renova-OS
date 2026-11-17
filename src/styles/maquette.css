@@ -58,3 +58,72 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 /* Pendant le chargement : pas de faux zéros */
 .kpi-chargement { color: #9DB3B0; animation: kpiPulse 1.2s ease-in-out infinite; }
 @keyframes kpiPulse { 50% { opacity: .45; } }
+
+/* ---------------------------------------------------------------- Tableau de bord (maquette) */
+.vm-banner { display: flex; justify-content: space-between; align-items: stretch; gap: 24px; padding: 26px 30px; margin-bottom: 18px; border-radius: 24px; color: #fff; background: radial-gradient(circle at 92% 110%, rgba(224,154,98,.45), transparent 38%), linear-gradient(120deg, #0B3F3B, #1F7A70); box-shadow: var(--m-shadow); }
+.vm-banner-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.vm-kicker { font-size: 13px; opacity: .85; }
+.vm-banner h1 { font-size: 30px; line-height: 1.15; color: #fff; margin: 0; }
+.vm-banner p { margin: 0; opacity: .9; font-size: 15px; }
+.vm-banner-actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+.vm-btn { display: inline-flex; align-items: center; gap: 8px; min-height: 42px; padding: 0 18px; border-radius: 12px; font: 600 14px var(--font-body); color: #fff; cursor: pointer; }
+.vm-btn-cuivre { background: #C2703D; border: 1px solid #C2703D; }
+.vm-btn-ghost { background: transparent; border: 1px solid rgba(255,255,255,.55); }
+.vm-btn:hover { filter: brightness(1.08); }
+.vm-banner-side { flex: 0 0 280px; display: flex; flex-direction: column; justify-content: center; gap: 4px; padding: 18px 22px; border-radius: 18px; background: rgba(255,255,255,.14); }
+.vm-banner-side span { font-size: 13px; opacity: .9; }
+.vm-banner-side strong { font-family: var(--font-display); font-size: 34px; line-height: 1.1; }
+.vm-banner-side small { font-size: 12px; opacity: .8; }
+
+.vm-kpis { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin-bottom: 18px; }
+.vm-kpi { display: flex; flex-direction: column; gap: 6px; padding: 20px; min-height: 150px; border-radius: 22px; background: #fff; color: #14262A; box-shadow: var(--m-shadow); }
+.vm-kpi span:not(.vm-kpi-ico) { font-size: 14px; opacity: .85; }
+.vm-kpi strong { font-family: var(--font-display); font-size: 34px; line-height: 1.1; margin-top: auto; font-variant-numeric: tabular-nums; }
+.vm-kpi em { font-style: normal; font-size: 12px; font-weight: 600; color: #A4562A; background: #FBE9DC; border-radius: 99px; padding: 2px 10px; align-self: flex-start; }
+.vm-kpi-ico { width: 38px; height: 38px; border-radius: 12px; display: flex; align-items: center; justify-content: center; background: #E1F1EF; color: #0B6B6B; }
+.vm-kpi-cuivre { background: linear-gradient(135deg, #C2703D, #E09A62); color: #fff; }
+.vm-kpi-teal { background: linear-gradient(135deg, #0B3F3B, #1F7A70); color: #fff; }
+.vm-kpi-cuivre .vm-kpi-ico, .vm-kpi-teal .vm-kpi-ico { background: rgba(255,255,255,.2); color: #fff; }
+
+.vm-card { background: #fff; border-radius: 22px; padding: 22px 24px; margin-bottom: 18px; box-shadow: var(--m-shadow); min-width: 0; }
+.vm-card-head { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 14px; }
+.vm-card-head h2 { font-size: 20px; color: #0B3F3B; margin: 0; }
+.vm-card-head span { font-size: 13px; color: #5B6F72; }
+.vm-vide { color: #7A8C8F; font-size: 14px; margin: 6px 0; }
+
+.vm-chevrons { display: flex; align-items: stretch; gap: 0; overflow-x: auto; padding-bottom: 4px; }
+.vm-chev { flex: 1 1 0; min-width: 104px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 16px 22px 16px 26px; color: #fff; font-size: 13px; margin-left: -10px; clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%, 18px 50%); }
+.vm-chev:first-child { margin-left: 0; clip-path: polygon(0 0, calc(100% - 18px) 0, 100% 50%, calc(100% - 18px) 100%, 0 100%); }
+.vm-chev strong { font-family: var(--font-display); font-size: 28px; line-height: 1.1; }
+.vm-fleche { align-self: center; margin: 0 10px; color: #C2703D; flex: none; }
+.vm-archive { flex: 1 1 190px; min-width: 190px; display: flex; flex-direction: column; gap: 4px; justify-content: center; padding: 12px 16px; border: 2px dashed #5AA196; border-radius: 14px; background: #E6F6EE; color: #0B5B3E; font-size: 12px; }
+.vm-archive b { font-size: 14px; }
+
+.vm-duo { display: grid; grid-template-columns: minmax(0, 1.9fr) minmax(0, 1fr); gap: 18px; }
+.vm-chart { width: 100%; height: auto; }
+.vm-objectif { display: flex; flex-direction: column; align-items: center; text-align: center; gap: 6px; }
+.vm-objectif p { margin: 4px 0 0; font-size: 13px; color: #3C5155; }
+.vm-objectif b { color: #A4562A; font-size: 13px; }
+
+.vm-trio { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+.vm-ligne { display: flex; align-items: center; gap: 12px; padding: 9px 0; font-size: 14px; }
+.vm-ligne > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.vm-ligne b { font-weight: 600; overflow-wrap: anywhere; }
+.vm-ligne small, .vm-ligne em { font-size: 12px; color: #7A8C8F; font-style: normal; white-space: nowrap; }
+.vm-av { flex: none; width: 36px; height: 36px; border-radius: 50%; background: #C2703D; color: #fff; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 700; }
+.vm-rang { padding: 8px 0; }
+.vm-rang > div { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+.vm-rang b { flex: 1; font-weight: 600; }
+.vm-rang i { display: block; height: 8px; border-radius: 99px; background: #E3ECEA; margin-top: 8px; overflow: hidden; }
+.vm-rang u { display: block; height: 100%; border-radius: 99px; background: #C2703D; text-decoration: none; }
+.vm-afaire { background: linear-gradient(135deg, #FBE9DC, #F7DCC8); }
+.vm-todo { background: rgba(255,255,255,.75); border-radius: 12px; padding: 10px 12px; margin-bottom: 8px; display: flex; flex-direction: column; gap: 2px; font-size: 14px; }
+.vm-todo small { font-size: 12px; color: #5B6F72; }
+
+@media (max-width: 1100px) {
+  .vm-kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .vm-duo, .vm-trio { grid-template-columns: 1fr; }
+  .vm-banner { flex-direction: column; }
+  .vm-banner-side { flex-basis: auto; }
+}
+@media (max-width: 600px) { .vm-banner h1 { font-size: 22px; } .vm-kpis { grid-template-columns: 1fr 1fr; } .vm-kpi strong { font-size: 26px; } }

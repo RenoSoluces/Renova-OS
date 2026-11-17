@@ -9,6 +9,7 @@ import { Button } from '../ui/Button'
 import { Modal } from '../ui/Modal'
 import { useAuth } from '../../lib/auth/AuthContext'
 import { PilotageEtats } from './PilotageEtats'
+import { VueEnsemble } from './VueEnsemble'
 import type { Devis, Prospect, Commission, Dossier } from '../../types'
 
 interface Installer { id:string; nom:string; telephone?:string; email?:string; ville?:string; zone_intervention?:string; actif:boolean }
@@ -348,25 +349,19 @@ export function AdminDashboard({ onNavigate }:{onNavigate:(p:any)=>void}) {
 
   return <div className="admin-dashboard">
 
-    <div className="admin-dashboard-hero">
-      <div>
-        <div className="admin-dashboard-kicker">
-          {dateDuJour}
-        </div>
-        <h1>{prenom ? `Bonjour ${prenom},` : 'Bonjour,'}<br/><span>voici l’essentiel de votre activité.</span></h1>
-        <p>Cash, partenaires, relances et signatures : tout ce qui mérite une action est visible ici.</p>
-      </div>
-
-      <div className="admin-hero-actions">
-        <Button variant="ghost" onClick={()=>load()}>
-          <RefreshCw size={15}/> Actualiser
-        </Button>
-
-        <Button variant="primary" onClick={()=>setDispatcherOpen(true)}>
-          <Bot size={15}/> Dispatcher un lead
-        </Button>
-      </div>
-    </div>
+    <VueEnsemble
+      prenom={prenom}
+      dateDuJour={dateDuJour}
+      prospects={prospects}
+      devis={devis}
+      commissions={commissions}
+      profiles={profiles}
+      activite={ticker.map((t:any)=>({id:t.id,at:t.at,text:t.text,value:t.value}))}
+      aFaire={alerts.map(a=>({id:a.id,title:a.title,detail:a.detail}))}
+      onNavigate={onNavigate}
+      onActualiser={()=>load()}
+      onDispatcher={()=>setDispatcherOpen(true)}
+    />
 
     <section className="cash-grid">
 
