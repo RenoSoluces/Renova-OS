@@ -276,7 +276,12 @@ export function DossiersPage({
       .then(({ data }) => setOrganisations((data || []) as OrganisationOption[]))
     supabase.from('installateurs').select('id, nom').eq('actif', true).order('nom')
       .then(({ data }) => setInstallateursDossier((data || []) as { id: string; nom: string }[]))
+  }, [])
 
+  // La liste complète des prospects ne sert qu'au choix du client dans « Nouveau dossier » :
+  // on ne la charge qu'à l'ouverture de cette fenêtre (elle ralentissait toute la page, ~6 s).
+  useEffect(() => {
+    if (!newModalOpen || prospects.length > 0) return
     lireTout(() => supabase
       .from('prospects')
       .select('*')
@@ -284,7 +289,7 @@ export function DossiersPage({
       .then(({ data }) => {
         setProspects((data || []) as Prospect[])
       })
-  }, [])
+  }, [newModalOpen])
 
   useEffect(() => {
     if (!newProspectId) {
