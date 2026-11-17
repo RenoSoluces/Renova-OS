@@ -1208,7 +1208,7 @@ export function DossiersPage({
       </div>
 
       <section className="dashboard-kpis page-kpi-strip">
-        {kpis.map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':idx===3?'purple':'amber'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong>{k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">{(k as any).note || 'Pilotage'}</span></div>)}
+        {kpis.map((k,idx) => <div className="dashboard-kpi" key={k.label}><span className={`dashboard-kpi-icon ${idx===0?'blue':idx===1?'amber':idx===2?'green':idx===3?'purple':'amber'}`}>{k.icon}</span><span className="dashboard-kpi-main"><strong className={loading ? 'kpi-chargement' : undefined}>{loading ? '…' : k.value}</strong><span>{k.label}</span></span><span className="dashboard-kpi-note">{loading ? 'Chargement…' : (k as any).note || 'Pilotage'}</span></div>)}
       </section>
 
       <div className="dossier-filtres" role="search">
