@@ -19,6 +19,7 @@ import './styles/prospects.css'
 import './index.css'
 import './styles/premium.css'
 import './styles/ecrans-premium.css'
+import './styles/maquette.css'
 import { installerRapportErreurs } from './lib/fiabilite/rapportErreurs'
 
 installerRapportErreurs()

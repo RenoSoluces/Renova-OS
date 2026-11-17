@@ -1,0 +1,50 @@
+/*
+ * Refonte visuelle validée sur la maquette (teal profond, cuivre, fond froid, cartes arrondies).
+ * Chargé en dernier : il ne change que l'apparence, jamais la structure ni les calculs.
+ */
+:root {
+  --font-display: 'Space Grotesk', 'Inter', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --c-bg: #E9EFEE;
+  --c-bg-soft: #DCE6E4;
+  --c-border: #DCE6E4;
+  --c-border-light: #E8EFEE;
+  --c-sidebar-bg: #0B3F3B;
+  --c-accent: #C2703D;
+  --m-radius: 20px;
+  --m-shadow: 0 1px 2px rgba(11, 63, 59, .05), 0 10px 28px -14px rgba(11, 63, 59, .22);
+}
+body { background: var(--c-bg); font-family: var(--font-body); }
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; letter-spacing: -.02em; }
+.topbar-title { font-family: var(--font-display); font-weight: 700; }
+.topbar-search input { background: #DCE6E4; }
+
+/* Barre latérale : dégradé teal, élément actif en pastille claire */
+.sidebar { background: linear-gradient(180deg, #0B3F3B 0%, #082E2B 100%); }
+.sidebar-brand-text { font-family: var(--font-display); font-weight: 700; }
+.sidebar-brand-logo { background: linear-gradient(135deg, #E09A62, #C2703D); color: #fff; box-shadow: 0 6px 16px -6px rgba(194, 112, 61, .7); }
+.sidebar-section-label { color: #7FB5AE; letter-spacing: .12em; }
+.sidebar-item { color: #C9DDDA; border-radius: 12px; }
+.sidebar-item.active { background: #F4F8F7; color: #0B3F3B; font-weight: 600; box-shadow: none; }
+.sidebar-item.active svg { color: #0B3F3B; }
+.sidebar-item.active::before { display: none; }
+.sidebar-item-badge { background: #C2703D; box-shadow: none; }
+.sidebar-user-avatar { background: linear-gradient(135deg, #E09A62, #C2703D); color: #fff; }
+
+/* Cartes et panneaux */
+.admin-panel, .card, .kpi-card, .partner-card { border-radius: var(--m-radius); border-color: transparent; box-shadow: var(--m-shadow); }
+.cash-card { border-radius: var(--m-radius); }
+.cash-latent { background: linear-gradient(135deg, #0B3F3B, #1F7A70); }
+.cash-invoice { background: linear-gradient(135deg, #0B6B6B, #1B7A7C); }
+.cash-outstanding { background: linear-gradient(135deg, #C2703D, #E09A62); }
+
+/* Bandeau d'accueil du tableau de bord */
+.admin-dashboard-hero {
+  background: radial-gradient(circle at 90% 0%, rgba(224, 154, 98, .35), transparent 40%), linear-gradient(120deg, #0B3F3B, #1F7A70);
+  border: 0; border-radius: var(--m-radius); color: #fff; box-shadow: var(--m-shadow);
+}
+.admin-dashboard-hero h1, .admin-dashboard-hero p, .admin-dashboard-hero h1 span { color: #fff; }
+.admin-dashboard-hero p { opacity: .88; }
+.admin-dashboard-kicker { color: #E09A62; }
+.admin-hero-actions .btn-ghost, .admin-hero-actions button:first-child { color: #fff; background: rgba(255, 255, 255, .14); border-color: transparent; }
+.admin-hero-actions button:last-child { background: #C2703D; border-color: #C2703D; color: #fff; }
