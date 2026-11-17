@@ -215,9 +215,14 @@ export function DevisPage({
       })
   }
 
+  // La liste complète des prospects ne sert qu'au choix du client dans « Nouveau devis » : chargée à l'ouverture seulement.
+  useEffect(() => {
+    if (!showNewModal || prospects.length > 0) return
+    lireTout(() => supabase.from('prospects').select('*').order('nom')).then(({ data }) => setProspects((data || []) as Prospect[]))
+  }, [showNewModal])
+
   useEffect(() => {
     fetchListe()
-    lireTout(() => supabase.from('prospects').select('*').order('nom')).then(({ data }) => setProspects((data || []) as Prospect[]))
     void (async () => {
       // Supabase REST peut limiter une réponse à 1 000 lignes. Charger toutes les pages
       // pour ne pas masquer les catégories situées en fin de catalogue (SSC, VMC, etc.).

@@ -33,3 +33,12 @@ describe('lireTout', () => {
     expect((await lireTout(() => q)).data).toHaveLength(996)
   })
 })
+
+describe('lireTout (pages en parallèle)', () => {
+  it('conserve l\'ordre et ne perd aucune ligne avec plusieurs lots', async () => {
+    const { q } = fausseRequete(7300)
+    const { data } = await lireTout(() => q)
+    expect(data).toHaveLength(7300)
+    expect(data.every((r: any, i: number) => r.id === i)).toBe(true)
+  })
+})
