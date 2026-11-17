@@ -17,7 +17,7 @@ import { PipelineBoard } from '../components/crm/PipelineBoard'
 import { Timeline } from '../components/crm/Timeline'
 import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
-import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf } from '../lib/crm/constants'
+import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf, isProspectTerminal } from '../lib/crm/constants'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { FICHES_CEE } from '../lib/crm/fichesCee'
 import { FoyerFiscalAvis } from '../components/crm/FoyerFiscalAvis'
@@ -1294,7 +1294,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       <div className="page">
         <div className="page-header">
           <div className="page-header-left">
-            <h1 className="page-title">Prospects</h1>
+            <h1 className="page-title">{view === 'pipeline' ? 'Pipeline' : 'Prospects'}</h1>
             <p className="page-subtitle">{prospects.length} prospect{prospects.length > 1 ? 's' : ''} · {formatDate(new Date().toISOString())}</p>
           </div>
           <div className="page-actions">
@@ -1396,6 +1396,15 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               </button>
             )}
           </div>
+        )}
+
+        {view === 'pipeline' && (
+          <nav className="pipeline-chevrons" aria-label="Étapes du pipeline">
+            {PIPELINE_STAGES.map(st => {
+              const n = prospects.filter(p => !isProspectTerminal(p.statut) && stageOf(p.statut).value === st.value).length
+              return <div key={st.value} className="pipeline-chevron" style={{ ['--chev' as string]: st.color }}><span>{st.label}</span><strong>{n}</strong></div>
+            })}
+          </nav>
         )}
 
         {view === 'pipeline' && (

@@ -48,3 +48,9 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 .admin-dashboard-kicker { color: #E09A62; }
 .admin-hero-actions .btn-ghost, .admin-hero-actions button:first-child { color: #fff; background: rgba(255, 255, 255, .14); border-color: transparent; }
 .admin-hero-actions button:last-child { background: #C2703D; border-color: #C2703D; color: #fff; }
+
+/* Frise en chevrons du Pipeline */
+.pipeline-chevrons { display: flex; gap: 0; margin: 0 0 16px; overflow-x: auto; }
+.pipeline-chevron { flex: 1 1 0; min-width: 120px; display: flex; flex-direction: column; justify-content: center; gap: 2px; padding: 10px 22px 10px 26px; color: #fff; font-size: 13px; font-weight: 600; background: var(--chev, #1F7A70); clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%, 16px 50%); margin-left: -8px; }
+.pipeline-chevron:first-child { margin-left: 0; clip-path: polygon(0 0, calc(100% - 16px) 0, 100% 50%, calc(100% - 16px) 100%, 0 100%); border-radius: 12px 0 0 12px; }
+.pipeline-chevron strong { font-family: var(--font-display); font-size: 20px; line-height: 1.1; }
