@@ -1313,6 +1313,18 @@ export function DossiersPage({
         </section>
       )}
 
+      {vue === 'pipeline' && !loading && rows.length > 0 && (
+        <section className="commission-recue">
+          <div>
+            <strong>Commission reçue</strong>
+            <p>Dès que la commission est encaissée et les factures payées, le dossier quitte le pipeline et passe en archives (« Soldés »).</p>
+          </div>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => { setAffichage('termines'); changerVue('liste') }}>
+            {nbSoldes} dossier{nbSoldes > 1 ? 's' : ''} soldé{nbSoldes > 1 ? 's' : ''} · Voir les archives
+          </button>
+        </section>
+      )}
+
       <div className="card" style={vue === 'pipeline' && !loading && rows.length > 0 ? { display: 'none' } : undefined}>
         {loading ? (
           <div className="card-pad text-muted">
