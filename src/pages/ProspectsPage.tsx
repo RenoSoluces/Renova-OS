@@ -168,6 +168,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [tagFilter, setTagFilter] = useState('')
   const [commercialFilter, setCommercialFilter] = useState('')
   const [potCommunOnly, setPotCommunOnly] = useState(false)
+  const [rapide, setRapide] = useState<'' | '30j' | '90j' | 'chauds' | 'sans' | 'apporteurs'>('')
   const [selected, setSelected] = useState<Prospect | null>(null)
   // Actions groupées (admin / manager) : prospects cochés dans la liste.
   const [coches, setCoches] = useState<Set<string>>(new Set())
@@ -455,11 +456,18 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       const matchesTag = !tagFilter || (p.tags || []).includes(tagFilter)
       const matchesCommercial = !commercialFilter || p.commercial_id === commercialFilter || (p as any).apporteur_user_id === commercialFilter
       const matchesPool = !potCommunOnly || !!(p as any).pot_commun
-      return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPool
+      const age = (jours: number) => !!p.created_at && Date.now() - new Date(p.created_at).getTime() <= jours * 86400000
+      const matchesRapide = !rapide ||
+        (rapide === '30j' && age(30)) ||
+        (rapide === '90j' && age(90)) ||
+        (rapide === 'chauds' && p.temperature === 'chaud') ||
+        (rapide === 'sans' && !p.commercial_id) ||
+        (rapide === 'apporteurs' && /apporteur/i.test(p.source || ''))
+      return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPool && matchesRapide
     })
-  }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly])
+  }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly, rapide])
 
-  useEffect(() => { setNombreAffiche(PAS_AFFICHAGE) }, [search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly])
+  useEffect(() => { setNombreAffiche(PAS_AFFICHAGE) }, [search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly, rapide])
   useEffect(() => {
     const cible = finListeRef.current
     if (!cible || typeof IntersectionObserver === 'undefined') return
@@ -471,7 +479,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly ? 'pot' : ''].filter(Boolean).length
 
   function reinitialiserFiltres() {
-    setStatutFilter(''); setTemperatureFilter(''); setSourceFilter(''); setTagFilter(''); setCommercialFilter(''); setPotCommunOnly(false)
+    setStatutFilter(''); setTemperatureFilter(''); setSourceFilter(''); setTagFilter(''); setCommercialFilter(''); setPotCommunOnly(false); setRapide('')
   }
 
   function openWizard() {
@@ -1332,6 +1340,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
         )}
 
         {view === 'liste' && (
+          <>
           <div className="pro-list-filters" style={{ flexWrap: 'wrap' }}>
             <div className="pro-search-wrap">
               <Search />
@@ -1390,12 +1399,19 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               </select>
             )}
             <button className={`btn btn-sm ${potCommunOnly ? 'btn-primary' : 'btn-outline'}`} onClick={() => setPotCommunOnly(v => !v)}>🟠 Pot commun</button>
+          </div>
+          <div className="prospect-puces" role="group" aria-label="Filtres rapides">
+            {([['', 'Tous'], ['30j', '30 derniers jours'], ['90j', '90 derniers jours'], ['chauds', 'Chauds'], ['sans', 'Sans commercial'], ['apporteurs', 'Apporteurs']] as const).map(([v, l]) => (
+              <button key={v} type="button" className={`puce ${rapide === v ? 'active' : ''}`} onClick={() => setRapide(v)}>{l}</button>
+            ))}
+            <span className="puces-compte">Affichage : {Math.min(nombreAffiche, filtered.length)} sur {filtered.length} prospects</span>
             {filtresActifsCount > 0 && (
               <button className="btn btn-ghost btn-sm" onClick={reinitialiserFiltres}>
                 Réinitialiser ({filtresActifsCount})
               </button>
             )}
           </div>
+          </>
         )}
 
         {view === 'pipeline' && (
