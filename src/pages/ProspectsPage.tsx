@@ -340,6 +340,22 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     }
   }, [selected?.id])
 
+  /** Note dans l'historique que l'appel a été lancé depuis la fiche (une seule trace par minute). */
+  const dernierAppelLog = useRef<Record<string, number>>({})
+  async function journaliserAppel(prospect: { id: string; telephone?: string | null }) {
+    const maintenant = Date.now()
+    if (maintenant - (dernierAppelLog.current[prospect.id] || 0) < 60_000) return
+    dernierAppelLog.current[prospect.id] = maintenant
+    const { error } = await supabase.from('interactions').insert({
+      prospect_id: prospect.id, type: 'appel', auteur: profile?.nom_complet || 'Vous',
+      contenu: `Appel lancé vers ${prospect.telephone || 'le prospect'} depuis la fiche`,
+      meta: { canal: 'telephone', source: 'fiche_prospect' },
+    })
+    if (error) { dernierAppelLog.current[prospect.id] = 0; return }
+    await supabase.from('prospects').update({ derniere_interaction_at: new Date().toISOString() }).eq('id', prospect.id)
+    setTimelineRefresh(r => r + 1)
+  }
+
   async function updateStage(prospectId: string, newStatut: string) {
     const prospect = prospects.find(p => p.id === prospectId)
     if (!prospect || stageOf(prospect.statut).value === newStatut) return
@@ -755,7 +771,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               <Calendar size={16} /> Nouvelle visite
             </Button>}
             {selected.telephone && (
-              <a href={`tel:${selected.telephone}`} className="btn btn-outline" style={{ textDecoration: 'none' }}>
+              <a href={`tel:${selected.telephone}`} className="btn btn-outline" style={{ textDecoration: 'none' }} onClick={() => void journaliserAppel(selected)}>
                 <Phone size={16} /> Appeler
               </a>
             )}
@@ -890,7 +906,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 </div>
                 <div className="detail-contact-btns">
                   {selected.telephone && (
-                    <a href={`tel:${selected.telephone}`} className="detail-contact-btn" style={{ textDecoration: 'none' }}>
+                    <a href={`tel:${selected.telephone}`} className="detail-contact-btn" style={{ textDecoration: 'none' }} onClick={() => void journaliserAppel(selected)}>
                       <Phone size={16} /> Appeler
                     </a>
                   )}
