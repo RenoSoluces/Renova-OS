@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { Phone, RefreshCw } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { Button } from '../components/ui/Button'
+import { useAuth } from '../lib/auth/AuthContext'
+import { journaliserAppel } from '../lib/crm/journalAppel'
 
 interface Rdv { evenement_id: string; prospect_id: string; titre: string; date: string; heure: string | null; type: string; adresse: string; nom: string; prenom: string; telephone: string | null; ville: string | null; commercial: string | null; derniere_statut: string | null; derniere_note: string | null }
 interface Vente { devis_id: string; prospect_id: string; numero: string; signature_date: string; nom: string; prenom: string; telephone: string | null; ville: string | null; commercial: string | null; produits: string | null; derniere_statut: string | null; derniere_note: string | null }
@@ -11,6 +13,7 @@ const dateFr = (v: string) => new Date(/^\d{4}-\d{2}-\d{2}$/.test(v) ? `${v}T12:
 
 /** Espace du confirmateur : appelle les clients avant les rendez-vous et après la signature. Aucun prix ni commission n'est affiché. */
 export function ConfirmationsPage() {
+  const { profile } = useAuth()
   const [rdv, setRdv] = useState<Rdv[]>([])
   const [ventes, setVentes] = useState<Vente[]>([])
   const [onglet, setOnglet] = useState<'rdv' | 'ventes'>('rdv')
@@ -43,7 +46,7 @@ export function ConfirmationsPage() {
     </div>
   )
   const dernier = (s: string | null, n: string | null) => s ? <small className="confirm-dernier">Dernier appel : {STATUTS[s] || s}{n ? ` — ${n}` : ''}</small> : null
-  const tel = (t: string | null) => t ? <a className="confirm-tel" href={`tel:${t}`}><Phone size={14} /> {t}</a> : <span className="text-muted">Pas de téléphone</span>
+  const tel = (t: string | null, prospectId?: string) => t ? <a className="confirm-tel" href={`tel:${t}`} onClick={() => void journaliserAppel({ prospectId, telephone: t, auteur: profile?.nom_complet, source: 'confirmations' })}><Phone size={14} /> {t}</a> : <span className="text-muted">Pas de téléphone</span>
   const restants = (liste: { derniere_statut: string | null }[]) => liste.filter(x => x.derniere_statut !== 'confirme').length
 
   return (
@@ -62,7 +65,7 @@ export function ConfirmationsPage() {
         ? <div className="card card-pad"><b>Aucun rendez-vous à confirmer</b><p className="text-muted" style={{ marginBottom: 0 }}>Les rendez-vous et visites des 7 prochains jours apparaissent ici.</p></div>
         : <div className="confirm-liste">{rdv.map(r => (
           <div className="card card-pad" key={r.evenement_id}>
-            <div className="confirm-tete"><b>{r.prenom} {r.nom}</b>{tel(r.telephone)}</div>
+            <div className="confirm-tete"><b>{r.prenom} {r.nom}</b>{tel(r.telephone, r.prospect_id)}</div>
             <div className="text-sm">{dateFr(r.date)}{r.heure ? ` à ${r.heure}` : ''} · {r.type === 'visite' ? 'Visite technique' : 'Rendez-vous'} · {r.adresse || r.ville}</div>
             <div className="text-sm text-muted">{r.commercial ? `Avec ${r.commercial}` : 'Commercial non renseigné'}</div>
             {dernier(r.derniere_statut, r.derniere_note)}
@@ -72,7 +75,7 @@ export function ConfirmationsPage() {
         ? <div className="card card-pad"><b>Aucune vente à valider</b><p className="text-muted" style={{ marginBottom: 0 }}>Les devis signés depuis moins de 3 semaines apparaissent ici jusqu'à leur confirmation.</p></div>
         : <div className="confirm-liste">{ventes.map(v => (
           <div className="card card-pad" key={v.devis_id}>
-            <div className="confirm-tete"><b>{v.prenom} {v.nom}</b>{tel(v.telephone)}</div>
+            <div className="confirm-tete"><b>{v.prenom} {v.nom}</b>{tel(v.telephone, v.prospect_id)}</div>
             <div className="text-sm">Devis {v.numero} signé le {dateFr(v.signature_date)} · {v.ville}</div>
             <div className="text-sm">{v.produits || 'Produits non renseignés'}</div>
             <div className="text-sm text-muted">{v.commercial ? `Vendu par ${v.commercial}` : ''}</div>
