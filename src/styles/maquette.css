@@ -194,3 +194,6 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 .piece-client-mpr-champs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
 .piece-client-mpr-champs .input { height: 38px; min-width: 190px; }
 .piece-client-mdp { display: inline-flex; align-items: center; gap: 4px; }
+
+/* Partenaires : bandeau de cartes compact comme les autres pages */
+.partner-kpis.page-kpi-strip .dashboard-kpi { min-height: 0; }
