@@ -8,6 +8,7 @@ export const FICHES_CEE = [
   { code: 'BAR-TH-171', cat: 'PAC air/eau', title: 'Pompe à chaleur de type air/eau', desc: 'PAC air/eau pour chauffage central', group: 'Chauffage' },
   { code: 'BAR-TH-172', cat: 'PAC eau/eau ou sol/eau', title: 'Pompe à chaleur de type eau/eau ou sol/eau', desc: 'PAC géothermique sur capteurs enterrés', group: 'Chauffage' },
   { code: 'BAR-TH-129', cat: 'PAC air/air', title: 'Pompe à chaleur de type air/air', desc: 'PAC air/air (climatisation réversible)', group: 'Chauffage' },
+  { code: 'BAR-TH-112', cat: 'Poêle à granulés', title: 'Poêle à granulés (appareil indépendant de chauffage au bois)', desc: 'Poêle à granulés ou à bois, chauffage d\'appoint ou principal', group: 'Chauffage' },
   { code: 'BAR-TH-143', cat: 'Système solaire combiné', title: 'Système solaire combiné', desc: 'Chauffage et eau chaude solaires', group: 'Chauffage' },
   { code: 'BAR-TH-148', cat: 'Chauffe-eau thermodynamique', title: 'Chauffe-eau thermodynamique à accumulation', desc: 'Production d\'eau chaude sanitaire thermodynamique', group: 'Eau chaude' },
   { code: 'BAR-TH-168', cat: 'Solaire thermique', title: 'Dispositif solaire thermique', desc: 'Chauffe-eau solaire individuel', group: 'Eau chaude' },
