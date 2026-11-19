@@ -36,6 +36,7 @@ export function FacturationPage(): JSX.Element {
   const [montantHt,setMontantHt] = useState('')
   const [dateEcheance,setDateEcheance] = useState('')
   const [search,setSearch] = useState('')
+  const [filtreFacture,setFiltreFacture] = useState<''|'acompte'|'solde'|'retard'>('')
 
   async function load(): Promise<void> {
     setLoading(true)
@@ -165,13 +166,31 @@ export function FacturationPage(): JSX.Element {
     if(error){setError(error.message);return}
     setFactures(prev=>prev.map(x=>x.id===f.id?{...x,statut:'annulee'}:x))
   }
-  const visible=factures.filter(f=>`${f.numero} ${f.prospect?.nom||''} ${f.prospect?.prenom||''} ${f.devis_numero||''}`.toLowerCase().includes(search.toLowerCase()))
+  const aujourdhui=new Date().toISOString().slice(0,10)
+  const enRetard=(f:FactureClient)=>f.statut==='emise'&&!!f.date_echeance&&f.date_echeance.slice(0,10)<aujourdhui
+  const ttc=(f:FactureClient)=>Number(f.montant_ttc ?? (Number(f.montant_ht)*(1+Number(f.taux_tva)/100)))
+  const ouvertes=factures.filter(f=>f.statut==='emise')
+  const payees=factures.filter(f=>f.statut==='payee')
+  const retards=factures.filter(enRetard)
+  const moisCourant=aujourdhui.slice(0,7)
+  const factureesMois=factures.filter(f=>f.statut!=='annulee'&&f.date_emission.slice(0,7)===moisCourant)
+  const somme=(l:FactureClient[])=>l.reduce((t,f)=>t+ttc(f),0)
+  const visible=factures.filter(f=>!filtreFacture||(filtreFacture==='retard'?enRetard(f):filtreFacture==='solde'?f.type_facture==='solde':f.type_facture===filtreFacture)).filter(f=>`${f.numero} ${f.prospect?.nom||''} ${f.prospect?.prenom||''} ${f.devis_numero||''}`.toLowerCase().includes(search.toLowerCase()))
 
   return (
     <div className="page">
       <div className="page-header"><div><h1 className="page-title">Facturation client</h1><p className="page-subtitle">Factures d’acompte, de démarrage de chantier et de solde, reliées aux devis signés.</p></div>{isAdmin&&<Button variant="primary" onClick={ouvrirCreation}><Plus size={16}/> Nouvelle facture</Button>}</div>
       {error&&<div className="card card-pad" style={{marginBottom:14,color:error.includes('envoyée')?'#166534':'#b91c1c'}}>{error}</div>}
-      <div className="card card-pad" style={{marginBottom:14}}><input className="input" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher une facture, un client ou un devis…"/></div>
+      <section className="dashboard-kpis page-kpi-strip">
+        <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Receipt size={19}/></span><span className="dashboard-kpi-main"><strong>{loading?'…':euro(somme(ouvertes))}</strong><span>À encaisser</span></span><span className="dashboard-kpi-note">{ouvertes.length} facture{ouvertes.length>1?'s':''} ouverte{ouvertes.length>1?'s':''}</span></div>
+        <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><CheckCircle2 size={19}/></span><span className="dashboard-kpi-main"><strong>{loading?'…':euro(somme(payees))}</strong><span>Encaissé</span></span><span className="dashboard-kpi-note">{payees.length} facture{payees.length>1?'s':''} payée{payees.length>1?'s':''}</span></div>
+        <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><XCircle size={19}/></span><span className="dashboard-kpi-main"><strong>{loading?'…':euro(somme(retards))}</strong><span>En retard</span></span><span className="dashboard-kpi-note">{retards.length} à relancer</span></div>
+        <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><Receipt size={19}/></span><span className="dashboard-kpi-main"><strong>{loading?'…':euro(somme(factureesMois))}</strong><span>Facturé ce mois</span></span><span className="dashboard-kpi-note">{factureesMois.length} facture{factureesMois.length>1?'s':''}</span></div>
+      </section>
+      <div className="card card-pad devis-filtres" style={{marginBottom:14}}>
+        <div className="devis-recherche"><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Rechercher une facture, un client ou un devis…"/></div>
+        <div className="prospect-puces">{([['','Toutes'],['acompte','Acomptes'],['solde','Soldes'],['retard','En retard']] as const).map(([v,l])=><button key={v} type="button" className={`puce${filtreFacture===v?' active':''}`} onClick={()=>setFiltreFacture(v)}>{l}</button>)}</div>
+      </div>
       <div className="card">
         {loading?<div className="card-pad text-muted">Chargement des factures…</div>:visible.length===0?<div className="empty-state"><Receipt size={36}/><h3>Aucune facture client</h3><p>Créez une facture à partir d’un devis signé. Le montant reste modifiable, dans la limite du reste à facturer.</p></div>:<div style={{overflowX:'auto'}}><table className="table"><thead><tr><th>Facture</th><th>Client</th><th>Devis</th><th>Type</th><th>Montant TTC</th><th>Statut</th><th>E-mail</th><th>Actions</th></tr></thead><tbody>{visible.map(f=><tr key={f.id}><td><strong>{f.numero}</strong><div className="text-xs text-muted">{new Date(`${f.date_emission}T12:00:00`).toLocaleDateString('fr-FR')}</div></td><td>{f.prospect?`${f.prospect.prenom||''} ${f.prospect.nom||''}`.trim():'—'}<div className="text-xs text-muted">{f.prospect?.email||'Pas d’e-mail'}</div></td><td>{f.devis_numero||'—'}</td><td>{TYPE_LABEL[f.type_facture]||f.type_facture}</td><td>{euro(Number(f.montant_ttc ?? (Number(f.montant_ht)*(1+Number(f.taux_tva)/100))))}</td><td><span className={`badge ${f.statut==='payee'?'badge-success':f.statut==='annulee'?'badge-error':'badge-warning'}`}>{f.statut==='payee'?'Payée':f.statut==='annulee'?'Annulée':'Émise'}</span></td><td>{f.email_envoye_at?<span className="text-sm" style={{color:'#166534'}}>Envoyée</span>:<span className="text-sm text-muted">{f.email_erreur||'Non envoyée'}</span>}</td><td><div style={{display:'flex',gap:5,flexWrap:'wrap'}}>{isAdmin&&f.statut!=='annulee'&&<Button size="sm" variant="secondary" onClick={()=>void envoyerFactureEmail(f)}><Mail size={13}/>{f.email_envoye_at?'Renvoyer':'Envoyer'}</Button>}{isAdmin&&f.statut==='emise'&&<Button size="sm" variant="ghost" onClick={()=>void marquerPayee(f)}><CheckCircle2 size={13}/> Payée</Button>}{isAdmin&&f.statut!=='annulee'&&<Button size="sm" variant="ghost" onClick={()=>void annuler(f)}><XCircle size={13}/> Annuler</Button>}{f.pdf_storage_path&&<Button size="sm" variant="ghost" onClick={()=>{const {data}=supabase.storage.from('documents').getPublicUrl(f.pdf_storage_path!);window.open(data.publicUrl,'_blank','noopener,noreferrer')}}><Download size={13}/> PDF</Button>}</div></td></tr>)}</tbody></table></div>}
       </div>
