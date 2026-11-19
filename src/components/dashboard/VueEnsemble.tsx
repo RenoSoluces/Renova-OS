@@ -1,4 +1,4 @@
-import { useMemo } from 'react'
+import { useMemo, useState } from 'react'
 import { ArrowRight, Check, FileSignature, Plus, RefreshCw, Bot, Send, Users, Euro } from 'lucide-react'
 import { PIPELINE_STAGES, euro, normalizeStatut, stageOf, timeAgo } from '../../lib/crm/constants'
 
@@ -38,10 +38,13 @@ export function VueEnsemble({ prenom, dateDuJour, prospects, devis, commissions,
     // CA signé HT par semaine, 8 dernières semaines
     const l0 = lundi(new Date())
     const semaines = Array.from({ length: 8 }, (_, i) => { const x = new Date(l0); x.setDate(x.getDate() - (7 - i) * 7); return x })
-    const caSemaine = semaines.map(s => {
+    const parSemaine = semaines.map(s => {
       const fin = new Date(s); fin.setDate(fin.getDate() + 7)
-      return signes.filter(x => { const t = dateSignature(x); return t >= s && t < fin }).reduce((a, x) => a + (Number(x.montant_ht) || 0), 0)
+      const liste = signes.filter(x => { const t = dateSignature(x); return t >= s && t < fin })
+      return { ca: liste.reduce((a, x) => a + (Number(x.montant_ht) || 0), 0), nb: liste.length }
     })
+    const caSemaine = parSemaine.map(x => x.ca)
+    const nbSemaine = parSemaine.map(x => x.nb)
 
     const objectif = profiles.filter(p => !/reno\s*soluces/i.test(p.nom_complet || '')).reduce((s, p) => s + (Number(p.objectif_mensuel ?? 10000) || 0), 0)
 
@@ -57,9 +60,10 @@ export function VueEnsemble({ prenom, dateDuJour, prospects, devis, commissions,
       return { id: p.id, nom: p.nom_complet || 'Commercial', ca }
     }).sort((a, b) => b.ca - a.ca).slice(0, 3)
 
-    return { signesMois, envoyesMois, caSigneMois, nouveauxMois, transfo, semaines, caSemaine, objectif, etapes, recuesMois, encaisseMois, parCommercial }
+    return { signesMois, envoyesMois, caSigneMois, nouveauxMois, transfo, semaines, caSemaine, nbSemaine, objectif, etapes, recuesMois, encaisseMois, parCommercial }
   }, [devis, prospects, commissions, profiles])
 
+  const [survol, setSurvol] = useState<number | null>(null)
   const joursRestants = (() => { const f = new Date(); f.setMonth(f.getMonth() + 1, 0); return Math.max(0, f.getDate() - new Date().getDate()) })()
   const pct = d.objectif > 0 ? Math.min(100, Math.round((d.caSigneMois / d.objectif) * 100)) : 0
 
@@ -115,12 +119,33 @@ export function VueEnsemble({ prenom, dateDuJour, prospects, devis, commissions,
       <section className="vm-duo">
         <article className="vm-card">
           <div className="vm-card-head"><h2>CA signé par semaine</h2><span>8 dernières semaines · HT</span></div>
-          <svg viewBox={`0 0 ${W} ${H}`} className="vm-chart" role="img" aria-label="CA signé HT par semaine">
+          <svg viewBox={`0 0 ${W} ${H}`} className="vm-chart vm-chart-vivant" role="img" aria-label="CA signé HT par semaine" onMouseLeave={() => setSurvol(null)}>
             {[0, 0.5, 1].map(f => <line key={f} x1={P} x2={W - P} y1={H - P - f * (H - 2 * P)} y2={H - P - f * (H - 2 * P)} stroke="#E3ECEA" />)}
-            <polygon points={aire} fill="rgba(31,122,112,.12)" />
-            <polyline points={ligne} fill="none" stroke="#0B6B6B" strokeWidth="3" strokeLinejoin="round" />
-            {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r="4" fill="#fff" stroke="#0B6B6B" strokeWidth="2.5" />)}
-            {d.semaines.map((s, i) => <text key={i} x={pts[i][0]} y={H - 6} textAnchor="middle" fontSize="11" fill="#7A8C8F">{s.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</text>)}
+            <polygon points={aire} fill="rgba(31,122,112,.12)" className="vm-chart-aire" />
+            <polyline points={ligne} fill="none" stroke="#0B6B6B" strokeWidth="3" strokeLinejoin="round" pathLength={1} className="vm-chart-ligne" />
+            {survol !== null && <line x1={pts[survol][0]} x2={pts[survol][0]} y1={P / 2} y2={H - P} stroke="#C2703D" strokeDasharray="4 4" />}
+            {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={survol === i ? 7 : 4} fill={survol === i ? '#C2703D' : '#fff'} stroke={survol === i ? '#C2703D' : '#0B6B6B'} strokeWidth="2.5" className="vm-chart-point" style={{ transitionDelay: survol === null ? `${i * 60}ms` : '0ms' }} />)}
+            {d.semaines.map((s, i) => <text key={i} x={pts[i][0]} y={H - 6} textAnchor="middle" fontSize="11" fontWeight={survol === i ? 700 : 400} fill={survol === i ? '#0B3F3B' : '#7A8C8F'}>{s.toLocaleDateString('fr-FR', { day: '2-digit', month: '2-digit' })}</text>)}
+            {pts.map((p, i) => (
+              <rect key={`h${i}`} x={p[0] - (W - 2 * P) / 14} y={0} width={(W - 2 * P) / 7} height={H} fill="transparent" style={{ cursor: 'pointer' }}
+                onMouseEnter={() => setSurvol(i)} onFocus={() => setSurvol(i)} onClick={() => setSurvol(i)} />
+            ))}
+            {survol !== null && (() => {
+              const [x, y] = pts[survol]
+              const fin = new Date(d.semaines[survol]); fin.setDate(fin.getDate() + 6)
+              const w = 150, h = 62
+              const bx = Math.min(Math.max(x - w / 2, 4), W - w - 4)
+              const by = y - h - 14 < 2 ? y + 16 : y - h - 14
+              const nb = d.nbSemaine[survol]
+              return (
+                <g pointerEvents="none">
+                  <rect x={bx} y={by} width={w} height={h} rx="10" fill="#0B3F3B" opacity=".96" />
+                  <text x={bx + 12} y={by + 18} fontSize="11" fill="#9FC2BD">{`${d.semaines[survol].toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })} – ${fin.toLocaleDateString('fr-FR', { day: '2-digit', month: 'short' })}`}</text>
+                  <text x={bx + 12} y={by + 38} fontSize="16" fontWeight="700" fill="#fff">{Math.round(d.caSemaine[survol]).toLocaleString('fr-FR')} € HT</text>
+                  <text x={bx + 12} y={by + 54} fontSize="11" fill="#E9B98F">{nb} devis signé{nb > 1 ? 's' : ''}</text>
+                </g>
+              )
+            })()}
           </svg>
         </article>
         <article className="vm-card vm-objectif">
