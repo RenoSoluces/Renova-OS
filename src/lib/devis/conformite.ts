@@ -77,7 +77,15 @@ export function fusionnerMeta(stocke: unknown, defauts: ConformiteMeta = META_PA
     ...defauts,
     ...s,
     logement: { ...defauts.logement, ...(s.logement || {}) },
-    pro: { ...defauts.pro, ...(s.pro || {}), couvre: { ...defauts.pro.couvre, ...(s.pro?.couvre || {}) } },
+    pro: {
+      ...defauts.pro,
+      ...(s.pro || {}),
+      // Le devis a sa propre qualification : seules ses fiches cochées comptent, pas celles
+      // mémorisées sur le poste pour une autre qualification.
+      couvre: s.pro?.rge && s.pro.rge !== defauts.pro.rge
+        ? { ...(s.pro?.couvre || {}) }
+        : { ...defauts.pro.couvre, ...(s.pro?.couvre || {}) },
+    },
     dates: { ...defauts.dates, ...(s.dates || {}) },
   }
 }

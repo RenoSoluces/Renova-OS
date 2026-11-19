@@ -46,6 +46,7 @@ import {
 import { REGLES_FICHES } from '../lib/devis/reglesFichesCEE'
 import { useNomEntreprise } from '../lib/organisation/useNomEntreprise'
 import { entrepriseCourante } from '../lib/organisation/entrepriseCourante'
+import { lireChoixEmetteur, modelesDe, optionsEmetteur, proDuModele } from '../lib/devis/modelesEmetteur'
 
 const CLE_PRO_LOCAL = 'renova.devis.pro'
 const pick = (o: any, cles: string[]) => { for (const k of cles) if (o && o[k] !== undefined && o[k] !== null && o[k] !== '') return String(o[k]); return '' }
@@ -284,7 +285,10 @@ export function DevisPage({
     const partenaire = prospect?.installateur_id
       ? partenairesDevis.find(x => x.id === prospect.installateur_id && x.devis_autorise)
       : null
-    setQuoteIssuerId(partenaire ? partenaire.id : 'renova_soluces')
+    // Partenaire avec des modèles : on ne devine pas le type de devis, on prend le premier
+    // modèle et l'utilisateur choisit (clim, PV, isolation…) dans la liste.
+    const premierModele = partenaire ? modelesDe(partenaire)[0] : undefined
+    setQuoteIssuerId(partenaire ? (premierModele ? `${partenaire.id}::${premierModele.code}` : partenaire.id) : 'renova_soluces')
   }, [newProspectId, prospects, partenairesDevis])
 
   async function creerDevis() {
@@ -301,9 +305,12 @@ export function DevisPage({
       return
     }
 
+    const choix = lireChoixEmetteur(quoteIssuerId)
     const partenaire = quoteIssuerId !== 'renova_soluces'
-      ? partenairesDevis.find(x => x.id === quoteIssuerId)
+      ? partenairesDevis.find(x => x.id === choix.installateurId)
       : null
+    const modele = partenaire && choix.modele ? modelesDe(partenaire).find(m => m.code === choix.modele) || null : null
+    const em = modele?.emetteur || {}
 
     if (quoteIssuerId !== 'renova_soluces' && !partenaire) {
       setCreationError('Le partenaire sélectionné n’est plus autorisé à émettre des devis.')
@@ -317,17 +324,17 @@ export function DevisPage({
       ? {
           emetteur_type: 'partenaire',
           emetteur_installateur_id: partenaire.id,
-          emetteur_nom_affichage: partenaire.devis_nom_affichage || partenaire.nom,
-          emetteur_raison_sociale: partenaire.devis_raison_sociale || partenaire.nom,
-          emetteur_forme_juridique: partenaire.devis_forme_juridique || '',
-          emetteur_siret: partenaire.siret || '',
-          emetteur_numero_tva: partenaire.numero_tva || '',
-          emetteur_adresse: partenaire.adresse || '',
-          emetteur_code_postal: partenaire.code_postal || '',
-          emetteur_ville: partenaire.ville || '',
-          emetteur_telephone: partenaire.telephone || '',
-          emetteur_email: partenaire.email || '',
-          emetteur_logo_url: partenaire.devis_logo_url || '',
+          emetteur_nom_affichage: em.nom_affichage || partenaire.devis_nom_affichage || partenaire.nom,
+          emetteur_raison_sociale: em.raison_sociale || partenaire.devis_raison_sociale || partenaire.nom,
+          emetteur_forme_juridique: em.forme_juridique ?? (partenaire.devis_forme_juridique || ''),
+          emetteur_siret: em.siret || partenaire.siret || '',
+          emetteur_numero_tva: em.numero_tva || partenaire.numero_tva || '',
+          emetteur_adresse: em.adresse || partenaire.adresse || '',
+          emetteur_code_postal: em.code_postal || partenaire.code_postal || '',
+          emetteur_ville: em.ville || partenaire.ville || '',
+          emetteur_telephone: em.telephone || partenaire.telephone || '',
+          emetteur_email: em.email || partenaire.email || '',
+          emetteur_logo_url: em.logo_url ?? (partenaire.devis_logo_url || ''),
           emetteur_cgv: partenaire.devis_cgv || '',
         }
       : {
@@ -360,6 +367,8 @@ export function DevisPage({
       montant_ht_avant_remise: 0,
       remise_montant_ht: 0,
       ...issuer,
+      // Modèle choisi : le bloc « professionnel qualifié » est rempli d'office.
+      ...(modele ? { conformite_devis: { pro: proDuModele(modele), modele_devis: modele.code } } : {}),
     }).select('*').single()
 
     if (error || !data) {
@@ -1252,12 +1261,12 @@ export function DevisPage({
               onChange={setQuoteIssuerId}
               options={[
                 { value: 'renova_soluces', label: entreprise?.raison_sociale || nomEntreprise || 'Mon entreprise' },
-                ...partenairesDevis.map(p => ({ value: p.id, label: p.devis_nom_affichage || p.nom })),
+                ...optionsEmetteur(partenairesDevis),
               ]}
             />
             {quoteIssuerId !== 'renova_soluces' && (
               <div className="text-xs text-muted mt-2">
-                Le devis sera édité au nom du partenaire autorisé et utilisera ses coordonnées légales et ses CGV enregistrées.
+                Le devis sera édité au nom du partenaire autorisé. Le type choisi remplit la société émettrice, la qualification RGE et l’assurance.
               </div>
             )}
           </div>
