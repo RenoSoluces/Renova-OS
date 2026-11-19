@@ -17,7 +17,7 @@ import { PipelineBoard } from '../components/crm/PipelineBoard'
 import { Timeline } from '../components/crm/Timeline'
 import { TasksPanel } from '../components/crm/TasksPanel'
 import { ProspectChat } from '../components/crm/ProspectChat'
-import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf, isProspectTerminal } from '../lib/crm/constants'
+import { PIPELINE_STAGES, TEMPERATURES, euro, stageOf, isProspectTerminal, normalizeStatut, isOverdue } from '../lib/crm/constants'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { FICHES_CEE } from '../lib/crm/fichesCee'
 import { FoyerFiscalAvis } from '../components/crm/FoyerFiscalAvis'
@@ -492,6 +492,21 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     return () => obs.disconnect()
   }, [nombreAffiche, filtered.length])
 
+  const kpiPro = useMemo(() => {
+    const actifsL = prospects.filter(p => !isProspectTerminal(p.statut) && !['perdu', 'refuse'].includes(normalizeStatut(p.statut)))
+    const il7 = Date.now() - 7 * 86400000
+    const chauds = actifsL.filter(p => p.temperature === 'chaud')
+    return {
+      actifs: actifsL.length,
+      enCours: actifsL.length,
+      chauds: chauds.filter(p => !p.derniere_interaction_at || new Date(p.derniere_interaction_at).getTime() < il7).length,
+      chaudsTotal: chauds.length,
+      installes: prospects.filter(p => normalizeStatut(p.statut) === 'installe').length,
+      avisiter: actifsL.filter(p => stageOf(p.statut).value === 'Qualifié').length,
+      valeur: actifsL.reduce((s, p) => s + (Number(p.montant_potentiel) || 0), 0),
+      retard: Object.values(tasksByProspect).flat().filter(t => isOverdue(t)).length,
+    }
+  }, [prospects, tasksByProspect])
   const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly ? 'pot' : ''].filter(Boolean).length
 
   function reinitialiserFiltres() {
@@ -1361,9 +1376,19 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
         {view === 'liste' && (
           <section className="dashboard-kpis page-kpi-strip">
-            <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.filter(p => !['Installé','Perdu','Refusé'].includes(p.statut)).length}</strong><span>Prospects actifs</span></span><span className="dashboard-kpi-note">À suivre</span></div>
-            <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Check size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.filter(p => p.statut === 'Installé').length}</strong><span>Clients</span></span><span className="dashboard-kpi-note">Installés</span></div>
-            <div className="dashboard-kpi"><span className="dashboard-kpi-icon purple"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.length}</strong><span>Total prospects</span></span><span className="dashboard-kpi-note">Base CRM</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.actifs}</strong><span>Prospects à suivre</span></span><span className="dashboard-kpi-note">sur {prospects.length} au total</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><Flame size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.chauds}</strong><span>Chauds à rappeler</span></span><span className="dashboard-kpi-note">sans contact depuis 7 jours</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Check size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.installes}</strong><span>Clients installés</span></span><span className="dashboard-kpi-note">dossiers terminés</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon purple"><Calendar size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.avisiter}</strong><span>Visites à planifier</span></span><span className="dashboard-kpi-note">qualifiés sans rendez-vous</span></div>
+          </section>
+        )}
+
+        {view === 'pipeline' && (
+          <section className="dashboard-kpis page-kpi-strip">
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.enCours}</strong><span>Prospects en cours</span></span><span className="dashboard-kpi-note">dans le pipeline</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Wallet size={19}/></span><span className="dashboard-kpi-main"><strong>{euro(kpiPro.valeur)}</strong><span>Valeur potentielle</span></span><span className="dashboard-kpi-note">devis en cours</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><Flame size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.chaudsTotal}</strong><span>Chauds</span></span><span className="dashboard-kpi-note">à rappeler cette semaine</span></div>
+            <div className="dashboard-kpi"><span className="dashboard-kpi-icon purple"><AlertTriangle size={19}/></span><span className="dashboard-kpi-main"><strong>{kpiPro.retard}</strong><span>Actions en retard</span></span><span className="dashboard-kpi-note">relances à faire</span></div>
           </section>
         )}
 
