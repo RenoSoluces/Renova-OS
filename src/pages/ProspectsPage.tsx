@@ -649,7 +649,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       commentaires: editForm.commentaires || null,
       fiches_cee: editForm.fiches_cee,
     }
-    await supabase.from('prospects').update(payload).eq('id', selected.id)
+    if (lectureSeule) {
+      // Apporteur : coordonnées et foyer seulement (la base refuse le reste de toute façon).
+      for (const k of ['type_prospect', 'zone_climatique', 'regime_aide_commission', 'source', 'fiches_cee']) delete payload[k]
+    }
+    const { error } = await supabase.from('prospects').update(payload).eq('id', selected.id)
+    if (error) { alert(`Modification impossible : ${error.message}`); return }
     setEditModal(false)
     fetchProspects().then(() => {
       const updated = prospects.find(p => p.id === selected.id)
@@ -764,7 +769,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 <PhoneCall size={16} /> Prospection tél.
               </Button>
             )}
-            {!lectureSeule && <Button variant="ghost" onClick={() => openEdit(selected)}>
+            {(!lectureSeule || selected.statut !== 'Signé') && <Button variant="ghost" onClick={() => openEdit(selected)}>
               <Pencil size={16} /> Modifier
             </Button>}
           </div>
@@ -1278,7 +1283,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             </>
           }
         >
-          <EditFormBody form={editForm} set={setEdit} toggleFiche={toggleEditFiche} fichesByGroup={fichesByGroup} />
+          {lectureSeule && (
+            <p className="text-sm text-muted" style={{ marginTop: 0 }}>
+              Vous pouvez corriger les coordonnées et la situation du foyer, et ajouter un commentaire. Le suivi du dossier reste géré par Reno Soluces.
+            </p>
+          )}
+          <EditFormBody form={editForm} set={setEdit} toggleFiche={toggleEditFiche} fichesByGroup={fichesByGroup} apporteur={lectureSeule} commentaireInitial={selected ? (extended(selected).commentaires || '') : ''} />
         </Modal>
 
         {/* Delete confirm */}
@@ -1752,8 +1762,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
 // ===== Edit form body (shared between edit modal) =====
 function EditFormBody({
-  form, set, toggleFiche, fichesByGroup,
+  form, set, toggleFiche, fichesByGroup, apporteur = false, commentaireInitial = '',
 }: {
+  apporteur?: boolean
+  commentaireInitial?: string
   form: typeof EMPTY_FORM
   set: <K extends keyof typeof EMPTY_FORM>(key: K, val: (typeof EMPTY_FORM)[K]) => void
   toggleFiche: (code: string) => void
@@ -1762,7 +1774,7 @@ function EditFormBody({
   return (
     <>
       <div className="grid grid-2 gap-3">
-        <FloatSelect label="Type de prospect" value={form.type_prospect} onChange={v => set('type_prospect', v as 'particulier' | 'professionnel')} options={TYPES_PROSPECT} />
+        {!apporteur && <FloatSelect label="Type de prospect" value={form.type_prospect} onChange={v => set('type_prospect', v as 'particulier' | 'professionnel')} options={TYPES_PROSPECT} />}
         <FloatSelect label="Civilité" value={form.civilite} onChange={v => set('civilite', v)} options={CIVILITES} />
       </div>
       {form.type_prospect === 'professionnel' && (
@@ -1800,16 +1812,27 @@ function EditFormBody({
       </div>
       <FloatSelect label="Statut d'occupation" value={form.statut_occupation} onChange={v => set('statut_occupation', v)} options={STATUTS_OCC} />
       <div className="mt-4"><FoyerFiscalAvis form={form as any} set={set as any} /></div>
+      {!apporteur && <>
       <div className="grid grid-2 gap-3 mt-4">
         <FloatSelect label="Zone climatique (barème commissions)" value={form.zone_climatique} onChange={v => set('zone_climatique', v)} options={[{ value: '', label: 'À renseigner' }, { value: 'H1', label: 'H1' }, { value: 'H2', label: 'H2' }, { value: 'H3', label: 'H3' }]} />
         <FloatSelect label="Régime d’aide solaire thermique" value={form.regime_aide_commission} onChange={v => set('regime_aide_commission', v)} options={[{ value: '', label: 'Sans objet / à renseigner' }, { value: 'mpr_cee', label: 'MaPrimeRénov’ + CEE' }, { value: 'full_cee', label: 'Full CEE' }]} />
       </div>
       <p className="text-sm text-muted" style={{ marginTop: 6 }}>Ces paramètres servent au calcul du barème apporteur pour le solaire thermique et l’isolation des combles. Vérifiez-les avant de signer le devis.</p>
       <FloatSelect label="Source" value={form.source} onChange={v => set('source', v)} options={SOURCES.map(s => ({ value: s, label: s }))} />
+      </>}
       <div style={{ marginTop: 16 }}>
-        <FloatTextarea label="Commentaires" value={form.commentaires} onChange={v => set('commentaires', v)} rows={3} />
+        {apporteur ? (
+          <>
+            {commentaireInitial && <p className="text-sm text-muted" style={{ whiteSpace: 'pre-wrap', margin: '0 0 8px' }}>{commentaireInitial}</p>}
+            <FloatTextarea label="Ajouter un commentaire" value={form.commentaires.startsWith(commentaireInitial) ? form.commentaires.slice(commentaireInitial.length).replace(/^\n+/, '') : form.commentaires}
+              onChange={v => set('commentaires', commentaireInitial ? (v.trim() ? `${commentaireInitial}\n\n${v}` : commentaireInitial) : v)} rows={3} />
+          </>
+        ) : (
+          <FloatTextarea label="Commentaires" value={form.commentaires} onChange={v => set('commentaires', v)} rows={3} />
+        )}
       </div>
 
+      {!apporteur && <>
       <div style={{ marginTop: 24, marginBottom: 8, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--c-primary-600)' }}>
         Fiches CEE
       </div>
@@ -1835,6 +1858,7 @@ function EditFormBody({
           </div>
         </div>
       ))}
+      </>}
     </>
   )
 }
