@@ -173,6 +173,8 @@ export function DevisPage({
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
   const [showNewModal, setShowNewModal] = useState(false)
+  const [rechercheListe, setRechercheListe] = useState('')
+  const [filtreStatutListe, setFiltreStatutListe] = useState<'' | 'brouillon' | 'envoye' | 'signe'>('')
   const [newProspectId, setNewProspectId] = useState('')
   const [filtrePublic, setFiltrePublic] = useState<'particulier' | 'professionnel' | 'tous'>('particulier')
   const [partenairesDevis, setPartenairesDevis] = useState<Installateur[]>([])
@@ -1144,6 +1146,16 @@ export function DevisPage({
     (!rechercheProduit.trim() || [p.nom, p.marque, p.reference].some(v => String(v || '').toLowerCase().includes(rechercheProduit.trim().toLowerCase())))
   )
 
+  const debutMois = new Date(); debutMois.setDate(1); debutMois.setHours(0, 0, 0, 0)
+  const caSigneMois = rows
+    .filter(d => d.statut === 'signe' && new Date(d.signature_date || d.created_at) >= debutMois)
+    .reduce((t, d) => t + (d.montant_ttc || 0), 0)
+  const termeListe = rechercheListe.trim().toLowerCase()
+  const rowsListe = rows.filter(d =>
+    (!filtreStatutListe || d.statut === filtreStatutListe) &&
+    (!termeListe || `${d.numero} ${d.prospect ? `${d.prospect.prenom} ${d.prospect.nom}` : ''}`.toLowerCase().includes(termeListe))
+  )
+
   if (view === 'list') {
     return (
       <div className="page">
@@ -1163,7 +1175,22 @@ export function DevisPage({
           <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><FileSignature size={19}/></span><span className="dashboard-kpi-main"><strong>{rows.filter(d => d.statut === 'brouillon').length}</strong><span>Brouillons</span></span><span className="dashboard-kpi-note">À finaliser</span></div>
           <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Send size={19}/></span><span className="dashboard-kpi-main"><strong>{rows.filter(d => d.statut === 'envoye').length}</strong><span>Envoyés</span></span><span className="dashboard-kpi-note">En attente</span></div>
           <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><CheckCircle2 size={19}/></span><span className="dashboard-kpi-main"><strong>{rows.filter(d => d.statut === 'signe').length}</strong><span>Signés</span></span><span className="dashboard-kpi-note">Clients engagés</span></div>
+          <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><FileSignature size={19}/></span><span className="dashboard-kpi-main"><strong>{euro(caSigneMois)}</strong><span>CA signé TTC</span></span><span className="dashboard-kpi-note">Ce mois-ci</span></div>
         </section>
+
+        {rows.length > 0 && (
+          <div className="card card-pad devis-filtres">
+            <div className="devis-recherche">
+              <Search size={16} />
+              <input value={rechercheListe} onChange={e => setRechercheListe(e.target.value)} placeholder="Rechercher un numéro, un client…" />
+            </div>
+            <div className="prospect-puces">
+              {([['', 'Tous'], ['brouillon', 'Brouillons'], ['envoye', 'Envoyés'], ['signe', 'Signés']] as const).map(([v, l]) => (
+                <button key={v} type="button" className={`puce${filtreStatutListe === v ? ' active' : ''}`} onClick={() => setFiltreStatutListe(v)}>{l}</button>
+              ))}
+            </div>
+          </div>
+        )}
 
         <div className="card">
           {loading ? (
@@ -1186,7 +1213,7 @@ export function DevisPage({
                 </tr>
               </thead>
               <tbody>
-                {rows.map(d => (
+                {rowsListe.map(d => (
                   <tr key={d.id} onClick={() => ouvrirDevis(d)} style={{ cursor: 'pointer' }}>
                     <td className="font-semibold">
                       {d.numero}
