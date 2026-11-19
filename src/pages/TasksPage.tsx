@@ -3,6 +3,7 @@ import { BoutonRelance } from '../components/partage/BoutonRelance'
 import type { ContexteRelance, InfosRelance } from '../lib/crm/messagesRelance'
 import { CalendarClock, CheckCircle2, Circle, Phone, Mail, Calendar, RefreshCw, MapPin, MessageCircle, Navigation, UserRoundX, PhoneOff, PhoneCall, Clock3, StickyNote } from 'lucide-react'
 import { useAuth } from '../lib/auth/AuthContext'
+import { journaliserAppel } from '../lib/crm/journalAppel'
 import { normalizeStatut } from '../lib/crm/constants'
 import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { supabase } from '../lib/supabase'
@@ -164,7 +165,7 @@ export function TasksPage(): JSX.Element {
     const phone = prospect?.telephone || ''
     const destination = (address || adresseProspect(prospect)).trim()
     return <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginTop: 9 }}>
-      {phone && <a className="btn btn-sm btn-secondary" href={`tel:${phone}`}><Phone size={14}/> Appeler</a>}
+      {phone && <a className="btn btn-sm btn-secondary" href={`tel:${phone}`} onClick={() => void journaliserAppel({ prospectId: (prospect as any)?.id, telephone: phone, auteur: profile?.nom_complet, source: 'tâches' })}><Phone size={14}/> Appeler</a>}
       {prospect && <BoutonRelance prospect={prospect as any} contexte={contexte} infos={infos} libelle="SMS / WhatsApp" />}
       {prospect?.email && <button type="button" className="btn btn-sm btn-secondary" onClick={() => setEmailPour(prospect)}><Mail size={14}/> E-mail</button>}
       {destination && <a className="btn btn-sm btn-secondary" href={`https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destination)}`} target="_blank" rel="noreferrer"><Navigation size={14}/> Itinéraire</a>}

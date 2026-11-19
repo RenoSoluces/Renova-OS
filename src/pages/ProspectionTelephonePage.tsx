@@ -5,6 +5,7 @@ import {
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
+import { journaliserAppel } from '../lib/crm/journalAppel'
 import { lirePages } from '../lib/catalogue/chargerCatalogue'
 import type { Prospect } from '../types'
 import { Button } from '../components/ui/Button'
@@ -74,6 +75,7 @@ const dateCourte = (iso: string | null) => iso ? new Date(iso).toLocaleDateStrin
 
 export function ProspectionTelephonePage(): JSX.Element {
   const { profile } = useAuth()
+  const tracerAppel = (l: { id: string; telephone: string | null }) => journaliserAppel({ prospectId: l.id, telephone: l.telephone, auteur: profile?.nom_complet, source: 'prospection téléphonique' })
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -281,13 +283,13 @@ async function importerCsv(file?:File):Promise<void>{
               <strong>{l.raison_sociale || `${l.prenom} ${l.nom}`.trim()}</strong>
               <span>{[l.code_postal, l.ville].filter(Boolean).join(' ') || 'Localisation inconnue'}{l.liste_appels_le ? ` · Commercial : ${l.commercial || '—'}${peutConstituer && l.liste_appels_pour && l.liste_appels_pour !== profile?.id ? ` · Liste de ${appelants[l.liste_appels_pour] || '…'}` : ''}` : ''}</span>
             </div>
-            <div className="pt-lead-tel">{l.telephone ? <a href={`tel:${telPropre(l.telephone)}`}>{l.telephone}</a> : <em>Téléphone manquant</em>}</div>
+            <div className="pt-lead-tel">{l.telephone ? <a href={`tel:${telPropre(l.telephone)}`} onClick={() => void tracerAppel(l)}>{l.telephone}</a> : <em>Téléphone manquant</em>}</div>
             <div className="pt-lead-statut">
               <span className={`pt-badge ${l.statutLead}`}>{l.statutLead === 'a_appeler' ? 'À appeler' : l.statutLead === 'joint' ? 'Joint' : 'Pas joint'}</span>
               {l.dernierResultat && <small>{l.dernierResultat} · {dateCourte(l.dernierAppel)}{l.tentatives > 1 ? ` · ${l.tentatives} appels` : ''}</small>}
             </div>
             <div className="pt-lead-actions">
-              {l.telephone && <a className="btn btn-secondary btn-sm" href={`tel:${telPropre(l.telephone)}`}><Phone size={14} /> Appeler</a>}
+              {l.telephone && <a className="btn btn-secondary btn-sm" href={`tel:${telPropre(l.telephone)}`} onClick={() => void tracerAppel(l)}><Phone size={14} /> Appeler</a>}
               <Button variant={l.statutLead === 'a_appeler' ? 'primary' : 'secondary'} size="sm" onClick={() => ouvrir(l)}>Résultat <ArrowRight size={14} /></Button>
               {l.liste_appels_le && <button type="button" className="pt-retirer" onClick={() => void retirerDeLaListe(l)} title="Retirer de la liste d’appels (la fiche et son commercial ne changent pas)" aria-label={`Retirer ${l.prenom} ${l.nom} de la liste d’appels`}><X size={15} /></button>}
             </div>
@@ -301,7 +303,7 @@ async function importerCsv(file?:File):Promise<void>{
       footer={<><Button variant="secondary" onClick={() => setSelected(null)}>Annuler</Button><Button variant="secondary" onClick={() => void enregistrerResultat(false)} disabled={savingResult}>Enregistrer</Button><Button variant="primary" onClick={() => void enregistrerResultat(true)} disabled={savingResult}>{savingResult ? 'Enregistrement…' : 'Enregistrer et suivant'}</Button></>}>
       {selected && <div className="pt-modal">
         <div className="pt-modal-contact">
-          {selected.telephone ? <a className="pt-gros-tel" href={`tel:${telPropre(selected.telephone)}`}><Phone size={20} /> {selected.telephone}</a> : <strong>Téléphone manquant</strong>}
+          {selected.telephone ? <a className="pt-gros-tel" href={`tel:${telPropre(selected.telephone)}`} onClick={() => void tracerAppel(selected)}><Phone size={20} /> {selected.telephone}</a> : <strong>Téléphone manquant</strong>}
           <span>{[selected.adresse, selected.code_postal, selected.ville].filter(Boolean).join(', ')}</span>
           {selected.tentatives > 0 && <small>{selected.tentatives} appel(s) déjà passé(s) · dernier : {selected.dernierResultat}</small>}
         </div>

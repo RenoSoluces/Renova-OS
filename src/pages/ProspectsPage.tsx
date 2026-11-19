@@ -26,6 +26,7 @@ import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { ImportRdvGoogleModal } from '../components/crm/ImportRdvGoogleModal'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { journaliserAppel } from '../lib/crm/journalAppel'
 import { PiecesClient, estPieceClient } from '../components/crm/PiecesClient'
 import { resolveDocumentRows } from '../lib/storage/documentUrl'
 import { ProspectShareControl } from '../components/crm/ProspectShareControl'
@@ -340,20 +341,9 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     }
   }, [selected?.id])
 
-  /** Note dans l'historique que l'appel a été lancé depuis la fiche (une seule trace par minute). */
-  const dernierAppelLog = useRef<Record<string, number>>({})
-  async function journaliserAppel(prospect: { id: string; telephone?: string | null }) {
-    const maintenant = Date.now()
-    if (maintenant - (dernierAppelLog.current[prospect.id] || 0) < 60_000) return
-    dernierAppelLog.current[prospect.id] = maintenant
-    const { error } = await supabase.from('interactions').insert({
-      prospect_id: prospect.id, type: 'appel', auteur: profile?.nom_complet || 'Vous',
-      contenu: `Appel lancé vers ${prospect.telephone || 'le prospect'} depuis la fiche`,
-      meta: { canal: 'telephone', source: 'fiche_prospect' },
-    })
-    if (error) { dernierAppelLog.current[prospect.id] = 0; return }
-    await supabase.from('prospects').update({ derniere_interaction_at: new Date().toISOString() }).eq('id', prospect.id)
-    setTimelineRefresh(r => r + 1)
+  async function journaliserAppelFiche(prospect: { id: string; telephone?: string | null }) {
+    const ajoute = await journaliserAppel({ prospectId: prospect.id, telephone: prospect.telephone, auteur: profile?.nom_complet, source: 'fiche prospect' })
+    if (ajoute) setTimelineRefresh(r => r + 1)
   }
 
   async function updateStage(prospectId: string, newStatut: string) {
@@ -771,7 +761,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               <Calendar size={16} /> Nouvelle visite
             </Button>}
             {selected.telephone && (
-              <a href={`tel:${selected.telephone}`} className="btn btn-outline" style={{ textDecoration: 'none' }} onClick={() => void journaliserAppel(selected)}>
+              <a href={`tel:${selected.telephone}`} className="btn btn-outline" style={{ textDecoration: 'none' }} onClick={() => void journaliserAppelFiche(selected)}>
                 <Phone size={16} /> Appeler
               </a>
             )}
@@ -906,7 +896,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 </div>
                 <div className="detail-contact-btns">
                   {selected.telephone && (
-                    <a href={`tel:${selected.telephone}`} className="detail-contact-btn" style={{ textDecoration: 'none' }} onClick={() => void journaliserAppel(selected)}>
+                    <a href={`tel:${selected.telephone}`} className="detail-contact-btn" style={{ textDecoration: 'none' }} onClick={() => void journaliserAppelFiche(selected)}>
                       <Phone size={16} /> Appeler
                     </a>
                   )}

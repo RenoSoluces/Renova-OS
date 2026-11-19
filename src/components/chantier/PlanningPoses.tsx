@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { CalendarDays, CheckCircle2, ClipboardCheck, HardHat, Loader2, MapPin, Phone, Wrench, X } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useAuth } from '../../lib/auth/AuthContext'
+import { journaliserAppel } from '../../lib/crm/journalAppel'
 import { euro } from '../../lib/crm/constants'
 import { BoutonRelance } from '../partage/BoutonRelance'
 import { SignaturePad } from '../shared/SignaturePad'
@@ -73,7 +74,7 @@ export function PlanningPoses() {
         {mode !== 'termine' && <button type="button" className="btn btn-sm btn-secondary" onClick={() => setPlanifier(d)}><CalendarDays size={14} /> {mode === 'planifier' ? 'Planifier' : 'Modifier'}</button>}
         {mode === 'planifie' && <BoutonRelance prospect={d.prospect as any} contexte="installation" infos={{ date: d.date_installation_prevue, installateur: nomInstallateur(d.installateur_id), dureeJours: d.duree_pose_jours }} libelle="Prévenir le client" />}
         {mode !== 'planifier' && !d.reception?.signe && <button type="button" className="btn btn-sm btn-primary" onClick={() => setReception(d)}><ClipboardCheck size={14} /> PV de réception</button>}
-        {d.prospect?.telephone && <a className="btn btn-sm btn-ghost" href={`tel:${d.prospect.telephone}`}><Phone size={14} /></a>}
+        {d.prospect?.telephone && <a className="btn btn-sm btn-ghost" href={`tel:${d.prospect.telephone}`} onClick={() => void journaliserAppel({ prospectId: d.prospect_id || d.prospect?.id, telephone: d.prospect?.telephone, auteur: profile?.nom_complet, source: 'planning des poses' })}><Phone size={14} /></a>}
       </div>
     </article>
   )
