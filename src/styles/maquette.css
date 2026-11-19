@@ -176,3 +176,9 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 .dossier-card { border-radius: 16px; border: 0; box-shadow: 0 1px 2px rgba(11,63,59,.06); }
 /* Bandeau à 5 cartes : la note d'en-tête chevauchait le titre */
 .dashboard-kpis.page-kpi-strip:has(.dashboard-kpi:nth-child(5):last-child) .dashboard-kpi-note { display: none; }
+
+/* Devis : barre de recherche + puces */
+.devis-filtres { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; margin-bottom: 16px; border-radius: 22px; box-shadow: var(--m-shadow); }
+.devis-recherche { flex: 1 1 260px; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 46px; border: 1px solid #D5E0DE; border-radius: 14px; background: #fff; color: #5B6F72; }
+.devis-recherche input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: #14262A; }
+.devis-filtres .prospect-puces { margin: 0; }
