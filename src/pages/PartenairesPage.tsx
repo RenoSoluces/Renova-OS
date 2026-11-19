@@ -71,7 +71,7 @@ export function PartenairesPage() {
   }
   return <div className="page partners-page">
     <div className="page-header"><div><div className="dashboard-kicker">RÉSEAU ADMIN</div><h1 className="page-title">Partenaires</h1><p className="page-subtitle">Pilotage des installateurs, spécialités et zones d’intervention.</p></div><Button variant="primary" onClick={()=>{setEditing(null);setForm({nom:'',contact:'',telephone:'',email:'',adresse:'',code_postal:'',ville:'',zone_intervention:'',numero_rge:'',specialites:'',siret:'',numero_tva:'',devis_autorise:false,devis_nom_affichage:'',devis_raison_sociale:'',devis_forme_juridique:'',devis_logo_url:'',devis_cgv:''});setOpen(true)}}><Plus size={17}/> Nouveau partenaire</Button></div>
-    <section className="dashboard-kpis partner-kpis">
+    <section className="dashboard-kpis page-kpi-strip partner-kpis">
       <div className="dashboard-kpi"><span className="dashboard-kpi-icon green"><Building2 size={19}/></span><span className="dashboard-kpi-main"><strong>{partners.filter(p=>p.actif).length}</strong><span>Partenaires actifs</span></span></div>
       <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><Users size={19}/></span><span className="dashboard-kpi-main"><strong>{prospects.filter(p=>p.installateur_id).length}</strong><span>Leads attribués</span></span></div>
       <div className="dashboard-kpi"><span className="dashboard-kpi-icon amber"><Wrench size={19}/></span><span className="dashboard-kpi-main"><strong>{dossiers.filter(d=>d.installateur_id && d.statut!=='installe').length}</strong><span>Chantiers en cours</span></span></div>
