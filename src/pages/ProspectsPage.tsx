@@ -3,7 +3,7 @@ import {
   Plus, Search, ChevronLeft, ChevronRight, Check, Phone, Mail, MapPin,
   Pencil, Trash2, Zap, Home, Wrench, User, Users, Wallet, ArrowRight,
   AlertTriangle, FileText, Calendar, LayoutGrid, List as ListIcon,
-  Flame, Snowflake, Minus, Tag, X as XIcon, UploadCloud, Download, CalendarDays, PhoneCall,
+  Flame, Snowflake, Minus, Bell, Tag, X as XIcon, UploadCloud, Download, CalendarDays, PhoneCall,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { lireTout } from '../lib/lireTout'
@@ -116,6 +116,15 @@ function avatarColor(name: string): string {
 
 function initials(prenom: string, nom: string): string {
   return ((prenom?.[0] || '') + (nom?.[0] || '')).toUpperCase() || '?'
+}
+
+function ilYa(iso?: string | null): string {
+  if (!iso) return 'jamais contacté'
+  const j = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000)
+  if (j <= 0) return "aujourd'hui"
+  if (j === 1) return 'hier'
+  if (j < 60) return `il y a ${j} j`
+  return `il y a ${Math.floor(j / 30)} mois`
 }
 
 function formatDate(iso: string): string {
@@ -1041,7 +1050,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               <div className="detail-section-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
                 <Timeline prospectId={selected.id} refreshKey={timelineRefresh} auteur={profile?.nom_complet || 'Vous'} />
               </div>
-              <div className="detail-section-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
+              <div id="prospect-taches" className="detail-section-card" style={{ padding: 0, background: 'transparent', border: 'none', boxShadow: 'none' }}>
                 <TasksPanel prospectId={selected.id} onChanged={fetchOpenTasks} defaultAssigne={profile?.nom_complet || ''} />
               </div>
 
@@ -1544,11 +1553,34 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                     </span>
                     {e.type_prospect === 'professionnel' && <span className="badge badge-info">Pro</span>}
                     {ceeCount > 0 && <span className="prospect-cee-tag">{ceeCount} CEE</span>}
+                    <span className={`prospect-temp-tag temp-${p.temperature || 'tiede'}`}>
+                      {TEMPERATURES.find(t => t.value === (p.temperature || 'tiede'))?.label}
+                    </span>
                     {isAdmin && (
                       <span className="badge badge-neutral">{p.commercial || 'Non attribué'}</span>
                     )}
                   </div>
-                  <div className="prospect-row-date">{formatDate(p.created_at)}</div>
+                  <div className="prospect-row-date" title={`Créé le ${formatDate(p.created_at)}`}>{ilYa(p.derniere_interaction_at)}</div>
+                  <div className="prospect-row-actions" onClick={ev => ev.stopPropagation()}>
+                    {p.telephone ? (
+                      <a className="row-action" href={`tel:${p.telephone}`} aria-label="Appeler" title="Appeler"
+                        onClick={() => void journaliserAppel({ prospectId: p.id, telephone: p.telephone, auteur: profile?.nom_complet, source: 'liste des prospects' })}>
+                        <Phone size={16} />
+                      </a>
+                    ) : <span className="row-action disabled" aria-hidden><Phone size={16} /></span>}
+                    {p.email ? (
+                      <button type="button" className="row-action" aria-label="Envoyer un e-mail" title="Envoyer un e-mail"
+                        onClick={() => { setSelected(p); setEmailOuvert(true) }}>
+                        <Mail size={16} />
+                      </button>
+                    ) : <span className="row-action disabled" aria-hidden><Mail size={16} /></span>}
+                    {!lectureSeule && (
+                      <button type="button" className="row-action" aria-label="Programmer une relance" title="Programmer une relance"
+                        onClick={() => { setSelected(p); setTimeout(() => document.getElementById('prospect-taches')?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 400) }}>
+                        <Bell size={16} />
+                      </button>
+                    )}
+                  </div>
                 </div>
               )
             })}
