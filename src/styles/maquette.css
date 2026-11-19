@@ -182,3 +182,7 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 .devis-recherche { flex: 1 1 260px; display: flex; align-items: center; gap: 10px; padding: 0 14px; height: 46px; border: 1px solid #D5E0DE; border-radius: 14px; background: #fff; color: #5B6F72; }
 .devis-recherche input { flex: 1; border: 0; outline: 0; background: transparent; font: inherit; color: #14262A; }
 .devis-filtres .prospect-puces { margin: 0; }
+
+/* Barres de filtres (Dossiers, SAV, Veille) : carte blanche arrondie comme la maquette */
+.dossier-filtres { background: #fff; border-radius: 22px; box-shadow: var(--m-shadow); padding: 14px 16px; }
+.dossier-filtres .input { border-radius: 14px; height: 46px; }
