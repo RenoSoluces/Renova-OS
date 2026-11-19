@@ -149,3 +149,10 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 .pro-filter-select, .page .input { border-radius: 12px; }
 .prospect-list-card, .card { border-radius: 22px; border-color: transparent; box-shadow: var(--m-shadow); }
 .badge { border-radius: 99px; font-weight: 600; }
+
+/* Cartes blanches du bandeau : texte foncé (les textes clairs d'origine les rendaient invisibles) */
+.dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) *,
+.dashboard-kpis.page-kpi-strip .dashboard-kpi:nth-child(2):last-child * { color: #14262A !important; }
+.dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) .dashboard-kpi-main span { color: #5B6F72 !important; }
+.dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) .dashboard-kpi-icon { background: #E1F1EF !important; }
+.dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) .dashboard-kpi-icon * { color: #0B6B6B !important; }
