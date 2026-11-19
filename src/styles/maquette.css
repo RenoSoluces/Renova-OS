@@ -197,3 +197,13 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 
 /* Partenaires : bandeau de cartes compact comme les autres pages */
 .partner-kpis.page-kpi-strip .dashboard-kpi { min-height: 0; }
+
+/* Liste prospects — température, dernier contact, actions rapides (maquette) */
+.prospect-temp-tag{font-size:12px;font-weight:600;padding:3px 10px;border-radius:99px;white-space:nowrap}
+.prospect-temp-tag.temp-chaud{color:#9A3412;background:#FDE5D6}
+.prospect-temp-tag.temp-tiede{color:#8A6A00;background:#FBF0C8}
+.prospect-temp-tag.temp-froid{color:#35566B;background:#E3EEF5}
+.prospect-row-actions{display:flex;gap:6px;flex-shrink:0}
+.row-action{width:36px;height:36px;border:1px solid #D3DEDC;background:#fff;border-radius:10px;color:#0B4F4A;display:inline-flex;align-items:center;justify-content:center;padding:0;cursor:pointer;text-decoration:none}
+.row-action:hover{background:#F4F8F7;border-color:#0B4F4A}
+.row-action.disabled{opacity:.35;cursor:default;pointer-events:none}
