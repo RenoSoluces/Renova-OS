@@ -141,6 +141,8 @@ export function VisitesPage({
 
   const [view, setView] = useState<'list' | 'wizard' | 'overview'>('list')
   const [visites, setVisites] = useState<Visite[]>([])
+  const [rechercheVisite, setRechercheVisite] = useState('')
+  const [filtreVisite, setFiltreVisite] = useState<'' | 'planifiee' | 'en_cours' | 'terminee'>('')
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
   const [currentVisite, setCurrentVisite] = useState<Visite | null>(null)
@@ -1350,6 +1352,19 @@ export function VisitesPage({
               <div className="dashboard-kpi"><span className="dashboard-kpi-icon blue"><FileText size={19}/></span><span className="dashboard-kpi-main"><strong>{new Set(visites.map(v => (v as any).vt_produit_id).filter(Boolean)).size}</strong><span>Produits VT utilisés</span></span><span className="dashboard-kpi-note">Catalogue</span></div>
             </section>
 
+            {visites.length > 0 && (
+              <div className="card card-pad devis-filtres">
+                <div className="devis-recherche">
+                  <input value={rechercheVisite} onChange={e => setRechercheVisite(e.target.value)} placeholder="Rechercher un client, une ville…" />
+                </div>
+                <div className="prospect-puces">
+                  {([['', 'Toutes'], ['planifiee', 'Planifiées'], ['en_cours', 'En cours'], ['terminee', 'Terminées']] as const).map(([v, l]) => (
+                    <button key={v} type="button" className={`puce${filtreVisite === v ? ' active' : ''}`} onClick={() => setFiltreVisite(v)}>{l}</button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {loading && (
               <div className="text-muted">
                 Chargement…
@@ -1384,7 +1399,13 @@ export function VisitesPage({
                 </div>
               )}
 
-            {visites.map(v => {
+            {visites.filter(v => {
+              if (filtreVisite && v.statut !== filtreVisite) return false
+              const t = rechercheVisite.trim().toLowerCase()
+              if (!t) return true
+              const q = v.prospect as any
+              return `${q?.prenom || ''} ${q?.nom || ''} ${q?.ville || ''}`.toLowerCase().includes(t)
+            }).map(v => {
               const p = v.prospect as any
 
               const initials = p
