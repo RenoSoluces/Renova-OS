@@ -186,3 +186,11 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 /* Barres de filtres (Dossiers, SAV, Veille) : carte blanche arrondie comme la maquette */
 .dossier-filtres { background: #fff; border-radius: 22px; box-shadow: var(--m-shadow); padding: 14px 16px; }
 .dossier-filtres .input { border-radius: 14px; height: 46px; }
+
+/* Pièces du client (fiche prospect) */
+.piece-client-row, .piece-client-mpr { align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.piece-client-actions { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; }
+.piece-client-fichier { display: flex; align-items: center; gap: 8px; }
+.piece-client-mpr-champs { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: flex-end; }
+.piece-client-mpr-champs .input { height: 38px; min-width: 190px; }
+.piece-client-mdp { display: inline-flex; align-items: center; gap: 4px; }

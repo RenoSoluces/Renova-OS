@@ -26,6 +26,7 @@ import { EmailProspectModal } from '../components/crm/EmailProspectModal'
 import { ImportRdvGoogleModal } from '../components/crm/ImportRdvGoogleModal'
 import { useAuth } from '../lib/auth/AuthContext'
 import { uploadDocument } from '../lib/storage/uploadDocument'
+import { PiecesClient, estPieceClient } from '../components/crm/PiecesClient'
 import { resolveDocumentRows } from '../lib/storage/documentUrl'
 import { ProspectShareControl } from '../components/crm/ProspectShareControl'
 import { QuestionnairePro } from '../components/prospection/QuestionnairePro'
@@ -964,6 +965,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 </div>
               )}
 
+              {!lectureSeule && <PiecesClient prospectId={selected.id} documents={prospectDocuments} onChange={() => fetchProspectDocuments(selected.id)} />}
+
               {/* Documents du prospect / devis partenaires */}
               {!lectureSeule && <div className="detail-section-card">
                 <div className="detail-section-top">
@@ -997,11 +1000,11 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                   </div>
                 </div>
                 <div className="detail-info-card">
-                  {prospectDocuments.length === 0 ? (
+                  {prospectDocuments.filter(d => !estPieceClient(d.categorie)).length === 0 ? (
                     <div className="detail-info-inner text-sm text-muted">Aucun document partenaire enregistré.</div>
                   ) : (
                     <div className="detail-info-inner">
-                      {prospectDocuments.map(doc => {
+                      {prospectDocuments.filter(d => !estPieceClient(d.categorie)).map(doc => {
                         const partenaire = installateurs.find(i => i.id === doc.partenaire_id)?.nom
                         return (
                           <div className="detail-info-row" key={doc.id}>
