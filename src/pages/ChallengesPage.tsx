@@ -7,7 +7,7 @@ import { Button } from '../components/ui/Button'
 type Organisation = { id: string; nom: string }
 type Member = { id: string; nom_complet: string; role: string; organisation_id: string | null }
 type Challenge = { id: string; organisation_id: string; nom: string; description: string | null; date_debut: string; date_fin: string; objectif: string | null; statut: string }
-type Score = { id: string; challenge_id: string; participant_id: string; points: number; commentaire: string | null; updated_at: string }
+type Score = { id: string; challenge_id: string; participant_id: string | null; participant_nom?: string | null; points: number; commentaire: string | null; updated_at: string }
 const dateToday = () => new Date().toISOString().slice(0, 10)
 const canManageRole = (role?: string) => ['admin','manager','partner_admin','company_admin'].includes(role || '')
 
@@ -61,7 +61,10 @@ export function ChallengesPage() {
     return members.filter(m => m.organisation_id === selected.organisation_id && m.role !== 'admin')
   }, [members, selected])
   const ranked = useMemo(() => [...scores].sort((a,b) => Number(b.points)-Number(a.points)), [scores])
-  const memberName = (id: string) => members.find(m => m.id === id)?.nom_complet || 'Compte indisponible'
+  const memberName = (id: string | null) => (id && members.find(m => m.id === id)?.nom_complet) || 'Compte indisponible'
+  // Un participant sans compte Renova (ex. « Claude ») est nommé directement.
+  const scoreName = (sc: Score) => sc.participant_id ? memberName(sc.participant_id) : (sc.participant_nom || 'Participant')
+  const calculAuto = (selected as any)?.calcul_auto === 'commissions_societe'
   const organisationName = (id: string) => organisations.find(o => o.id === id)?.nom || 'Société'
 
   function startCreate() {
@@ -102,7 +105,7 @@ export function ChallengesPage() {
     await loadScores(selected.id)
   }
   function editScore(score: Score) {
-    setScoreEditingId(score.id); setParticipantId(score.participant_id); setPoints(String(score.points)); setCommentaire(score.commentaire || '')
+    setScoreEditingId(score.id); setParticipantId(score.participant_id || ""); setPoints(String(score.points)); setCommentaire(score.commentaire || '')
   }
   async function refresh() { await loadBase(); if (selectedId) await loadScores(selectedId) }
 
@@ -120,8 +123,9 @@ export function ChallengesPage() {
     {loading ? <div className="card card-pad">Chargement des challenges…</div> : challenges.length === 0 ? <div className="card card-pad" style={{textAlign:'center'}}><Award size={30}/><h3>Aucun challenge pour le moment</h3><p className="text-muted">Créez un challenge pour une société afin de lancer son classement.</p></div> : <div className="grid-2" style={{alignItems:'start',gap:16}}>
       <div className="card card-pad"><h3>Challenges</h3><div style={{display:'grid',gap:8}}>{challenges.map(ch=><button key={ch.id} className="card card-pad" style={{textAlign:'left',border:ch.id===selectedId?'2px solid var(--c-primary,#2563eb)':undefined,cursor:'pointer'}} onClick={()=>setSelectedId(ch.id)}><strong>{ch.nom}</strong><div className="text-sm text-muted">{organisationName(ch.organisation_id)} · {ch.date_debut} → {ch.date_fin}</div><div className="text-sm">{ch.objectif || ch.description || 'Classement par points'}</div></button>)}</div></div>
       {selected && <div className="card card-pad"><div style={{display:'flex',alignItems:'start',gap:10}}><Trophy size={24}/><div><h2 style={{margin:0}}>{selected.nom}</h2><p className="text-muted">{organisationName(selected.organisation_id)} · {selected.date_debut} au {selected.date_fin}</p>{selected.description && <p>{selected.description}</p>}</div></div>
-        <h3 style={{marginTop:18}}>Classement</h3>{ranked.length===0 ? <p className="text-muted">Aucun score. Ajoutez les participants et leurs points ci-dessous.</p> : <div className="table-wrap"><table><thead><tr><th>Rang</th><th>Participant</th><th>Points</th>{canManage && <th>Action</th>}</tr></thead><tbody>{ranked.map((s,index)=><tr key={s.id}><td><strong>{index+1}</strong></td><td>{memberName(s.participant_id)}{s.commentaire && <div className="text-sm text-muted">{s.commentaire}</div>}</td><td><strong>{Number(s.points).toLocaleString('fr-FR')}</strong></td>{canManage && <td><Button variant="secondary" onClick={()=>editScore(s)}>Modifier</Button></td>}</tr>)}</tbody></table></div>}
-        {canManage && <form onSubmit={saveScore} style={{marginTop:18}}><h3>{scoreEditingId?'Modifier un score':'Ajouter un participant au classement'}</h3><div className="form-grid"><label className="field"><span>Participant</span><select required value={participantId} onChange={e=>setParticipantId(e.target.value)}><option value="">Choisir un membre de cette société</option>{participants.map(m=><option key={m.id} value={m.id}>{m.nom_complet} — {m.role}</option>)}</select></label><label className="field"><span>Points</span><input required type="number" min="0" step="0.01" value={points} onChange={e=>setPoints(e.target.value)}/></label><label className="field" style={{gridColumn:'1 / -1'}}><span>Commentaire</span><input value={commentaire} onChange={e=>setCommentaire(e.target.value)} placeholder="Résultat, bonus, remarque…"/></label></div><div className="page-actions" style={{marginTop:10}}><Button type="submit" variant="primary" disabled={saving}><Save size={15}/>{saving?'Enregistrement…':'Enregistrer le score'}</Button>{scoreEditingId && <Button type="button" variant="secondary" onClick={()=>{setScoreEditingId(null);setParticipantId('');setPoints('0');setCommentaire('')}}>Annuler</Button>}</div></form>}
+        <h3 style={{marginTop:18}}>Classement</h3>{ranked.length===0 ? <p className="text-muted">Aucun score. Ajoutez les participants et leurs points ci-dessous.</p> : <div className="table-wrap"><table><thead><tr><th>Rang</th><th>Participant</th><th>Points</th>{canManage && !calculAuto && <th>Action</th>}</tr></thead><tbody>{ranked.map((s,index)=><tr key={s.id}><td><strong>{index+1}</strong></td><td>{scoreName(s)}{s.commentaire && <div className="text-sm text-muted">{s.commentaire}</div>}</td><td><strong>{Number(s.points).toLocaleString('fr-FR')}</strong></td>{canManage && !calculAuto && <td><Button variant="secondary" onClick={()=>editScore(s)}>Modifier</Button></td>}</tr>)}</tbody></table></div>}
+        {calculAuto && <p className="text-sm text-muted" style={{marginTop:12}}>Classement calculé automatiquement : commissions société des devis signés pendant le challenge et validés. Prospect trouvé par la prospection de Claude → Claude ; sinon le commercial s’il participe ; sinon le créateur du challenge.</p>}
+        {canManage && !calculAuto && <form onSubmit={saveScore} style={{marginTop:18}}><h3>{scoreEditingId?'Modifier un score':'Ajouter un participant au classement'}</h3><div className="form-grid"><label className="field"><span>Participant</span><select required value={participantId} onChange={e=>setParticipantId(e.target.value)}><option value="">Choisir un membre de cette société</option>{participants.map(m=><option key={m.id} value={m.id}>{m.nom_complet} — {m.role}</option>)}</select></label><label className="field"><span>Points</span><input required type="number" min="0" step="0.01" value={points} onChange={e=>setPoints(e.target.value)}/></label><label className="field" style={{gridColumn:'1 / -1'}}><span>Commentaire</span><input value={commentaire} onChange={e=>setCommentaire(e.target.value)} placeholder="Résultat, bonus, remarque…"/></label></div><div className="page-actions" style={{marginTop:10}}><Button type="submit" variant="primary" disabled={saving}><Save size={15}/>{saving?'Enregistrement…':'Enregistrer le score'}</Button>{scoreEditingId && <Button type="button" variant="secondary" onClick={()=>{setScoreEditingId(null);setParticipantId('');setPoints('0');setCommentaire('')}}>Annuler</Button>}</div></form>}
       </div>}
     </div>}
   </div>
