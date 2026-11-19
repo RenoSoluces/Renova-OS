@@ -156,3 +156,10 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 .dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) .dashboard-kpi-main span { color: #5B6F72 !important; }
 .dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) .dashboard-kpi-icon { background: #E1F1EF !important; }
 .dashboard-kpis.page-kpi-strip .dashboard-kpi:not(:first-child):not(:last-child) .dashboard-kpi-icon * { color: #0B6B6B !important; }
+
+/* Puces de filtre rapides */
+.prospect-puces { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 14px; }
+.puce { min-height: 38px; padding: 0 18px; border-radius: 99px; border: 1px solid #CBD9D6; background: #fff; color: #14262A; font: 500 14px var(--font-body); cursor: pointer; }
+.puce:hover { border-color: #1F7A70; }
+.puce.active { background: #0B3F3B; border-color: #0B3F3B; color: #fff; }
+.puces-compte { margin-left: auto; font-size: 13px; color: #5B6F72; }
