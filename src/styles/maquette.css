@@ -215,3 +215,8 @@ h1, h2, h3, h4, h5, h6 { font-family: var(--font-display); font-weight: 700; let
 @keyframes vm-trace{to{stroke-dashoffset:0}}
 @keyframes vm-fondu{to{opacity:1}}
 @media (prefers-reduced-motion:reduce){.vm-chart-vivant .vm-chart-ligne,.vm-chart-vivant .vm-chart-aire{animation:none;stroke-dashoffset:0;opacity:1}}
+
+/* Espace apporteur : documents joints à la recommandation */
+.eap-pieces-liste{display:flex;flex-wrap:wrap;gap:8px}
+.eap-piece{display:inline-flex;align-items:center;gap:6px;border:1px dashed #9FC2BD;background:#fff;color:#0B3F3B;border-radius:99px;padding:8px 14px;font-size:13px;cursor:pointer}
+.eap-piece.ok{border-style:solid;background:#E6F2EF;font-weight:600}

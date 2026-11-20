@@ -1000,7 +1000,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 </div>
               )}
 
-              {!lectureSeule && <PiecesClient prospectId={selected.id} documents={prospectDocuments} onChange={() => fetchProspectDocuments(selected.id)} />}
+              {(!lectureSeule || selected.statut !== 'Signé') && <PiecesClient prospectId={selected.id} documents={prospectDocuments} apporteur={lectureSeule} onChange={() => fetchProspectDocuments(selected.id)} />}
 
               {/* Documents du prospect / devis partenaires */}
               {!lectureSeule && <div className="detail-section-card">
