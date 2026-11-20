@@ -4,7 +4,6 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { PageKey } from '../types'
 import { FoyerFiscalAvis } from '../components/crm/FoyerFiscalAvis'
-import { FICHES_CEE } from '../lib/crm/fichesCee'
 import type { AvisImposition } from '../lib/crm/foyerFiscal'
 import { determinerCategorieRevenu, estIleDeFrance } from '../lib/moteurAides'
 import { libelleParcours } from '../lib/dossiers/parcoursCee'
@@ -23,6 +22,11 @@ const OCCUPATIONS = [
 
 const ETAPES = ['Reçu', 'Contacté', 'Visite technique', 'Devis envoyé', 'Signé', 'Installé']
 const PROJETS_PARTICULIER = ['PAC Air Eau', 'PAC Air Air', 'Isolation des combles perdus', 'Isolation des rampants', 'Ballon Thermo', 'SSC', 'Panneaux photovoltaïques', 'Poêle à granulés', 'Rénovation d’Ampleur']
+/** Fiche CEE associée à chaque projet (particuliers) : évite de redemander les travaux dans le dossier complet. */
+const FICHE_PAR_PROJET: Record<string, string> = {
+  'PAC Air Eau': 'BAR-TH-171', 'PAC Air Air': 'BAR-TH-129', 'Isolation des combles perdus': 'BAR-EN-101', 'Isolation des rampants': 'BAR-EN-101',
+  'Ballon Thermo': 'BAR-TH-148', 'SSC': 'BAR-TH-143', 'Poêle à granulés': 'BAR-TH-112', 'Rénovation d’Ampleur': 'BAR-TH-174',
+}
 const PROJETS_PRO = ['PAC Air Eau', 'PAC Air Air', 'Isolation de la toiture', 'Destratificateur', 'HP Flottante', 'Déshumidificateur', 'Panneaux photovoltaïques']
 const RAPPELS = ['Le matin', 'Le midi', 'L’après-midi', 'Le soir', 'Le samedi']
 const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
@@ -48,7 +52,6 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
   const [complet, setComplet] = useState(false)
   const [occupation, setOccupation] = useState('propriétaire_occupant')
   const [foyer, setFoyer] = useState<{ rfr: string; nombre_personnes_foyer: number; avis_imposition: AvisImposition[] }>({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] })
-  const [fiches, setFiches] = useState<string[]>([])
 
   async function charger() {
     setChargement(true)
@@ -83,7 +86,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
           prenom: champs.prenom, nom: champs.nom, telephone: champs.telephone, email: champs.email, adresse: champs.adresse,
           code_postal: champs.code_postal, ville: champs.ville, besoins: projets, commentaire: champs.commentaire, rappel,
           statut_occupation: occupation, nombre_personnes_foyer: foyer.nombre_personnes_foyer, rfr: rfrNum > 0 ? rfrNum : null,
-          avis_imposition: foyer.avis_imposition, categorie_mpr: categorie, fiches_cee: fiches,
+          avis_imposition: foyer.avis_imposition, categorie_mpr: categorie, fiches_cee: typeClient === 'particulier' ? [...new Set(projets.map(p => FICHE_PAR_PROJET[p]).filter(Boolean))] : [],
         } })
       : await supabase.rpc('recommander_client', {
           p_prenom: champs.prenom, p_nom: champs.nom, p_telephone: champs.telephone, p_email: champs.email, p_adresse: champs.adresse,
@@ -104,7 +107,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
     setSucces(`Merci ! ${champs.prenom || champs.nom} sera rappelé(e) rapidement. Vous suivez l’avancement ci-dessous.${echecs.length ? ` Attention : ${echecs.length} document(s) n’ont pas pu être envoyés (${echecs.join(', ')}) : ouvrez la fiche pour les ajouter.` : ''}`)
     setPieces({}); setTypeClient('particulier'); setRaisonSociale('')
     setChamps(VIDE); setProjets([]); setRappel(''); setAccord(false); setFormulaire(false)
-    setComplet(false); setOccupation('propriétaire_occupant'); setFoyer({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] }); setFiches([])
+    setComplet(false); setOccupation('propriétaire_occupant'); setFoyer({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] })
     void charger()
   }
 
@@ -207,7 +210,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
             </div>
             <div className="eap-complet">
               <button type="button" className="eap-complet-bouton" aria-expanded={complet} onClick={() => setComplet(v => !v)}>
-                {complet ? '− Retirer' : '+ Ajouter'} le dossier complet <small>(foyer fiscal, travaux envisagés)</small>
+                {complet ? '− Retirer' : '+ Ajouter'} le dossier complet <small>(foyer fiscal)</small>
               </button>
               {complet && (
                 <div className="eap-complet-corps">
@@ -215,12 +218,6 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
                     <select value={occupation} onChange={e => setOccupation(e.target.value)}>{OCCUPATIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</select>
                   </label>
                   <FoyerFiscalAvis form={{ ...foyer, code_postal: champs.code_postal }} set={(cle, valeur) => setFoyer(f => ({ ...f, [cle]: valeur }))} />
-                  <div className="eap-choix"><span>Travaux envisagés</span>
-                    <div>{FICHES_CEE.filter(f => f.code !== 'VISITE-TECHNIQUE').map(f => (
-                      <button key={f.code} type="button" className={fiches.includes(f.code) ? 'on' : ''} aria-pressed={fiches.includes(f.code)} title={f.desc}
-                        onClick={() => setFiches(x => x.includes(f.code) ? x.filter(y => y !== f.code) : [...x, f.code])}>{f.cat}</button>
-                    ))}</div>
-                  </div>
                 </div>
               )}
             </div>
