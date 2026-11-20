@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
-import { Check, CheckCircle2, ChevronRight, Clock3, Gift, Loader2, Plus, RefreshCw, Send, Share2, Trophy, UserPlus, Wallet, X } from 'lucide-react'
+import { Check, CheckCircle2, FileText, ChevronRight, Clock3, Gift, Loader2, Plus, RefreshCw, Send, Share2, Trophy, UserPlus, Wallet, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../lib/auth/AuthContext'
 import type { PageKey } from '../types'
@@ -8,6 +8,8 @@ import { FICHES_CEE } from '../lib/crm/fichesCee'
 import type { AvisImposition } from '../lib/crm/foyerFiscal'
 import { determinerCategorieRevenu, estIleDeFrance } from '../lib/moteurAides'
 import { libelleParcours } from '../lib/dossiers/parcoursCee'
+import { uploadDocument } from '../lib/storage/uploadDocument'
+import { PIECES_CLIENT, categoriePiece } from '../components/crm/PiecesClient'
 
 interface Recommandation {
   id: string; client: string; ville: string | null; statut: string; etape: string
@@ -20,7 +22,8 @@ const OCCUPATIONS = [
 ]
 
 const ETAPES = ['Reçu', 'Contacté', 'Visite technique', 'Devis envoyé', 'Signé', 'Installé']
-const PROJETS = ['Pompe à chaleur', 'Isolation', 'Panneaux solaires', 'Fenêtres', 'Chauffe-eau', 'Climatisation', 'Rénovation globale', 'Autre']
+const PROJETS_PARTICULIER = ['PAC Air Eau', 'PAC Air Air', 'Isolation des combles perdus', 'Isolation des rampants', 'Ballon Thermo', 'SSC', 'Panneaux photovoltaïques', 'Poêle à granulés', 'Rénovation d’Ampleur']
+const PROJETS_PRO = ['PAC Air Eau', 'PAC Air Air', 'Isolation de la toiture', 'Destratificateur', 'HP Flottante', 'Déshumidificateur', 'Panneaux photovoltaïques']
 const RAPPELS = ['Le matin', 'Le midi', 'L’après-midi', 'Le soir', 'Le samedi']
 const euro = (n: number) => new Intl.NumberFormat('fr-FR', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n)
 const VIDE = { prenom: '', nom: '', telephone: '', email: '', adresse: '', code_postal: '', ville: '', commentaire: '' }
@@ -33,6 +36,9 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
   const [formulaire, setFormulaire] = useState(false)
   const [champs, setChamps] = useState(VIDE)
   const [projets, setProjets] = useState<string[]>([])
+  const [typeClient, setTypeClient] = useState<'particulier' | 'professionnel'>('particulier')
+  const [raisonSociale, setRaisonSociale] = useState('')
+  const [pieces, setPieces] = useState<Record<string, File[]>>({})
   const [rappel, setRappel] = useState('')
   const [accord, setAccord] = useState(false)
   const [envoi, setEnvoi] = useState(false)
@@ -65,12 +71,15 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
   async function envoyer(e: FormEvent) {
     e.preventDefault()
     setErreur('')
+    if (typeClient === 'professionnel' && !raisonSociale.trim()) { setErreur('Indiquez le nom de l’entreprise.'); return }
     if (!accord) { setErreur('Confirmez que le client est d’accord pour être contacté.'); return }
     setEnvoi(true)
     const rfrNum = parseFloat(foyer.rfr) || 0
     const categorie = complet && rfrNum > 0 ? determinerCategorieRevenu(rfrNum, foyer.nombre_personnes_foyer, estIleDeFrance(champs.code_postal)).categorie : null
-    const { error } = complet
+    const pro = typeClient === 'professionnel'
+    const { data: idCree, error } = (complet || pro)
       ? await supabase.rpc('deposer_dossier', { p_donnees: {
+          type_prospect: typeClient, raison_sociale: pro ? raisonSociale : undefined,
           prenom: champs.prenom, nom: champs.nom, telephone: champs.telephone, email: champs.email, adresse: champs.adresse,
           code_postal: champs.code_postal, ville: champs.ville, besoins: projets, commentaire: champs.commentaire, rappel,
           statut_occupation: occupation, nombre_personnes_foyer: foyer.nombre_personnes_foyer, rfr: rfrNum > 0 ? rfrNum : null,
@@ -80,9 +89,20 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
           p_prenom: champs.prenom, p_nom: champs.nom, p_telephone: champs.telephone, p_email: champs.email, p_adresse: champs.adresse,
           p_code_postal: champs.code_postal, p_ville: champs.ville, p_besoins: projets, p_commentaire: champs.commentaire, p_rappel: rappel,
         })
+    if (error) { setEnvoi(false); setErreur(error.message || 'Envoi impossible, réessayez.'); return }
+    // Pièces jointes à la création : déposées sur le prospect qui vient d'être créé.
+    const echecs: string[] = []
+    if (idCree) {
+      for (const [label, fichiers] of Object.entries(pieces)) {
+        for (const f of fichiers) {
+          const r = await uploadDocument(f, { prospectId: String(idCree), type: 'piece_client', categorie: categoriePiece(label) })
+          if (r.error) echecs.push(f.name)
+        }
+      }
+    }
     setEnvoi(false)
-    if (error) { setErreur(error.message || 'Envoi impossible, réessayez.'); return }
-    setSucces(`Merci ! ${champs.prenom || champs.nom} sera rappelé(e) rapidement. Vous suivez l’avancement ci-dessous.`)
+    setSucces(`Merci ! ${champs.prenom || champs.nom} sera rappelé(e) rapidement. Vous suivez l’avancement ci-dessous.${echecs.length ? ` Attention : ${echecs.length} document(s) n’ont pas pu être envoyés (${echecs.join(', ')}) : ouvrez la fiche pour les ajouter.` : ''}`)
+    setPieces({}); setTypeClient('particulier'); setRaisonSociale('')
     setChamps(VIDE); setProjets([]); setRappel(''); setAccord(false); setFormulaire(false)
     setComplet(false); setOccupation('propriétaire_occupant'); setFoyer({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] }); setFiches([])
     void charger()
@@ -158,7 +178,9 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
         <div className="eap-voile" role="dialog" aria-modal="true" aria-label="Recommander un client" onClick={e => { if (e.target === e.currentTarget) setFormulaire(false) }}>
           <form className="eap-feuille" onSubmit={envoyer}>
             <div className="eap-feuille-tete"><h2><UserPlus size={20} /> Recommander un client</h2><button type="button" onClick={() => setFormulaire(false)} aria-label="Fermer"><X size={18} /></button></div>
+            <div className="eap-choix"><span>Type de client</span><div>{(['particulier', 'professionnel'] as const).map(t => <button key={t} type="button" className={typeClient === t ? 'on' : ''} aria-pressed={typeClient === t} onClick={() => { setTypeClient(t); setProjets([]) }}>{t === 'particulier' ? 'Particulier' : 'Professionnel'}</button>)}</div></div>
             <div className="eap-grille">
+              {typeClient === 'professionnel' && <label className="large"><span>Entreprise *</span><input value={raisonSociale} onChange={e => setRaisonSociale(e.target.value)} autoComplete="off" /></label>}
               <label><span>Prénom</span><input value={champs.prenom} onChange={e => maj('prenom', e.target.value)} autoComplete="off" /></label>
               <label><span>Nom *</span><input value={champs.nom} onChange={e => maj('nom', e.target.value)} autoComplete="off" /></label>
               <label><span>Téléphone *</span><input type="tel" inputMode="tel" value={champs.telephone} onChange={e => maj('telephone', e.target.value)} placeholder="06…" /></label>
@@ -167,9 +189,22 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
               <label><span>Code postal</span><input inputMode="numeric" value={champs.code_postal} onChange={e => maj('code_postal', e.target.value)} /></label>
               <label><span>Ville</span><input value={champs.ville} onChange={e => maj('ville', e.target.value)} /></label>
             </div>
-            <div className="eap-choix"><span>Son projet</span><div>{PROJETS.map(p => <button key={p} type="button" className={projets.includes(p) ? 'on' : ''} aria-pressed={projets.includes(p)} onClick={() => setProjets(x => x.includes(p) ? x.filter(y => y !== p) : [...x, p])}>{p}</button>)}</div></div>
+            <div className="eap-choix"><span>Son projet</span><div>{(typeClient === 'professionnel' ? PROJETS_PRO : PROJETS_PARTICULIER).map(p => <button key={p} type="button" className={projets.includes(p) ? 'on' : ''} aria-pressed={projets.includes(p)} onClick={() => setProjets(x => x.includes(p) ? x.filter(y => y !== p) : [...x, p])}>{p}</button>)}</div></div>
             <div className="eap-choix"><span>Meilleur moment pour le rappeler</span><div>{RAPPELS.map(p => <button key={p} type="button" className={rappel === p ? 'on' : ''} aria-pressed={rappel === p} onClick={() => setRappel(r => r === p ? '' : p)}>{p}</button>)}</div></div>
             <label className="eap-commentaire"><span>Un mot sur la situation (facultatif)</span><textarea rows={3} value={champs.commentaire} onChange={e => maj('commentaire', e.target.value)} placeholder="Chaudière fioul en panne, maison de 120 m²…" /></label>
+            <div className="eap-choix eap-pieces"><span>Documents du client (facultatif)</span>
+              <div className="eap-pieces-liste">{PIECES_CLIENT.map(pc => {
+                const fichiers = pieces[pc.label] || []
+                return (
+                  <label key={pc.code} className={`eap-piece${fichiers.length ? ' ok' : ''}`}>
+                    <FileText size={15} /> {pc.label}{fichiers.length ? ` · ${fichiers.length} fichier${fichiers.length > 1 ? 's' : ''}` : ''}
+                    <input type="file" hidden multiple accept=".pdf,.jpg,.jpeg,.png,.heic,.webp"
+                      onChange={e => { const f = Array.from(e.target.files || []); if (f.length) setPieces(x => ({ ...x, [pc.label]: [...(x[pc.label] || []), ...f] })); e.target.value = '' }} />
+                  </label>
+                )
+              })}</div>
+              {Object.keys(pieces).length > 0 && <button type="button" className="eap-lien" onClick={() => setPieces({})}>Retirer les documents choisis</button>}
+            </div>
             <div className="eap-complet">
               <button type="button" className="eap-complet-bouton" aria-expanded={complet} onClick={() => setComplet(v => !v)}>
                 {complet ? '− Retirer' : '+ Ajouter'} le dossier complet <small>(foyer fiscal, travaux envisagés)</small>

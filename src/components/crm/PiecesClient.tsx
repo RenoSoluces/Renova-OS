@@ -20,9 +20,11 @@ interface Props {
   prospectId: string
   documents: any[]
   onChange: () => void | Promise<void>
+  /** Apporteur d'affaires : dépôt des pièces seulement, pas d'accès MPR. */
+  apporteur?: boolean
 }
 
-export function PiecesClient({ prospectId, documents, onChange }: Props) {
+export function PiecesClient({ prospectId, documents, onChange, apporteur = false }: Props) {
   const inputs = useRef<Record<string, HTMLInputElement | null>>({})
   const [envoiEnCours, setEnvoiEnCours] = useState<string | null>(null)
   const [identifiant, setIdentifiant] = useState('')
@@ -34,6 +36,7 @@ export function PiecesClient({ prospectId, documents, onChange }: Props) {
   const [mprModifie, setMprModifie] = useState(false)
 
   useEffect(() => {
+    if (apporteur) return
     let annule = false
     setIdentifiant(''); setMotDePasse(''); setAfficher(false); setMprMaj(null); setMprMessage(''); setMprModifie(false)
     void (async () => {
@@ -48,7 +51,7 @@ export function PiecesClient({ prospectId, documents, onChange }: Props) {
       }
     })()
     return () => { annule = true }
-  }, [prospectId])
+  }, [prospectId, apporteur])
 
   const piecesDe = (label: string) => documents.filter(d => d.categorie === categoriePiece(label))
 
@@ -90,7 +93,7 @@ export function PiecesClient({ prospectId, documents, onChange }: Props) {
         <div>
           <div className="detail-etape-row"><span className="detail-etape-label">Pièces du client</span></div>
           <div className="detail-section-heading">Documents du dossier</div>
-          <div className="detail-section-subdesc">Avis d’impôts, taxe foncière, pièce d’identité, facture d’énergie et accès MaPrimeRénov.</div>
+          <div className="detail-section-subdesc">{apporteur ? 'Avis d’impôts, taxe foncière, pièce d’identité et facture d’énergie du client.' : 'Avis d’impôts, taxe foncière, pièce d’identité, facture d’énergie et accès MaPrimeRénov.'}</div>
         </div>
       </div>
 
@@ -126,6 +129,7 @@ export function PiecesClient({ prospectId, documents, onChange }: Props) {
             )
           })}
 
+          {!apporteur && (<>
           <div className="detail-info-row piece-client-mpr">
             <span className="detail-info-key" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <KeyRound size={15} /> Accès compte MPR
@@ -145,6 +149,7 @@ export function PiecesClient({ prospectId, documents, onChange }: Props) {
           <div className="text-xs text-muted" style={{ padding: '6px 2px 0' }}>
             {mprMessage || (mprMaj ? `Mot de passe chiffré — dernière mise à jour le ${new Date(mprMaj).toLocaleDateString('fr-FR')}.` : 'Le mot de passe est chiffré dans la base et visible uniquement des personnes ayant accès à ce prospect.')}
           </div>
+          </>)}
         </div>
       </div>
     </div>
