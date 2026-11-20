@@ -89,6 +89,17 @@ export function ProspectionTelephonePage(): JSX.Element {
   const [ajoutOuvert, setAjoutOuvert] = useState(false)
   const peutConstituer = ['admin', 'manager', 'commercial_manager', 'partner_admin', 'company_admin'].includes(profile?.role || '')
   const dejaListes = useMemo(() => new Set(leads.map(l => l.id)), [leads])
+  // Les responsables voient toutes les listes : ils choisissent celle du télépro à afficher.
+  const [listeDe, setListeDe] = useState<string>('toutes')
+  const leadsListe = useMemo(() => listeDe === 'toutes' ? leads
+    : listeDe === 'fichiers' ? leads.filter(l => !l.liste_appels_pour)
+    : leads.filter(l => l.liste_appels_pour === listeDe), [leads, listeDe])
+  const listesDisponibles = useMemo(() => {
+    const n = new Map<string, number>()
+    for (const l of leads) if (l.liste_appels_pour) n.set(l.liste_appels_pour, (n.get(l.liste_appels_pour) || 0) + 1)
+    return [...n.entries()]
+  }, [leads])
+  const sansListe = useMemo(() => leads.filter(l => !l.liste_appels_pour).length, [leads])
 
   // Noms des personnes chargées des appels, pour que les responsables sachent dans quelle liste est chaque prospect.
   const [appelants, setAppelants] = useState<Record<string, string>>({})
@@ -113,7 +124,7 @@ export function ProspectionTelephonePage(): JSX.Element {
     // Les portes saisies sur le terrain sans numéro de téléphone n'ont pas leur place dans une liste d'appels.
     // Prospects envoyés depuis le CRM : dans la liste de la personne qui les appelle ; les responsables voient toutes les listes.
     // Un professionnel sans numéro n'a pas sa place non plus : on ne peut pas l'appeler.
-    const rows = data.filter(p => (p.liste_appels_le && (p.liste_appels_pour === profile?.id || peutConstituer))
+    const rows = data.filter(p => (p.liste_appels_le && p.telephone && (p.liste_appels_pour === profile?.id || peutConstituer))
       || (SOURCE_PROSPECTION.test(p.source || '') && (p.telephone || (p.type_prospect !== 'professionnel' && !/porte/i.test(p.source || '')))))
 
     // Historique des appels de prospection, par paquets (une liste d'identifiants trop longue casse l'URL de la requête).
@@ -208,7 +219,7 @@ async function importerCsv(file?:File):Promise<void>{
   // « Appeler le suivant » : prochain lead jamais appelé (le plus ancien d'abord), hors lead qu'on vient de traiter.
   const [prochainDemande, setProchainDemande] = useState<string | null>(null)
   function setProchain(sauf: string | null) { setProchainDemande(sauf ?? '') }
-  const filePrioritaire = useMemo(() => leads.filter(l => l.statutLead === 'a_appeler' && l.telephone).slice().reverse(), [leads])
+  const filePrioritaire = useMemo(() => leadsListe.filter(l => l.statutLead === 'a_appeler' && l.telephone).slice().reverse(), [leadsListe])
   useEffect(() => {
     if (prochainDemande === null) return
     const suivant = filePrioritaire.find(l => l.id !== prochainDemande)
@@ -217,17 +228,17 @@ async function importerCsv(file?:File):Promise<void>{
   }, [prochainDemande, filePrioritaire])
 
   const stats = useMemo(() => {
-    const appeles = leads.filter(l => l.statutLead !== 'a_appeler').length
-    const joints = leads.filter(l => l.statutLead === 'joint').length
+    const appeles = leadsListe.filter(l => l.statutLead !== 'a_appeler').length
+    const joints = leadsListe.filter(l => l.statutLead === 'joint').length
     return {
-      total: leads.length, aAppeler: leads.length - appeles, joints,
-      pasJoints: leads.filter(l => l.statutLead === 'pas_joint').length,
-      rdv: leads.filter(l => l.dernierResultat === 'Rendez-vous demandé').length,
+      total: leadsListe.length, aAppeler: leadsListe.length - appeles, joints,
+      pasJoints: leadsListe.filter(l => l.statutLead === 'pas_joint').length,
+      rdv: leadsListe.filter(l => l.dernierResultat === 'Rendez-vous demandé').length,
       tauxContact: appeles ? Math.round((joints / appeles) * 100) : null,
     }
-  }, [leads])
+  }, [leadsListe])
 
-  const visibles = leads.filter(l => {
+  const visibles = leadsListe.filter(l => {
     if (filtre === 'rdv' ? l.dernierResultat !== 'Rendez-vous demandé' : filtre !== 'tous' && l.statutLead !== filtre) return false
     return `${l.prenom} ${l.nom} ${l.raison_sociale || ''} ${l.telephone} ${l.email} ${l.ville}`.toLowerCase().includes(search.toLowerCase())
   })
@@ -259,6 +270,16 @@ async function importerCsv(file?:File):Promise<void>{
       </div>
     </div>
     {error && <div className={`pt-message ${/importé|ajouté/.test(error) ? 'ok' : 'erreur'}`} role="status">{error}</div>}
+
+    {peutConstituer && (listesDisponibles.length > 0 || sansListe > 0) && <div className="pt-barre">
+      <label className="field" style={{ minWidth: 280 }}><span>Liste du télépro</span>
+        <select className="input" value={listeDe} onChange={e => setListeDe(e.target.value)}>
+          <option value="toutes">Toutes les listes ({leads.length})</option>
+          {listesDisponibles.map(([id, n]) => <option key={id} value={id}>{id === profile?.id ? 'Ma liste' : (appelants[id] || '…')} ({n})</option>)}
+          {sansListe > 0 && <option value="fichiers">Fichiers importés, sans télépro ({sansListe})</option>}
+        </select>
+      </label>
+    </div>}
 
     <div className="pt-stats">
       {FILTRES.map(f => { const Icone = f.icone; return (
