@@ -129,7 +129,7 @@ export function DossiersPage({
   const [savingStatut, setSavingStatut] = useState(false)
   const [detailMessage, setDetailMessage] = useState('')
   const [organisations, setOrganisations] = useState<OrganisationOption[]>([])
-  const [installateursDossier, setInstallateursDossier] = useState<{ id: string; nom: string }[]>([])
+  const [installateursDossier, setInstallateursDossier] = useState<{ id: string; nom: string; actif?: boolean }[]>([])
   const [savingInstallateur, setSavingInstallateur] = useState(false)
   const [detailFacturationOrganisationId, setDetailFacturationOrganisationId] = useState('')
   const [detailDestinataireOrganisationId, setDetailDestinataireOrganisationId] = useState('')
@@ -159,6 +159,7 @@ export function DossiersPage({
   const [filtreEtape, setFiltreEtape] = useState('')
   const [filtrePersonne, setFiltrePersonne] = useState('')
   const [filtreParcours, setFiltreParcours] = useState('')
+  const [filtreInstallateur, setFiltreInstallateur] = useState('')
   // CEE par délégataire (admin) : grilles de prix et saisie du dossier ouvert.
   const [ceeDelegataires, setCeeDelegataires] = useState<{ id: string; nom: string }[]>([])
   const [ceeGrille, setCeeGrille] = useState<LignePrix[]>([])
@@ -274,8 +275,8 @@ export function DossiersPage({
     fetchListe()
     supabase.from('organisations').select('id, nom, type').eq('actif', true).order('nom')
       .then(({ data }) => setOrganisations((data || []) as OrganisationOption[]))
-    supabase.from('installateurs').select('id, nom').eq('actif', true).order('nom')
-      .then(({ data }) => setInstallateursDossier((data || []) as { id: string; nom: string }[]))
+    supabase.from('installateurs').select('id, nom, actif').order('nom')
+      .then(({ data }) => setInstallateursDossier((data || []) as { id: string; nom: string; actif?: boolean }[]))
   }, [])
 
   // La liste complète des prospects ne sert qu'au choix du client dans « Nouveau dossier » :
@@ -1086,6 +1087,9 @@ export function DossiersPage({
   }
   const nbSoldes = rows.filter(estSolde).length
   const nbActionAnah = rows.filter(d => actionRequise((d as any).mpr_statut)).length
+  // Installateur auquel le dossier a été confié (celui du dossier, à défaut celui de la fiche prospect).
+  const installateurIdDossier = (d: any): string | null => d.installateur_id || d.prospect?.installateur_id || null
+  const nomInstallateur = (d: any): string => installateursDossier.find(i => i.id === installateurIdDossier(d))?.nom || ''
   const rowsFiltrees = rows.filter(d => {
     const pr: any = d.prospect || {}
     // Une recherche porte toujours sur l'ensemble des dossiers, soldés compris.
@@ -1095,7 +1099,7 @@ export function DossiersPage({
     }
     if (recherche.trim()) {
       const q = normaliser(recherche.trim())
-      const texte = normaliser([d.reference, pr.prenom, pr.nom, `${pr.prenom || ''} ${pr.nom || ''}`, `${pr.nom || ''} ${pr.prenom || ''}`, pr.ville, pr.code_postal, pr.telephone, pr.email].join(' '))
+      const texte = normaliser([d.reference, pr.prenom, pr.nom, `${pr.prenom || ''} ${pr.nom || ''}`, `${pr.nom || ''} ${pr.prenom || ''}`, pr.ville, pr.code_postal, pr.telephone, pr.email, nomInstallateur(d)].join(' '))
       if (!q.split(/\s+/).every(m => texte.includes(m))) return false
     }
     if (filtreEtape) {
@@ -1104,9 +1108,10 @@ export function DossiersPage({
     }
     if (filtrePersonne && pr.commercial_id !== filtrePersonne && pr.apporteur_user_id !== filtrePersonne) return false
     if (filtreParcours && (d as any).parcours_etape !== filtreParcours) return false
+    if (filtreInstallateur === '__aucun__' ? installateurIdDossier(d) !== null : filtreInstallateur && installateurIdDossier(d) !== filtreInstallateur) return false
     return true
   })
-  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, filtreParcours, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
+  const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, filtreParcours, filtreInstallateur, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
 
   const totalFactureHtDetail = facturation.filter(l => l.statut !== 'annulee').reduce((t, l) => t + (Number(l.montant_ht) || 0), 0)
   const total = rows.length
@@ -1242,8 +1247,13 @@ export function DossiersPage({
           <option value="">Tous les commerciaux / apporteurs</option>
           {personnes.map(x => <option key={x.id} value={x.id}>{x.nom_complet}</option>)}
         </select>
+        <select className="input" value={filtreInstallateur} onChange={e => setFiltreInstallateur(e.target.value)} aria-label="Filtrer par installateur">
+          <option value="">Tous les installateurs</option>
+          <option value="__aucun__">Aucun installateur</option>
+          {installateursDossier.map(i => <option key={i.id} value={i.id}>{i.nom}{i.actif === false ? ' (inactif)' : ''}</option>)}
+        </select>
         {filtresActifs > 0 && (
-          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne(''); setFiltreParcours(''); setAffichage('actifs') }}>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne(''); setFiltreParcours(''); setFiltreInstallateur(''); setAffichage('actifs') }}>
             Réinitialiser ({filtresActifs})
           </button>
         )}
@@ -1289,6 +1299,7 @@ export function DossiersPage({
                           <span className="dossier-card-avatar">{initiales}</span>
                           <span className="dossier-card-id"><b>{nom}</b><small>{d.reference || d.id.slice(0, 8)}</small></span>
                         </span>
+                        <span className="dossier-card-installateur" title="Installateur du dossier">{nomInstallateur(d) ? `🔧 ${nomInstallateur(d)}` : 'Installateur à choisir'}</span>
                         <span className="dossier-card-montant" title="Facturé au partenaire (HT)">{euro(factureDossier(d.id))} HT</span>
                       </button>
                       {isAdmin && (
@@ -1357,6 +1368,7 @@ export function DossiersPage({
                   <th>Référence</th>
                   <th>Prospect</th>
                   <th>Statut</th>
+                  <th>Installateur</th>
                   <th>Parcours</th>
                   <th>CA chantier (TTC)</th>
                   {canViewCompanyCommission && <th>Commission société <span className="text-muted" style={{ fontWeight: 400 }}>(facturé partenaire HT)</span></th>}
@@ -1401,6 +1413,8 @@ export function DossiersPage({
                           return n ? <span className="badge badge-error" style={{ marginLeft: 6 }} title="Alertes sur le suivi des aides">{n} alerte{n > 1 ? 's' : ''} aides</span> : <span className="badge badge-success" style={{ marginLeft: 6 }}>Aides à jour</span>
                         })()}
                       </td>
+
+                      <td>{nomInstallateur(d) || <span className="text-muted">À choisir</span>}</td>
 
                       <td>
                         {libelleParcours((d as any).parcours_etape, (d as any).parcours_statut)}
@@ -1869,7 +1883,7 @@ export function DossiersPage({
                   onChange={v => void changerInstallateurDossier(v)}
                   options={[
                     { value: '', label: 'Aucun installateur' },
-                    ...installateursDossier.map(i => ({ value: i.id, label: i.nom })),
+                    ...installateursDossier.filter(i => i.actif !== false || i.id === detail.installateur_id).map(i => ({ value: i.id, label: i.actif === false ? `${i.nom} (inactif)` : i.nom })),
                   ]}
                 />
                 <div className="text-xs text-muted" style={{ marginTop: 4 }}>
