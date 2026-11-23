@@ -11,7 +11,7 @@ export interface EtapeParcours {
 }
 
 export const PARCOURS_CEE: EtapeParcours[] = [
-  { id: 'prospection', label: 'Prospection', statuts: ['A faire', 'En cours', 'Effectué'] },
+  { id: 'prospection', label: 'Prospection', statuts: ['A faire', 'En cours', 'Qualifié', 'Effectué'] },
   { id: 'rdv', label: 'RDV', statuts: ['RDV à prendre', 'À planifier', 'Planifié', 'Effectué'] },
   { id: 'audit', label: 'Audit', statuts: ['À faire', 'En cours', 'En attente du rapport', 'Effectué'] },
   { id: 'devis', label: 'Devis', statuts: ['À faire', 'Envoyé', 'En attente de signature', 'Signé', 'Signé en électronique', 'Refus'] },
