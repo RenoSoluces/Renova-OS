@@ -160,6 +160,9 @@ export function DossiersPage({
   const [filtrePersonne, setFiltrePersonne] = useState('')
   const [filtreParcours, setFiltreParcours] = useState('')
   const [filtreInstallateur, setFiltreInstallateur] = useState('')
+  // Partenaires (organisations) avec lesquels les prospects sont partagés, et partages par prospect.
+  const [orgsPartenaires, setOrgsPartenaires] = useState<{ id: string; nom: string }[]>([])
+  const [partagesParProspect, setPartagesParProspect] = useState<Record<string, string[]>>({})
   // CEE par délégataire (admin) : grilles de prix et saisie du dossier ouvert.
   const [ceeDelegataires, setCeeDelegataires] = useState<{ id: string; nom: string }[]>([])
   const [ceeGrille, setCeeGrille] = useState<LignePrix[]>([])
@@ -270,6 +273,18 @@ export function DossiersPage({
         setCommissionsSoldees(soldees)
       })
   }
+
+  useEffect(() => {
+    supabase.from('organisations').select('id, nom').eq('type', 'partenaire').order('nom')
+      .then(({ data }) => setOrgsPartenaires((data || []) as { id: string; nom: string }[]))
+    lireTout(() => supabase.from('prospect_shares').select('prospect_id, organisation_id'))
+      .then((data: any) => {
+        const m: Record<string, string[]> = {}
+        for (const x of (data || []) as { prospect_id: string; organisation_id: string }[]) (m[x.prospect_id] ||= []).push(x.organisation_id)
+        setPartagesParProspect(m)
+      })
+      .catch(() => undefined)
+  }, [])
 
   useEffect(() => {
     fetchListe()
@@ -1089,7 +1104,12 @@ export function DossiersPage({
   const nbActionAnah = rows.filter(d => actionRequise((d as any).mpr_statut)).length
   // Installateur auquel le dossier a été confié (celui du dossier, à défaut celui de la fiche prospect).
   const installateurIdDossier = (d: any): string | null => d.installateur_id || d.prospect?.installateur_id || null
-  const nomInstallateur = (d: any): string => installateursDossier.find(i => i.id === installateurIdDossier(d))?.nom || ''
+  const orgsDossier = (d: any): string[] => partagesParProspect[d.prospect_id || d.prospect?.id] || []
+  // « Confié à » : l'installateur du dossier et/ou les partenaires avec qui le prospect est partagé.
+  const nomInstallateur = (d: any): string => [
+    installateursDossier.find(i => i.id === installateurIdDossier(d))?.nom,
+    ...orgsDossier(d).map(id => orgsPartenaires.find(o => o.id === id)?.nom),
+  ].filter(Boolean).join(' · ')
   const rowsFiltrees = rows.filter(d => {
     const pr: any = d.prospect || {}
     // Une recherche porte toujours sur l'ensemble des dossiers, soldés compris.
@@ -1108,7 +1128,9 @@ export function DossiersPage({
     }
     if (filtrePersonne && pr.commercial_id !== filtrePersonne && pr.apporteur_user_id !== filtrePersonne) return false
     if (filtreParcours && (d as any).parcours_etape !== filtreParcours) return false
-    if (filtreInstallateur === '__aucun__' ? installateurIdDossier(d) !== null : filtreInstallateur && installateurIdDossier(d) !== filtreInstallateur) return false
+    if (filtreInstallateur === '__aucun__') { if (installateurIdDossier(d) !== null || orgsDossier(d).length) return false }
+    else if (filtreInstallateur.startsWith('org:')) { if (!orgsDossier(d).includes(filtreInstallateur.slice(4))) return false }
+    else if (filtreInstallateur && installateurIdDossier(d) !== filtreInstallateur) return false
     return true
   })
   const filtresActifs = [recherche.trim(), filtreEtape, filtrePersonne, filtreParcours, filtreInstallateur, affichage !== 'actifs' ? affichage : ''].filter(Boolean).length
@@ -1247,10 +1269,17 @@ export function DossiersPage({
           <option value="">Tous les commerciaux / apporteurs</option>
           {personnes.map(x => <option key={x.id} value={x.id}>{x.nom_complet}</option>)}
         </select>
-        <select className="input" value={filtreInstallateur} onChange={e => setFiltreInstallateur(e.target.value)} aria-label="Filtrer par installateur">
-          <option value="">Tous les installateurs</option>
-          <option value="__aucun__">Aucun installateur</option>
-          {installateursDossier.map(i => <option key={i.id} value={i.id}>{i.nom}{i.actif === false ? ' (inactif)' : ''}</option>)}
+        <select className="input" value={filtreInstallateur} onChange={e => setFiltreInstallateur(e.target.value)} aria-label="Filtrer par installateur ou partenaire">
+          <option value="">Tous les installateurs / partenaires</option>
+          <option value="__aucun__">Aucun installateur ni partenaire</option>
+          <optgroup label="Installateurs">
+            {installateursDossier.map(i => <option key={i.id} value={i.id}>{i.nom}{i.actif === false ? ' (inactif)' : ''}</option>)}
+          </optgroup>
+          {orgsPartenaires.length > 0 && (
+            <optgroup label="Partenaires (prospects partagés)">
+              {orgsPartenaires.map(o => <option key={o.id} value={`org:${o.id}`}>{o.nom}</option>)}
+            </optgroup>
+          )}
         </select>
         {filtresActifs > 0 && (
           <button type="button" className="btn btn-ghost btn-sm" onClick={() => { setRecherche(''); setFiltreEtape(''); setFiltrePersonne(''); setFiltreParcours(''); setFiltreInstallateur(''); setAffichage('actifs') }}>
@@ -1368,7 +1397,7 @@ export function DossiersPage({
                   <th>Référence</th>
                   <th>Prospect</th>
                   <th>Statut</th>
-                  <th>Installateur</th>
+                  <th>Confié à</th>
                   <th>Parcours</th>
                   <th>CA chantier (TTC)</th>
                   {canViewCompanyCommission && <th>Commission société <span className="text-muted" style={{ fontWeight: 400 }}>(facturé partenaire HT)</span></th>}
