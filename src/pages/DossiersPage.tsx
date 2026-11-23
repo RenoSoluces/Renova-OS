@@ -278,7 +278,7 @@ export function DossiersPage({
     supabase.from('organisations').select('id, nom').eq('type', 'partenaire').order('nom')
       .then(({ data }) => setOrgsPartenaires((data || []) as { id: string; nom: string }[]))
     lireTout(() => supabase.from('prospect_shares').select('prospect_id, organisation_id'))
-      .then((data: any) => {
+      .then(({ data }) => {
         const m: Record<string, string[]> = {}
         for (const x of (data || []) as { prospect_id: string; organisation_id: string }[]) (m[x.prospect_id] ||= []).push(x.organisation_id)
         setPartagesParProspect(m)
