@@ -160,9 +160,8 @@ export function DossiersPage({
   const [filtrePersonne, setFiltrePersonne] = useState('')
   const [filtreParcours, setFiltreParcours] = useState('')
   const [filtreInstallateur, setFiltreInstallateur] = useState('')
-  // Partenaires (organisations) avec lesquels les prospects sont partagés, et partages par prospect.
+  // Partenaires (organisations) à qui un dossier a été confié (un dossier par partenaire).
   const [orgsPartenaires, setOrgsPartenaires] = useState<{ id: string; nom: string }[]>([])
-  const [partagesParProspect, setPartagesParProspect] = useState<Record<string, string[]>>({})
   // CEE par délégataire (admin) : grilles de prix et saisie du dossier ouvert.
   const [ceeDelegataires, setCeeDelegataires] = useState<{ id: string; nom: string }[]>([])
   const [ceeGrille, setCeeGrille] = useState<LignePrix[]>([])
@@ -277,13 +276,6 @@ export function DossiersPage({
   useEffect(() => {
     supabase.from('organisations').select('id, nom').eq('type', 'partenaire').order('nom')
       .then(({ data }) => setOrgsPartenaires((data || []) as { id: string; nom: string }[]))
-    lireTout(() => supabase.from('prospect_shares').select('prospect_id, organisation_id'))
-      .then(({ data }) => {
-        const m: Record<string, string[]> = {}
-        for (const x of (data || []) as { prospect_id: string; organisation_id: string }[]) (m[x.prospect_id] ||= []).push(x.organisation_id)
-        setPartagesParProspect(m)
-      })
-      .catch(() => undefined)
   }, [])
 
   useEffect(() => {
@@ -1103,13 +1095,13 @@ export function DossiersPage({
   const nbSoldes = rows.filter(estSolde).length
   const nbActionAnah = rows.filter(d => actionRequise((d as any).mpr_statut)).length
   // Installateur auquel le dossier a été confié (celui du dossier, à défaut celui de la fiche prospect).
-  const installateurIdDossier = (d: any): string | null => d.installateur_id || d.prospect?.installateur_id || null
-  const orgsDossier = (d: any): string[] => partagesParProspect[d.prospect_id || d.prospect?.id] || []
-  // « Confié à » : l'installateur du dossier et/ou les partenaires avec qui le prospect est partagé.
-  const nomInstallateur = (d: any): string => [
-    installateursDossier.find(i => i.id === installateurIdDossier(d))?.nom,
-    ...orgsDossier(d).map(id => orgsPartenaires.find(o => o.id === id)?.nom),
-  ].filter(Boolean).join(' · ')
+  const partenaireIdDossier = (d: any): string | null => d.partenaire_organisation_id || null
+  const installateurIdDossier = (d: any): string | null => d.installateur_id || (partenaireIdDossier(d) ? null : d.prospect?.installateur_id) || null
+  // « Confié à » : un seul destinataire par dossier — son installateur, ou le partenaire à qui il a été confié.
+  const nomInstallateur = (d: any): string =>
+    installateursDossier.find(i => i.id === installateurIdDossier(d))?.nom
+    || orgsPartenaires.find(o => o.id === partenaireIdDossier(d))?.nom
+    || ''
   const rowsFiltrees = rows.filter(d => {
     const pr: any = d.prospect || {}
     // Une recherche porte toujours sur l'ensemble des dossiers, soldés compris.
@@ -1128,8 +1120,8 @@ export function DossiersPage({
     }
     if (filtrePersonne && pr.commercial_id !== filtrePersonne && pr.apporteur_user_id !== filtrePersonne) return false
     if (filtreParcours && (d as any).parcours_etape !== filtreParcours) return false
-    if (filtreInstallateur === '__aucun__') { if (installateurIdDossier(d) !== null || orgsDossier(d).length) return false }
-    else if (filtreInstallateur.startsWith('org:')) { if (!orgsDossier(d).includes(filtreInstallateur.slice(4))) return false }
+    if (filtreInstallateur === '__aucun__') { if (installateurIdDossier(d) !== null || partenaireIdDossier(d)) return false }
+    else if (filtreInstallateur.startsWith('org:')) { if (partenaireIdDossier(d) !== filtreInstallateur.slice(4)) return false }
     else if (filtreInstallateur && installateurIdDossier(d) !== filtreInstallateur) return false
     return true
   })
@@ -1276,7 +1268,7 @@ export function DossiersPage({
             {installateursDossier.map(i => <option key={i.id} value={i.id}>{i.nom}{i.actif === false ? ' (inactif)' : ''}</option>)}
           </optgroup>
           {orgsPartenaires.length > 0 && (
-            <optgroup label="Partenaires (prospects partagés)">
+            <optgroup label="Partenaires">
               {orgsPartenaires.map(o => <option key={o.id} value={`org:${o.id}`}>{o.nom}</option>)}
             </optgroup>
           )}
