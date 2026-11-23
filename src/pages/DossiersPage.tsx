@@ -115,6 +115,8 @@ export function DossiersPage({
   const [loading, setLoading] = useState(true)
 
   const [newModalOpen, setNewModalOpen] = useState(false)
+  // « Confier à » à la création : 'inst:<id>' (installateur) ou 'org:<id>' (partenaire). Un même partenaire peut avoir plusieurs dossiers pour un client.
+  const [newConfieA, setNewConfieA] = useState('')
   const [newProspectId, setNewProspectId] = useState('')
   const [devisDuProspect, setDevisDuProspect] = useState<Devis[]>([])
   const [newDevisId, setNewDevisId] = useState('')
@@ -345,6 +347,8 @@ export function DossiersPage({
         montant_total: devisChoisi?.montant_ttc || 0,
         aides_montant: devisChoisi?.montant_aides || 0,
         reste_a_charge: devisChoisi?.reste_a_charge || 0,
+        ...(newConfieA.startsWith('org:') ? { partenaire_organisation_id: newConfieA.slice(4) } : {}),
+        ...(newConfieA.startsWith('inst:') ? { installateur_id: newConfieA.slice(5) } : {}),
       })
       .select('id')
       .single()
@@ -373,7 +377,7 @@ export function DossiersPage({
       ])
 
       setNewModalOpen(false)
-      setNewProspectId('')
+      setNewProspectId(''); setNewConfieA('')
       setNewDevisId('')
       fetchListe()
     } else if (error) {
@@ -542,6 +546,20 @@ export function DossiersPage({
     setRows(prev => prev.map(row => row.id === detail.id ? { ...row, ...(data as Dossier) } : row))
     const nom = installateursDossier.find(i => i.id === installateurId)?.nom
     setDetailMessage(nom ? `Installateur du dossier : ${nom}. Les factures partenaires de ce dossier lui seront adressées.` : 'Installateur retiré du dossier.')
+  }
+
+  async function changerPartenaireDossier(orgId: string) {
+    if (!detail) return
+    setDetailMessage('')
+    const { data, error } = await supabase.from('dossiers').update({ partenaire_organisation_id: orgId || null }).eq('id', detail.id).select('*').single()
+    if (error || !data) {
+      setDetailMessage(`Impossible de changer le partenaire : ${error?.message || 'erreur inconnue'}`)
+      return
+    }
+    setDetail({ ...detail, ...(data as Dossier) })
+    setRows(prev => prev.map(row => row.id === detail.id ? { ...row, ...(data as Dossier) } : row))
+    const nom = orgsPartenaires.find(o => o.id === orgId)?.nom
+    setDetailMessage(nom ? `Dossier confié au partenaire ${nom}.` : 'Partenaire retiré du dossier.')
   }
 
   async function enregistrerConfigurationFacturation() {
@@ -1514,6 +1532,19 @@ export function DossiersPage({
             onChange={setNewProspectId}
           />
 
+          {isAdmin && (
+            <FloatSelect
+              label="Confier à (optionnel)"
+              value={newConfieA}
+              onChange={setNewConfieA}
+              options={[
+                { value: '', label: 'Personne pour le moment' },
+                ...installateursDossier.filter(i => i.actif !== false).map(i => ({ value: `inst:${i.id}`, label: `Installateur — ${i.nom}` })),
+                ...orgsPartenaires.map(o => ({ value: `org:${o.id}`, label: `Partenaire — ${o.nom}` })),
+              ]}
+            />
+          )}
+
           {newProspectId && (
             <FloatSelect
               label="Devis à rattacher (optionnel)"
@@ -1907,6 +1938,19 @@ export function DossiersPage({
                     ...installateursDossier.filter(i => i.actif !== false || i.id === detail.installateur_id).map(i => ({ value: i.id, label: i.actif === false ? `${i.nom} (inactif)` : i.nom })),
                   ]}
                 />
+                {isAdmin && (
+                  <div style={{ marginTop: 10 }}>
+                    <FloatSelect
+                      label="Partenaire du dossier"
+                      value={(detail as any).partenaire_organisation_id || ''}
+                      onChange={v => void changerPartenaireDossier(v)}
+                      options={[{ value: '', label: 'Aucun partenaire' }, ...orgsPartenaires.map(o => ({ value: o.id, label: o.nom }))]}
+                    />
+                    <div className="text-xs text-muted" style={{ marginTop: 4 }}>
+                      Le partenaire ne voit que les dossiers qui lui sont confiés (et leurs devis, documents et SAV), pas ceux des autres installateurs.
+                    </div>
+                  </div>
+                )}
                 <div className="text-xs text-muted" style={{ marginTop: 4 }}>
                   Repris du devis signé à la création du dossier. C’est à lui qu’est adressée la facture partenaire quand le destinataire est « Installateur associé au dossier ».
                 </div>
