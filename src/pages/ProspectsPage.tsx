@@ -13,6 +13,7 @@ import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
 import { AddressAutocomplete } from '../components/shared/AddressAutocomplete'
 import { determinerCategorieRevenu, estIleDeFrance } from '../lib/moteurAides'
+import { AttestationDemande, ATTESTATION_VIDE, MODES_DEMANDE, doitAttester, erreurAttestation, type ValeurAttestation } from '../components/crm/AttestationDemande'
 import { PipelineBoard } from '../components/crm/PipelineBoard'
 import { Timeline } from '../components/crm/Timeline'
 import { TasksPanel } from '../components/crm/TasksPanel'
@@ -181,6 +182,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [potCommunOnly, setPotCommunOnly] = useState(false)
   // Filtre « Partagé avec » : partenaires (organisations) à qui des prospects ont été partagés.
   const [partageFilter, setPartageFilter] = useState('')
+  const [attestationLead, setAttestationLead] = useState<ValeurAttestation>(ATTESTATION_VIDE)
   // Dossiers (prospect → installateur / partenaire) pour filtrer le Pipeline par « Confié à ».
   const [dossiersConfies, setDossiersConfies] = useState<{ prospect_id: string; installateur_id: string | null; partenaire_organisation_id: string | null }[]>([])
   const [partenairesPartage, setPartenairesPartage] = useState<{ id: string; nom: string }[]>([])
@@ -558,6 +560,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
   function openWizard() {
     setForm({ ...EMPTY_FORM })
+    setAttestationLead(ATTESTATION_VIDE)
     setWizardStep(1)
     setWizardOpen(true)
   }
@@ -594,6 +597,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
 
   async function saveProspect() {
     if (form.type_prospect === 'professionnel' ? !form.raison_sociale : !(form.nom && form.prenom)) return
+    if (doitAttester(profile?.role)) {
+      const errAttest = erreurAttestation(attestationLead)
+      if (errAttest) { alert(errAttest); return }
+    }
     setSaving(true)
 
     // Relire l'identité et l'organisation depuis Supabase juste avant l'insertion :
@@ -653,6 +660,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       commercial: creatorProfile.nom_complet || null,
       commercial_id: authResult.user.id,
       organisation_id: creatorProfile.organisation_id,
+      ...(doitAttester(creatorProfile.role) ? { attestation_demande: true, demande_date: attestationLead.date, demande_mode: attestationLead.mode } : {}),
     }
     const { data: nouveauProspect, error: insertError } = await supabase.from('prospects').insert(payload).select('id').single()
     setSaving(false)
@@ -1228,6 +1236,15 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                           )}
                         </div>
                       ))}
+                    </div>
+                  </div>
+                )}
+                {(selected as any).attestation_demande && (
+                  <div className="right-mini-card" style={{ margin: '12px 0', padding: 12, border: '1px solid var(--border, #d9e2e0)', borderRadius: 10, fontSize: 13 }}>
+                    <strong>Attestation de demande</strong>
+                    <div className="text-muted" style={{ marginTop: 4, lineHeight: 1.5 }}>
+                      Demande du {(selected as any).demande_date ? new Date((selected as any).demande_date).toLocaleDateString('fr-FR') : '—'} · {MODES_DEMANDE.find(m => m.value === (selected as any).demande_mode)?.label || '—'}
+                      <br />Attestée par le partenaire le {(selected as any).attestation_demande_le ? new Date((selected as any).attestation_demande_le).toLocaleDateString('fr-FR') : '—'}.
                     </div>
                   </div>
                 )}
@@ -1867,6 +1884,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
                 placeholder="Notes sur le besoin du prospect…"
               />
             </div>
+            {doitAttester(profile?.role) && <AttestationDemande value={attestationLead} onChange={setAttestationLead} />}
           </>
         )}
       </Modal>

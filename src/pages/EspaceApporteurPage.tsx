@@ -1,3 +1,4 @@
+import { AttestationDemande, ATTESTATION_VIDE, erreurAttestation, type ValeurAttestation } from '../components/crm/AttestationDemande'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Check, CheckCircle2, FileText, ChevronRight, Clock3, Gift, Loader2, Plus, RefreshCw, Send, Share2, Trophy, UserPlus, Wallet, X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
@@ -44,7 +45,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
   const [raisonSociale, setRaisonSociale] = useState('')
   const [pieces, setPieces] = useState<Record<string, File[]>>({})
   const [rappel, setRappel] = useState('')
-  const [accord, setAccord] = useState(false)
+  const [attest, setAttest] = useState<ValeurAttestation>(ATTESTATION_VIDE)
   const [envoi, setEnvoi] = useState(false)
   const [erreur, setErreur] = useState('')
   const [succes, setSucces] = useState('')
@@ -75,7 +76,8 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
     e.preventDefault()
     setErreur('')
     if (typeClient === 'professionnel' && !raisonSociale.trim()) { setErreur('Indiquez le nom de l’entreprise.'); return }
-    if (!accord) { setErreur('Confirmez que le client est d’accord pour être contacté.'); return }
+    const errAttest = erreurAttestation(attest)
+    if (errAttest) { setErreur(errAttest); return }
     setEnvoi(true)
     const rfrNum = parseFloat(foyer.rfr) || 0
     const categorie = complet && rfrNum > 0 ? determinerCategorieRevenu(rfrNum, foyer.nombre_personnes_foyer, estIleDeFrance(champs.code_postal)).categorie : null
@@ -87,10 +89,12 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
           code_postal: champs.code_postal, ville: champs.ville, besoins: projets, commentaire: champs.commentaire, rappel,
           statut_occupation: occupation, nombre_personnes_foyer: foyer.nombre_personnes_foyer, rfr: rfrNum > 0 ? rfrNum : null,
           avis_imposition: foyer.avis_imposition, categorie_mpr: categorie, fiches_cee: typeClient === 'particulier' ? [...new Set(projets.map(p => FICHE_PAR_PROJET[p]).filter(Boolean))] : [],
+          attestation: true, demande_date: attest.date, demande_mode: attest.mode,
         } })
       : await supabase.rpc('recommander_client', {
           p_prenom: champs.prenom, p_nom: champs.nom, p_telephone: champs.telephone, p_email: champs.email, p_adresse: champs.adresse,
           p_code_postal: champs.code_postal, p_ville: champs.ville, p_besoins: projets, p_commentaire: champs.commentaire, p_rappel: rappel,
+          p_demande_date: attest.date, p_demande_mode: attest.mode, p_attestation: true,
         })
     if (error) { setEnvoi(false); setErreur(error.message || 'Envoi impossible, réessayez.'); return }
     // Pièces jointes à la création : déposées sur le prospect qui vient d'être créé.
@@ -106,7 +110,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
     setEnvoi(false)
     setSucces(`Merci ! ${champs.prenom || champs.nom} sera rappelé(e) rapidement. Vous suivez l’avancement ci-dessous.${echecs.length ? ` Attention : ${echecs.length} document(s) n’ont pas pu être envoyés (${echecs.join(', ')}) : ouvrez la fiche pour les ajouter.` : ''}`)
     setPieces({}); setTypeClient('particulier'); setRaisonSociale('')
-    setChamps(VIDE); setProjets([]); setRappel(''); setAccord(false); setFormulaire(false)
+    setChamps(VIDE); setProjets([]); setRappel(''); setAttest(ATTESTATION_VIDE); setFormulaire(false)
     setComplet(false); setOccupation('propriétaire_occupant'); setFoyer({ rfr: '', nombre_personnes_foyer: 1, avis_imposition: [] })
     void charger()
   }
@@ -221,7 +225,7 @@ export function EspaceApporteurPage({ onNavigate, onOuvrirProspect }: { onNaviga
                 </div>
               )}
             </div>
-            <label className="eap-accord"><input type="checkbox" checked={accord} onChange={e => setAccord(e.target.checked)} /><span>Le client est d’accord pour être contacté au sujet de son projet.</span></label>
+            <AttestationDemande value={attest} onChange={setAttest} />
             {erreur && <div className="eap-erreur" role="alert">{erreur}</div>}
             <button type="submit" className="eap-cta plein" disabled={envoi}>{envoi ? <Loader2 size={18} className="spin" /> : <Send size={18} />} Envoyer la recommandation</button>
           </form>
