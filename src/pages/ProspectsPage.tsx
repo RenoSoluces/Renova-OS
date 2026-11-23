@@ -181,6 +181,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [potCommunOnly, setPotCommunOnly] = useState(false)
   // Filtre « Partagé avec » : partenaires (organisations) à qui des prospects ont été partagés.
   const [partageFilter, setPartageFilter] = useState('')
+  // Dossiers (prospect → installateur / partenaire) pour filtrer le Pipeline par « Confié à ».
+  const [dossiersConfies, setDossiersConfies] = useState<{ prospect_id: string; installateur_id: string | null; partenaire_organisation_id: string | null }[]>([])
   const [partenairesPartage, setPartenairesPartage] = useState<{ id: string; nom: string }[]>([])
   const [partagesParProspect, setPartagesParProspect] = useState<Record<string, string[]>>({})
   const [rapide, setRapide] = useState<'' | '30j' | '90j' | 'chauds' | 'sans' | 'apporteurs'>('')
@@ -472,6 +474,29 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       })
       .catch(() => undefined)
   }, [isAdmin])
+
+  useEffect(() => {
+    if (!isAdmin) return
+    lireTout(() => supabase.from('dossiers').select('prospect_id, installateur_id, partenaire_organisation_id'))
+      .then(({ data }) => setDossiersConfies((data || []) as any))
+      .catch(() => undefined)
+  }, [isAdmin])
+
+  const confiesParProspect = useMemo(() => {
+    const m: Record<string, string[]> = {}
+    const ajouter = (id: string, cle: string) => { const l = (m[id] ||= []); if (!l.includes(cle)) l.push(cle) }
+    for (const d of dossiersConfies) {
+      if (d.installateur_id) ajouter(d.prospect_id, `inst:${d.installateur_id}`)
+      if (d.partenaire_organisation_id) ajouter(d.prospect_id, `org:${d.partenaire_organisation_id}`)
+    }
+    for (const p of prospects) if ((p as any).installateur_id) ajouter(p.id, `inst:${(p as any).installateur_id}`)
+    return m
+  }, [dossiersConfies, prospects])
+
+  const optionsConfie = useMemo(() => isAdmin ? [
+    ...installateurs.map(i => ({ value: `inst:${i.id}`, label: i.nom, groupe: 'Installateurs' as const })),
+    ...partenairesPartage.map(o => ({ value: `org:${o.id}`, label: o.nom, groupe: 'Partenaires' as const })),
+  ] : [], [isAdmin, installateurs, partenairesPartage])
 
   const filtered = useMemo(() => {
     return prospects.filter(p => {
@@ -1506,6 +1531,8 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
             tasksByProspect={tasksByProspect}
             onOpen={p => setSelected(p)}
             onStageChange={updateStage}
+            confiesParProspect={confiesParProspect}
+            optionsConfie={optionsConfie}
           />
         )}
 

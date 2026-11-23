@@ -10,6 +10,9 @@ interface Props {
   tasksByProspect: Record<string, CrmTask[]>
   onOpen: (p: Prospect) => void
   onStageChange: (prospectId: string, newStatut: string) => void
+  /** Installateurs / partenaires auxquels chaque client a été confié (clés « inst:<id> » ou « org:<id> »). */
+  confiesParProspect?: Record<string, string[]>
+  optionsConfie?: { value: string; label: string; groupe: 'Installateurs' | 'Partenaires' }[]
 }
 
 function initials(prenom: string, nom: string) {
@@ -19,13 +22,14 @@ function initials(prenom: string, nom: string) {
 const TEMP_ICON: Record<string, any> = { chaud: Flame, froid: Snowflake, tiede: Minus }
 const TEMP_LABEL: Record<string, string> = { chaud: 'Lead chaud', froid: 'Lead froid', tiede: 'Lead tiède' }
 
-export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChange }: Props) {
+export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChange, confiesParProspect = {}, optionsConfie = [] }: Props) {
   const [dragId, setDragId] = useState<string | null>(null)
   const [overStage, setOverStage] = useState<string | null>(null)
   const [paidCommissionProspectIds, setPaidCommissionProspectIds] = useState<Set<string>>(new Set())
   const [search, setSearch] = useState('')
   const [temperatureFilter, setTemperatureFilter] = useState('tous')
   const [urgentOnly, setUrgentOnly] = useState(false)
+  const [confieFilter, setConfieFilter] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -123,6 +127,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
         if (!haystack.includes(q)) return false
       }
       if (temperatureFilter !== 'tous' && (p.temperature || 'tiede') !== temperatureFilter) return false
+      if (confieFilter === '__aucun__' ? (confiesParProspect[p.id] || []).length > 0 : confieFilter && !(confiesParProspect[p.id] || []).includes(confieFilter)) return false
       if (urgentOnly) {
         const tasks = (tasksByProspect[p.id] || []).filter(t => !t.done)
         const hasLateTask = tasks.some(isOverdue)
@@ -134,7 +139,7 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
       }
       return true
     })
-  }, [prospects, tasksByProspect, search, temperatureFilter, urgentOnly])
+  }, [prospects, tasksByProspect, search, temperatureFilter, urgentOnly, confieFilter, confiesParProspect])
 
   const columns = useMemo(() => {
     return PIPELINE_STAGES.map(stage => {
@@ -202,13 +207,27 @@ export function PipelineBoard({ prospects, tasksByProspect, onOpen, onStageChang
             <option value="froid">Froids</option>
           </select>
         </label>
+        {optionsConfie.length > 0 && (
+          <label className="pl-filter">
+            <SlidersHorizontal size={16} aria-hidden="true" />
+            <span>Confié à</span>
+            <select value={confieFilter} onChange={e => setConfieFilter(e.target.value)} aria-label="Filtrer par installateur ou partenaire">
+              <option value="">Tous</option>
+              <option value="__aucun__">Aucun installateur ni partenaire</option>
+              {(['Installateurs', 'Partenaires'] as const).map(g => {
+                const opts = optionsConfie.filter(o => o.groupe === g)
+                return opts.length ? <optgroup key={g} label={g}>{opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}</optgroup> : null
+              })}
+            </select>
+          </label>
+        )}
         <label className={`pl-urgent-toggle ${urgentOnly ? 'is-active' : ''}`}>
           <input type="checkbox" checked={urgentOnly} onChange={e => setUrgentOnly(e.target.checked)} />
           <AlertCircle size={15} />
           <span>Prioritaires</span>
         </label>
-        {(search || temperatureFilter !== 'tous' || urgentOnly) && (
-          <button type="button" className="pl-reset" onClick={() => { setSearch(''); setTemperatureFilter('tous'); setUrgentOnly(false) }}>
+        {(search || temperatureFilter !== 'tous' || urgentOnly || confieFilter) && (
+          <button type="button" className="pl-reset" onClick={() => { setSearch(''); setTemperatureFilter('tous'); setUrgentOnly(false); setConfieFilter('') }}>
             Réinitialiser
           </button>
         )}
