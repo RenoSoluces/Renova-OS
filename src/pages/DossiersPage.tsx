@@ -101,16 +101,11 @@ export function DossiersPage({
   const canViewCompanyCommission = isAdmin || ['super_admin', 'partner_admin', 'company_admin'].includes(profile?.role || '')
 
   const [rows, setRows] = useState<DossierAvecRelations[]>([])
-  const [vue, setVue] = useState<'liste' | 'pipeline'>(() => {
-    try { return localStorage.getItem('renova.dossiers.vue') === 'liste' ? 'liste' : 'pipeline' } catch { return 'pipeline' }
-  })
+  // Le Pipeline se trouve désormais dans la page Pipeline (par client) : les dossiers n'ont plus que la liste.
+  const vue = 'liste' as 'liste' | 'pipeline'
   const [dragId, setDragId] = useState<string | null>(null)
   const [overCol, setOverCol] = useState<string | null>(null)
   const [messagePipeline, setMessagePipeline] = useState('')
-  const changerVue = (v: 'liste' | 'pipeline') => {
-    setVue(v)
-    try { localStorage.setItem('renova.dossiers.vue', v) } catch { /* stockage indisponible */ }
-  }
   const [prospects, setProspects] = useState<Prospect[]>([])
   const [loading, setLoading] = useState(true)
 
@@ -1234,10 +1229,6 @@ export function DossiersPage({
         </div>
 
         <div className="page-actions">
-          <div className="vue-switch" role="group" aria-label="Affichage des dossiers">
-            <button type="button" className={vue === 'liste' ? 'on' : ''} onClick={() => changerVue('liste')}>Liste</button>
-            <button type="button" className={vue === 'pipeline' ? 'on' : ''} onClick={() => changerVue('pipeline')}>Pipeline</button>
-          </div>
           {isAdmin && <Button variant="ghost" onClick={() => setImportAnahOpen(true)}>Mettre à jour depuis l'Anah{nbActionAnah > 0 ? ` (${nbActionAnah} à traiter)` : ''}</Button>}
           <Button
             variant="primary"
@@ -1369,7 +1360,7 @@ export function DossiersPage({
             <strong>Commission reçue</strong>
             <p>Dès que la commission est encaissée et les factures payées, le dossier quitte le pipeline et passe en archives (« Soldés »).</p>
           </div>
-          <button type="button" className="btn btn-outline btn-sm" onClick={() => { setAffichage('termines'); changerVue('liste') }}>
+          <button type="button" className="btn btn-outline btn-sm" onClick={() => { setAffichage('termines') }}>
             {nbSoldes} dossier{nbSoldes > 1 ? 's' : ''} soldé{nbSoldes > 1 ? 's' : ''} · Voir les archives
           </button>
         </section>
