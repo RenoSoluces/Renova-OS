@@ -179,6 +179,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
   const [tagFilter, setTagFilter] = useState('')
   const [commercialFilter, setCommercialFilter] = useState('')
   const [potCommunOnly, setPotCommunOnly] = useState(false)
+  // Filtre « Partagé avec » : partenaires (organisations) à qui des prospects ont été partagés.
+  const [partageFilter, setPartageFilter] = useState('')
+  const [partenairesPartage, setPartenairesPartage] = useState<{ id: string; nom: string }[]>([])
+  const [partagesParProspect, setPartagesParProspect] = useState<Record<string, string[]>>({})
   const [rapide, setRapide] = useState<'' | '30j' | '90j' | 'chauds' | 'sans' | 'apporteurs'>('')
   const [selected, setSelected] = useState<Prospect | null>(null)
   // Actions groupées (admin / manager) : prospects cochés dans la liste.
@@ -456,6 +460,19 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
     [prospects]
   )
 
+  useEffect(() => {
+    if (!isAdmin) return
+    supabase.from('organisations').select('id, nom').eq('type', 'partenaire').order('nom')
+      .then(({ data }) => setPartenairesPartage((data || []) as { id: string; nom: string }[]))
+    lireTout(() => supabase.from('prospect_shares').select('prospect_id, organisation_id'))
+      .then((data: any) => {
+        const m: Record<string, string[]> = {}
+        for (const x of (data || []) as { prospect_id: string; organisation_id: string }[]) (m[x.prospect_id] ||= []).push(x.organisation_id)
+        setPartagesParProspect(m)
+      })
+      .catch(() => undefined)
+  }, [isAdmin])
+
   const filtered = useMemo(() => {
     return prospects.filter(p => {
       const e = extended(p)
@@ -471,6 +488,7 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       const matchesSource = !sourceFilter || p.source === sourceFilter
       const matchesTag = !tagFilter || (p.tags || []).includes(tagFilter)
       const matchesCommercial = !commercialFilter || p.commercial_id === commercialFilter || (p as any).apporteur_user_id === commercialFilter
+      const matchesPartage = !partageFilter || (partagesParProspect[p.id] || []).includes(partageFilter)
       const matchesPool = !potCommunOnly || !!(p as any).pot_commun
       const age = (jours: number) => !!p.created_at && Date.now() - new Date(p.created_at).getTime() <= jours * 86400000
       const matchesRapide = !rapide ||
@@ -479,11 +497,11 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
         (rapide === 'chauds' && p.temperature === 'chaud') ||
         (rapide === 'sans' && !p.commercial_id) ||
         (rapide === 'apporteurs' && /apporteur/i.test(p.source || ''))
-      return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPool && matchesRapide
+      return matchesSearch && matchesStatut && matchesTemperature && matchesSource && matchesTag && matchesCommercial && matchesPartage && matchesPool && matchesRapide
     })
-  }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly, rapide])
+  }, [prospects, search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, partageFilter, partagesParProspect, potCommunOnly, rapide])
 
-  useEffect(() => { setNombreAffiche(PAS_AFFICHAGE) }, [search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly, rapide])
+  useEffect(() => { setNombreAffiche(PAS_AFFICHAGE) }, [search, statutFilter, temperatureFilter, sourceFilter, tagFilter, commercialFilter, partageFilter, potCommunOnly, rapide])
   useEffect(() => {
     const cible = finListeRef.current
     if (!cible || typeof IntersectionObserver === 'undefined') return
@@ -507,10 +525,10 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
       retard: Object.values(tasksByProspect).flat().filter(t => isOverdue(t)).length,
     }
   }, [prospects, tasksByProspect])
-  const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter, potCommunOnly ? 'pot' : ''].filter(Boolean).length
+  const filtresActifsCount = [temperatureFilter, sourceFilter, tagFilter, commercialFilter, partageFilter, potCommunOnly ? 'pot' : ''].filter(Boolean).length
 
   function reinitialiserFiltres() {
-    setStatutFilter(''); setTemperatureFilter(''); setSourceFilter(''); setTagFilter(''); setCommercialFilter(''); setPotCommunOnly(false); setRapide('')
+    setStatutFilter(''); setTemperatureFilter(''); setSourceFilter(''); setTagFilter(''); setCommercialFilter(''); setPartageFilter(''); setPotCommunOnly(false); setRapide('')
   }
 
   function openWizard() {
@@ -1449,6 +1467,12 @@ export function ProspectsPage({ onProspectClick, onContinueLifecycle, initialVie
               >
                 <option value="">Tous les commerciaux</option>
                 {commerciaux.map(c => <option key={c.id} value={c.id}>{c.nom_complet || c.role}</option>)}
+              </select>
+            )}
+            {isAdmin && partenairesPartage.length > 0 && (
+              <select className="pro-filter-select" value={partageFilter} onChange={e => setPartageFilter(e.target.value)} aria-label="Prospects partagés avec un partenaire">
+                <option value="">Partagés avec : tous</option>
+                {partenairesPartage.map(o => <option key={o.id} value={o.id}>Partagés avec {o.nom}</option>)}
               </select>
             )}
             <button className={`btn btn-sm ${potCommunOnly ? 'btn-primary' : 'btn-outline'}`} onClick={() => setPotCommunOnly(v => !v)}>🟠 Pot commun</button>
