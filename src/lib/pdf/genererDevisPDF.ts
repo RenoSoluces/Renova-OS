@@ -1,5 +1,6 @@
 import jsPDF from "jspdf";
 import type { Devis, DevisLigne, DevisAide, Prospect, Entreprise } from "../../types";
+import { nomClientDevis, attentionClientDevis, siretClientDevis } from "../clientDevis";
 
 type RGB = readonly [number, number, number];
 const C = {
@@ -65,7 +66,7 @@ export function genererDevisPDF(
   const phone=devis.emetteur_telephone||entreprise?.telephone||"";
   const email=devis.emetteur_email||entreprise?.email||"";
   const rge=partner?"":(entreprise?.numero_rge||"");
-  const clientName=prospect?[`${prospect.civilite||""} ${prospect.prenom||""} ${prospect.nom||""}`].join("").replace(/\s+/g," ").trim():"—";
+  const clientName=prospect?(nomClientDevis(prospect)||"—"):"—";
   const clientAddr=prospect?.adresse_rue||prospect?.adresse||"";
   const clientCity=prospect?[`${prospect.code_postal||""} ${prospect.ville||""}`].join("").trim():"";
   const date=(v?:string|null)=>v?new Date(v).toLocaleDateString("fr-FR"):"—";
@@ -99,7 +100,7 @@ export function genererDevisPDF(
   label("Émetteur",M,y);label("Établi pour",xClient,y);drw(doc,C.trait);doc.line(M,y+2,M+colW,y+2);doc.line(xClient,y+2,PW-M,y+2);
   let ye=y+8,yc=y+8;doc.setFont("helvetica","bold");doc.setFontSize(10.5);txt(doc,C.ink);doc.text(safe(legalName),M,ye);ye+=5.2;doc.text(safe(clientName),xClient,yc);yc+=5.2;
   const issuer=[addr,cpCity,siret?`SIRET : ${siret}`:"",vat?`TVA intracommunautaire : ${vat}`:"",[phone,email].filter(Boolean).join(" · ")].filter(Boolean);
-  const customer=[clientAddr,clientCity,prospect?.telephone||"",prospect?.email||""].filter(Boolean);
+  const customer=[attentionClientDevis(prospect),clientAddr,clientCity,siretClientDevis(prospect),prospect?.telephone||"",prospect?.email||""].filter(Boolean);
   doc.setFont("helvetica","normal");doc.setFontSize(8.5);txt(doc,C.gris);
   for(const line of issuer)for(const part of doc.splitTextToSize(safe(line),colW) as string[]){doc.text(part,M,ye);ye+=4.2;}
   for(const line of customer)for(const part of doc.splitTextToSize(safe(line),colW) as string[]){doc.text(part,xClient,yc);yc+=4.2;}
