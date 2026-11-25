@@ -7,6 +7,7 @@ import { supabase } from '../lib/supabase'
 import { lireTout } from '../lib/lireTout'
 import { setProspectStatus } from '../lib/crm/workflow'
 import { logAuditEvent } from '../lib/auditLog'
+import { nomClientDevis, attentionClientDevis } from '../lib/clientDevis'
 import type { Devis, DevisLigne, DevisAide, Prospect, Produit, Entreprise, Installateur } from '../types'
 import { Modal } from '../components/ui/Modal'
 import { Button } from '../components/ui/Button'
@@ -835,7 +836,7 @@ export function DevisPage({
   const pointsConformite: PointConformite[] = useMemo(() => controlerDevis({
     lignes, produits, aides, meta: conf, totalTTC: totaux.montantTTC, categorieRevenus,
     societe: { siret: current?.emetteur_siret || entreprise?.siret },
-    client: { nom: current?.prospect ? `${current.prospect.prenom || ''} ${current.prospect.nom || ''}`.trim() : '', adresse: current?.prospect?.adresse_rue || (current?.prospect as any)?.adresse },
+    client: { nom: nomClientDevis(current?.prospect), adresse: current?.prospect?.adresse_rue || (current?.prospect as any)?.adresse },
     devis: { dateValidite: current?.date_validite, dateDevis: current?.created_at?.slice(0, 10), dateSignature: current?.signature_date },
   }), [lignes, produits, aides, conf, totaux.montantTTC, categorieRevenus, current, entreprise])
   const blocsConformite = pointsConformite.filter(x => x.gravite === 'bloc')
@@ -1162,7 +1163,7 @@ export function DevisPage({
   const termeListe = rechercheListe.trim().toLowerCase()
   const rowsListe = rows.filter(d =>
     (!filtreStatutListe || d.statut === filtreStatutListe) &&
-    (!termeListe || `${d.numero} ${d.prospect ? `${d.prospect.prenom} ${d.prospect.nom}` : ''}`.toLowerCase().includes(termeListe))
+    (!termeListe || `${d.numero} ${d.prospect ? `${d.prospect.prenom} ${d.prospect.nom} ${d.prospect.raison_sociale || ''}` : ''}`.toLowerCase().includes(termeListe))
   )
 
   if (view === 'list') {
@@ -1228,7 +1229,7 @@ export function DevisPage({
                       {d.numero}
                       {d.devis_parent_id && <span className="badge badge-neutral" style={{ marginLeft: 8, fontSize: 10 }}>Avenant</span>}
                     </td>
-                    <td>{d.prospect ? `${d.prospect.prenom} ${d.prospect.nom}` : '—'}</td>
+                    <td>{d.prospect ? nomClientDevis(d.prospect) : '—'}</td>
                     <td><span className={`badge ${STATUT_BADGE[d.statut] || 'badge-neutral'}`}>{d.statut}</span></td>
                     <td>{euro(d.montant_ttc)}</td>
                     <td>{euro(d.montant_aides)}</td>
@@ -1286,7 +1287,7 @@ export function DevisPage({
           <div>
             <h1 className="page-title">{current?.numero}</h1>
             <p className="page-subtitle">
-              {p ? `${p.prenom} ${p.nom} · ${p.adresse_rue || p.adresse || ''} ${p.code_postal || ''} ${p.ville || ''}` : ''}
+              {p ? `${nomClientDevis(p)} · ${p.adresse_rue || p.adresse || ''} ${p.code_postal || ''} ${p.ville || ''}` : ''}
             </p>
           </div>
         </div>
@@ -1382,7 +1383,7 @@ export function DevisPage({
           <section className="panel">
             <h2 className="rv-h">Client</h2>
             <div className="grid g2">
-              <label className="lab">Nom du client<input readOnly value={p ? `${p.civilite || ''} ${p.prenom || ''} ${p.nom || ''}`.trim() : ''} /></label>
+              <label className="lab">Nom du client<input readOnly value={p ? nomClientDevis(p) : ''} /></label>
               <label className="lab">Téléphone<input readOnly value={p?.telephone || ''} /></label>
               <label className="lab">Adresse du client<input readOnly value={[p?.adresse_rue || p?.adresse, p?.code_postal, p?.ville].filter(Boolean).join(' ')} /></label>
               <label className="lab">E-mail<input readOnly value={p?.email || ''} /></label>
@@ -1618,7 +1619,7 @@ export function DevisPage({
               </div>
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-              <div><b>Client</b><br />{p ? `${p.prenom || ''} ${p.nom || ''}`.trim() : 'Client à renseigner'}<br />{p?.adresse_rue || p?.adresse || ''}<br />{[p?.code_postal, p?.ville].filter(Boolean).join(' ')}<br />{p?.telephone || ''}{p?.email ? ` · ${p.email}` : ''}</div>
+              <div><b>Client</b><br />{p ? nomClientDevis(p) : 'Client à renseigner'}<br />{p && attentionClientDevis(p) ? <>{attentionClientDevis(p)}<br /></> : null}{p?.adresse_rue || p?.adresse || ''}<br />{[p?.code_postal, p?.ville].filter(Boolean).join(' ')}<br />{p?.telephone || ''}{p?.email ? ` · ${p.email}` : ''}</div>
               <div style={{ textAlign: 'right' }}><b>Chantier</b><br />{p?.adresse_rue || p?.adresse || 'Adresse à renseigner'}<br />{conf.logement.type}{conf.logement.annee ? `, construit en ${conf.logement.annee}` : ''}{conf.logement.zone ? `, zone ${conf.logement.zone}` : ''}</div>
             </div>
             <table><thead><tr><th>Désignation</th><th className="r">Qté</th><th className="r">PU HT</th><th className="r">TVA</th><th className="r">Total HT</th></tr></thead><tbody>
@@ -1688,7 +1689,7 @@ export function DevisPage({
         open={showSignatureModal}
         onClose={() => { if (!signing) setShowSignatureModal(false) }}
         numero={current?.numero || ''}
-        client={p ? `${p.prenom || ''} ${p.nom || ''}`.trim() : ''}
+        client={p ? nomClientDevis(p) : ''}
         emailClient={p?.email || null}
         lignes={lignesAvecCategorie.map(l => ({ designation: l.designation, quantite: Number(l.quantite) || 0, montant_ht: Number(l.montant_ht) || 0 }))}
         totalHT={totaux.montantHT}
